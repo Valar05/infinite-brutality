@@ -16,7 +16,7 @@ http://127.0.0.1:8798/infinite-brutality/index.html
 
 ## Current Build
 
-Build `0.8.21` uses the Mixamo-rigged `Standing Idle (4).fbx` orc as the visible enemy, with automatic runtime scale fitting and its embedded idle animation.
+Build `0.8.22` grounds the Mixamo-rigged standing idle orc after automatic runtime scale fitting.
 
 ## Validation
 

@@ -1,6 +1,6 @@
 # Infinite Brutality Room Batch Implementation
 
-Build: `0.8.21`
+Build: `0.8.22`
 
 The 48-room junction batch is now wired into runtime as a generated playable sequence.
 
@@ -147,3 +147,8 @@ The mutant FBX files remain in the project as possible future animation sources,
 Build `0.8.21` uses `/storage/emulated/0/Download/Standing Idle (4).fbx` as the active enemy model. This FBX contains geometry, `mixamorig` skeleton bones, skin deformers, bind pose, and an embedded idle animation, so it replaces the previous animation-only mutant import and the static Meshy texture FBX as the visible enemy source.
 
 The runtime loads `assets/models/orc_berserker/standing_idle.fbx`, normalizes it to a target enemy height using its bounding box, registers the embedded idle clip if present, and hides the primitive fallback only after this rigged orc loads successfully.
+
+
+## Build 0.8.22 Orc Foot Grounding
+
+Build `0.8.22` keeps the standing-idle orc scale and facing from `0.8.21`, but applies a small local Y offset after bounding-box normalization so the visible feet sit on the runway instead of hovering above it.

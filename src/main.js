@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.21';
+const BUILD = '0.8.22';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -1441,6 +1441,7 @@ const MUTANT_ORC_CLIPS = {
 };
 const ORC_BERSERKER_MODEL = 'assets/models/orc_berserker/standing_idle.fbx';
 const ORC_BERSERKER_TARGET_HEIGHT = 2.35;
+const ORC_BERSERKER_GROUND_OFFSET = -0.48;
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -2761,7 +2762,9 @@ function configureOrcBerserkerModel(model) {
       mat.needsUpdate = true;
     }
   });
-  return normalizeEnemyModelToHeight(model, ORC_BERSERKER_TARGET_HEIGHT);
+  const scale = normalizeEnemyModelToHeight(model, ORC_BERSERKER_TARGET_HEIGHT);
+  model.position.y += ORC_BERSERKER_GROUND_OFFSET;
+  return scale;
 }
 
 function loadOrcBerserkerEnemy() {

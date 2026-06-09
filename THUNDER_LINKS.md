@@ -16,7 +16,7 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 ## Local Runtime
 
 - Play URL: `http://127.0.0.1:8798/infinite-brutality/index.html`
-- Current documented build: `0.8.21`
+- Current documented build: `0.8.22`
 - Entry: `index.html`
 - Runtime: `src/main.js`
 - Styles: `src/styles.css`
