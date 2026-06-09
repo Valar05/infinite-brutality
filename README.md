@@ -16,7 +16,7 @@ http://127.0.0.1:8798/infinite-brutality/index.html
 
 ## Current Build
 
-Build `0.8.22` grounds the Mixamo-rigged standing idle orc after automatic runtime scale fitting.
+Build `0.8.30` adds an explicit room-traversal graph for the district spine so enemy pursuit and room-to-room movement follow authored sockets and route kinds instead of trying to infer the level from collision alone. It keeps the seeded elevation bands, 3D macro spine, vector material pass, and descent silhouette fix.
 
 ## Validation
 

@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.22';
+const BUILD = '0.8.30';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -138,6 +138,9 @@ const roomState = {
   spawn: new THREE.Vector3(0, PLAYER_EYE_HEIGHT, -8.4),
   transitionLock: 0,
   enemyPositions: [],
+  districtPlan: null,
+  gauntletRooms: [],
+  navGraph: null,
 };
 
 const input = {
@@ -378,6 +381,18 @@ function applyGeneratedSurfaceTextures() {
   });
   loadWrappedTexture('../assets/textures/ib-vector-bone-20260608.svg', 1, 1, (texture) => {
     applyTextureToMaterials(texture, [MAT.bone, MAT.bonePlain], 0xd4c39f);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-iron-20260609.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.iron], 0xc7d0d6);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-blood-20260609.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.blood, MAT.bloodDark], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-flesh-20260609.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.flesh], 0xe3c3ae);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-hazard-20260609.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.hazard, MAT.orange], 0xffffff);
   });
 }
 
@@ -1119,11 +1134,39 @@ function updateDiegeticLights(time) {
 
 function positionEnemy(position) {
   if (!enemy) return;
+  const nav = getEnemyNavState();
   enemy.visible = true;
   enemy.userData.health = 3;
   enemy.userData.hitTimer = 0;
   enemy.userData.dead = false;
   enemy.userData.deathTimer = 0;
+  enemy.userData.baseY = position.y;
+  enemy.userData.attackTimer = 0;
+  enemy.userData.attackElapsed = 0;
+  enemy.userData.attackCooldown = 0.75;
+  enemy.userData.attackHitDone = false;
+  enemy.userData.attackName = '';
+  enemy.userData.mode = 'approach';
+  enemy.userData.modeTimer = 0;
+  enemy.userData.commitTimer = ENEMY_COMMIT_INTERVAL * 0.55;
+  enemy.userData.commitElapsed = 0;
+  enemy.userData.orbitSign = enemy.userData.orbitSign || 1;
+  enemy.userData.pursuitStall = 0;
+  if (nav) {
+    nav.goal = null;
+    nav.waypoints.length = 0;
+    nav.waypointKinds.length = 0;
+    nav.routePath.length = 0;
+    nav.routeGraph = null;
+    nav.mode = 'approach';
+    nav.repathTimer = 0;
+    nav.stallCount = 0;
+    nav.lastSeenPlayer = null;
+    nav.lastValidSupport = position.clone();
+    nav.jump = null;
+    nav.lastEnemyRoomIndex = -1;
+    nav.lastPlayerRoomIndex = -1;
+  }
   enemy.position.copy(position);
   enemy.scale.setScalar(1);
   playEnemyAction('idle', 0.08);
@@ -1440,8 +1483,46 @@ const MUTANT_ORC_CLIPS = {
   dying: 'assets/models/mutant_orc/mutant_dying.fbx',
 };
 const ORC_BERSERKER_MODEL = 'assets/models/orc_berserker/standing_idle.fbx';
-const ORC_BERSERKER_TARGET_HEIGHT = 2.35;
-const ORC_BERSERKER_GROUND_OFFSET = -0.48;
+const ORC_BERSERKER_TARGET_HEIGHT = 1.7;
+const ORC_BERSERKER_GROUND_OFFSET = -0.32;
+const PRO_MELEE_AXE_CLIPS = {
+  idle: 'assets/models/pro_melee_axe/standing_idle.fbx',
+  walk: 'assets/models/pro_melee_axe/standing_walk_forward.fbx',
+  sidestepLeft: 'assets/models/pro_melee_axe/standing_walk_left.fbx',
+  sidestepRight: 'assets/models/pro_melee_axe/standing_walk_right.fbx',
+  run: 'assets/models/pro_melee_axe/standing_run_forward.fbx',
+  jumping: 'assets/models/pro_melee_axe/standing_jump.fbx',
+  attackHorizontal: 'assets/models/pro_melee_axe/standing_melee_attack_horizontal_smooth.poseclip.json',
+  attackDownward: 'assets/models/pro_melee_axe/standing_melee_attack_downward.fbx',
+  attackCombo: 'assets/models/pro_melee_axe/standing_melee_combo_attack_v1.fbx',
+  react: 'assets/models/pro_melee_axe/standing_react_large_gut.fbx',
+};
+const ENEMY_RING_RADIUS = 4.0;
+const ENEMY_RING_TOLERANCE = 0.45;
+const ENEMY_ATTACK_RANGE = 2.45;
+const ENEMY_ATTACK_WINDUP = 0.24;
+const ENEMY_ATTACK_ACTIVE_END = 0.46;
+const ENEMY_ATTACK_RECOVERY = 0.78;
+const ENEMY_ATTACK_COOLDOWN = 1.15;
+const ENEMY_COMMIT_INTERVAL = 1.25;
+const ENEMY_COMMIT_TIMEOUT = 1.3;
+const ENEMY_RETREAT_DURATION = 0.72;
+const ENEMY_WALK_SPEED = 2.0;
+const ENEMY_RUN_SPEED = 3.35;
+const ENEMY_SIDESTEP_SPEED = 1.05;
+const ENEMY_RETREAT_SPEED = 2.25;
+const ENEMY_LUNGE_SPEED = 2.9;
+const ENEMY_FLOOR_RADIUS = 0.36;
+const ENEMY_SOLID_RADIUS = 0.44;
+// Match the player's snap range so the enemy can clear the same tiny seams and ledges.
+const ENEMY_STEP_UP = SUPPORT_SNAP_UP;
+const ENEMY_STEP_DOWN = SUPPORT_SNAP_DOWN;
+const ENEMY_FLOOR_SAMPLE_STEP = 0.68;
+const ENEMY_NAV_REPATH_INTERVAL = 0.18;
+const ENEMY_NAV_STALL_LIMIT = 12;
+const ENEMY_JUMP_MIN_DISTANCE = 0.42;
+const ENEMY_JUMP_MAX_DISTANCE = 8.8;
+const ENEMY_JUMP_MAX_HEIGHT = 2.2;
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -1913,6 +1994,42 @@ function addWalkableTopBox(parent, name, sizeXZ, center, topY, mat, height = 0.4
   return addWalkableBox(parent, name, [sizeXZ[0], height, sizeXZ[1]], [center.x, topY - height * 0.5, center.z], mat, true, margin);
 }
 
+function addBrokenRouteRails(parent, name, a, b, topY, walkWidth = 4.2) {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const length = Math.hypot(dx, dz);
+  if (length < 3.4) return;
+  const alongX = Math.abs(dx) >= Math.abs(dz);
+  const seed = hashRoomKey(name + ':' + Math.round(topY * 10));
+  const rng = rngFromSeed(seed);
+  const sideBias = rng() < 0.68 ? [1] : [1, -1];
+  const railOffset = Math.max(1.55, walkWidth * 0.5 + 0.14);
+  const railTop = topY + 0.54;
+  const railHeight = 0.34;
+  const railThickness = 0.16;
+  const segments = length > 8.2 ? [[0.06, 0.28], [0.40, 0.61], [0.73, 0.94]] : [[0.08, 0.34], [0.60, 0.92]];
+  for (const side of sideBias) {
+    if (rng() < 0.22 && side < 0) continue;
+    const sideOffset = side * railOffset;
+    for (let i = 0; i < segments.length; i += 1) {
+      if (rng() < 0.18 && i === 1) continue;
+      const [t0, t1] = segments[i];
+      const startT = t0 + (rng() * 0.04);
+      const endT = t1 - (rng() * 0.04);
+      const segLen = Math.max(0.9, length * (endT - startT));
+      const midT = (startT + endT) * 0.5;
+      const cx = a.x + dx * midT;
+      const cz = a.z + dz * midT;
+      const pos = alongX
+        ? [cx, railTop - railHeight * 0.5, cz + sideOffset]
+        : [cx + sideOffset, railTop - railHeight * 0.5, cz];
+      const size = alongX ? [segLen, railHeight, railThickness] : [railThickness, railHeight, segLen];
+      addBeveledBox(parent, name + '-rail-' + (side > 0 ? 'outer' : 'inner') + '-' + i, size, pos, MAT.trim, false, 0.02, 1);
+      registerSolid(size, pos, 0.01);
+    }
+  }
+}
+
 function addBatchRouteSegment(parent, name, a, b, topY, width = 3.4, mat = MAT.bridge, trim = 0.95) {
   const dx = b.x - a.x;
   const dz = b.z - a.z;
@@ -1928,12 +2045,15 @@ function addBatchRouteSegment(parent, name, a, b, topY, width = 3.4, mat = MAT.b
   const lenX = Math.abs(endX - startX);
   const lenZ = Math.abs(endZ - startZ);
   if (lenX < 0.28 && lenZ < 0.28) return null;
+  const routeWidth = Math.max(width * 1.5, 4.2);
   if (lenX >= lenZ) {
     const center = makeVec((startX + endX) * 0.5, topY, (startZ + endZ) * 0.5);
-    return addWalkableTopBox(parent, name, [Math.max(0.4, lenX + 0.64), width], center, topY, mat, 0.42, 0.045);
+    addBrokenRouteRails(parent, name, a, b, topY, routeWidth);
+    return addWalkableTopBox(parent, name, [Math.max(0.4, lenX + 0.64), routeWidth], center, topY, mat, 0.42, 0.045);
   }
   const center = makeVec((startX + endX) * 0.5, topY, (startZ + endZ) * 0.5);
-  return addWalkableTopBox(parent, name, [width, Math.max(0.4, lenZ + 0.64)], center, topY, mat, 0.42, 0.045);
+  addBrokenRouteRails(parent, name, a, b, topY, routeWidth);
+  return addWalkableTopBox(parent, name, [routeWidth, Math.max(0.4, lenZ + 0.64)], center, topY, mat, 0.42, 0.045);
 }
 
 function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.platform) {
@@ -1946,7 +2066,7 @@ function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.plat
   const ux = dx / horizontalLength;
   const uz = dz / horizontalLength;
   const treadLength = Math.max(1.55, horizontalLength / steps * 0.98);
-  const stairWidth = 3.55;
+  const stairWidth = 4.9;
   for (let i = 0; i < steps; i += 1) {
     const t = (i + 0.5) / steps;
     const x = a.x + dx * t;
@@ -1959,13 +2079,15 @@ function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.plat
       const prevY = startTop + (endTop - startTop) * (i / steps) + (i - 1) * 0.008;
       const riserY = (prevY + topY) * 0.5 - 0.08;
       const riserH = Math.max(0.18, Math.abs(topY - prevY) + 0.14);
-      const riserX = a.x + dx * ((prevT + t) * 0.5);
-      const riserZ = a.z + dz * ((prevT + t) * 0.5);
+      const riserX = a.x + dx * prevT;
+      const riserZ = a.z + dz * prevT;
       const riserSize = alongX ? [0.24, riserH, stairWidth] : [stairWidth, riserH, 0.24];
-      addBeveledBox(parent, prefix + '-riser-' + i, riserSize, [riserX - ux * 0.08, riserY, riserZ - uz * 0.08], MAT.connectorWall, false, 0.015, 1);
+      const riserPos = [riserX - ux * 0.08, riserY, riserZ - uz * 0.08];
+      addBeveledBox(parent, prefix + '-riser-' + i, riserSize, riserPos, MAT.connectorWall, false, 0.015, 1);
+      registerSolid(riserSize, riserPos, 0.01);
     }
   }
-  addBatchRouteSegment(parent, prefix + '-base-join', a, b, Math.min(startTop, endTop) + 0.025, 2.15, MAT.connectorFloor, 1.65);
+  addBatchRouteSegment(parent, prefix + '-base-join', a, b, Math.min(startTop, endTop) + 0.025, 4.2, MAT.connectorFloor, 1.65);
 }
 
 function addBatchShell(parent, spec, width, depth, height) {
@@ -2032,6 +2154,7 @@ function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, cente
   const routeText = (spec.route_sentence || []).join(' ');
   const routeAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
   const sideSign = (hashRoomKey(spec.id || String(options.index || 0)) % 2) ? 1 : -1;
+  const isGoalTeaseCorner = options.wantsCorner && /goal_tease|blocked_goal_view|exit_gate_read/.test(role + ' ' + routeText);
   const attachWall = (name, side, span = 0.34, height = 4.4) => {
     if (side === 'north') addWallBox(parent, prefix + '-' + name, [width * span, height, 1.0], [0, height * 0.5, depth * 0.5 - 1.0], MAT.connectorWall, false);
     if (side === 'south') addWallBox(parent, prefix + '-' + name, [width * span, height, 1.0], [0, height * 0.5, -depth * 0.5 + 1.0], MAT.connectorWall, false);
@@ -2046,6 +2169,14 @@ function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, cente
     attachWall('hub-backed-shrine', sideWall, 0.42, 5.0);
     return;
   }
+  if (options.isDescent) {
+    const stairSide = routeAlongX ? (sideSign > 0 ? 'north' : 'south') : (sideSign > 0 ? 'east' : 'west');
+    attachWall('descent-lower-backing', oppositeWall, 0.22, 2.8);
+    addBeveledBox(parent, prefix + '-descent-tower-base', routeAlongX ? [2.0, 3.4, 4.0] : [4.0, 3.4, 2.0], routeAlongX ? [0, 1.7, sideSign * depth * 0.24] : [sideSign * width * 0.24, 1.7, 0], MAT.connectorWall, true, 0.04, 1);
+    addBeveledBox(parent, prefix + '-descent-buttress-a', [1.2, 3.0, 1.2], routeAlongX ? [start.x * 0.18, 1.5, sideSign * depth * 0.12] : [sideSign * width * 0.12, 1.5, start.z * 0.18], MAT.connectorWall, true, 0.04, 1);
+    addBeveledBox(parent, prefix + '-descent-buttress-b', [1.2, 2.6, 1.2], routeAlongX ? [exit.x * 0.18, 1.3, -sideSign * depth * 0.16] : [-sideSign * width * 0.16, 1.3, exit.z * 0.18], MAT.connectorWall, true, 0.04, 1);
+    return;
+  }
   if (options.hasUpper || role.includes('reward') || routeText.includes('upper')) {
     attachWall('upper-retaining-wall', sideWall, 0.52, 4.8);
     addBeveledBox(parent, prefix + '-upper-support-a', [1.0, 3.2, 1.0], routeAlongX ? [start.x * 0.45, 1.6, sideSign * depth * 0.28] : [sideSign * width * 0.28, 1.6, start.z * 0.45], MAT.connectorWall, true, 0.04, 1);
@@ -2058,6 +2189,11 @@ function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, cente
     return;
   }
   if (options.wantsCorner) {
+    if (isGoalTeaseCorner) {
+      attachWall('goal-tease-route-frame', sideWall, 0.18, 3.1);
+      addBeveledBox(parent, prefix + '-goal-tease-pier', routeAlongX ? [0.9, 2.2, 1.5] : [1.5, 2.2, 0.9], routeAlongX ? [center.x, 1.1, sideSign * depth * 0.18] : [sideSign * width * 0.18, 1.1, center.z], MAT.connectorWall, true, 0.04, 1);
+      return;
+    }
     attachWall('corner-blind-mass-a', sideWall, 0.36, 4.2);
     attachWall('corner-blind-mass-b', oppositeWall, 0.24, 3.4);
     return;
@@ -2071,12 +2207,14 @@ function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, cente
 }
 
 function addBatchVerticalPlayArea(parent, prefix, spec, width, depth, center, start, exit, options = {}) {
+  if (options.isDescent) return;
   const routeAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
   const sideSign = options.index % 2 ? 1 : -1;
   const upperTop = options.hasUpper ? 4.35 : options.wantsHub ? 3.85 : 3.15;
   const lowerTop = -1.15;
   const hasDropRoute = options.hasLower || /recovery|drop|secret|return/.test(options.routeText || '');
-  const wantsUpperLayer = options.hasUpper || options.wantsHub || (options.wantsCorner && !hasDropRoute);
+  const isGoalTeaseCorner = options.wantsCorner && /goal_tease|blocked_goal_view|exit_gate_read/.test((spec.semantic_role || '') + ' ' + (options.routeText || ''));
+  const wantsUpperLayer = options.hasUpper || options.wantsHub || (options.wantsCorner && !hasDropRoute && !isGoalTeaseCorner);
   if (options.enabled && wantsUpperLayer) {
     const gallery = routeAlongX
       ? makeVec((start.x + exit.x) * 0.32, upperTop, sideSign * depth * 0.31)
@@ -2165,7 +2303,7 @@ function addBatchRoleLandmarks(parent, spec, start, exit, center, width, depth, 
     addGroundedBeveledBox(parent, 'batch-switch-plinth', [2.2, 0.9, 1.6], [center.x, exitTop, center.z], MAT.trim, true, 0.04, 1);
     addMarker(parent, makeVec(center.x, exitTop + 1.05, center.z), MAT.exit, 0.75);
   }
-  if (role.includes('ambush') || role.includes('combat')) {
+  if ((role.includes('ambush') || role.includes('combat')) && !role.includes('corner')) {
     addBeveledBox(parent, 'batch-combat-cover', [2.0, 2.4, 1.5], [center.x, 1.2, center.z], MAT.connectorWall, true, 0.04, 1);
   }
   if (role.includes('hazard') || role.includes('deadfall') || role.includes('timing')) {
@@ -2201,7 +2339,8 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
   const wantsCorner = klass.includes('corner') || routeText.includes('turn') || routeText.includes('switchback');
   const wantsCombat = /combat|ambush|enemy/.test(role);
   const wantsHub = klass.startsWith('3c') || klass.startsWith('4c');
-  const wantsVerticalPlay = hasUpper || hasLower || wantsHub || wantsCorner || index % 3 === 2;
+  const isDescentRoom = role.includes('descent') || routeText.includes('visible_lower_goal') || routeText.includes('drop_or_stair_recovery');
+  const wantsVerticalPlay = (hasUpper || hasLower || wantsHub || wantsCorner || index % 3 === 2) && !isDescentRoom;
   const startTop = hasLower && role.includes('descent') ? 1.0 : 0;
   const exitTop = hasUpper ? 1.2 : role.includes('descent') ? 0 : 0.28;
   const startSurfaceTop = Math.max(0.22, startTop + 0.2);
@@ -2230,9 +2369,50 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
   if (wantsCorner) {
     const bendSide = terminalExitConnector === 'E' || spawnConnector === 'E' ? 1 : -1;
     const bend = makeVec(bendSide * width * 0.26, Math.max(0.36, (start.y + exit.y) * 0.5 + 0.08), (start.z + exit.z) * 0.18);
-    addWalkableTopBox(roomGroup, 'batch-corner-route-a', [5.2, 4.0], bend, bend.y, MAT.bridge, 0.28, 0.05);
+    addWalkableTopBox(roomGroup, 'batch-corner-route-a', [5.2, 4.0], bend, bend.y, MAT.platform, 0.28, 0.05);
     addBatchRouteSegment(roomGroup, 'batch-corner-entry-link', start, bend, bend.y + 0.035, 2.7, MAT.platform, 2.65);
     addBatchRouteSegment(roomGroup, 'batch-corner-exit-link', bend, exit, Math.max(bend.y + 0.09, exit.y + 0.08), 2.7, MAT.bridge, 2.65);
+  } else if (isDescentRoom) {
+    const routeAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
+    const stairSide = Math.abs(start.x) < 1 ? (index % 2 ? 1 : -1) : -Math.sign(start.x || 1);
+    const upperRun = routeAlongX
+      ? makeVec((start.x * 0.68 + center.x * 0.32), start.y, start.z * 0.28)
+      : makeVec(start.x * 0.16, start.y, (start.z * 0.68 + center.z * 0.32));
+    const dropLip = routeAlongX
+      ? makeVec((upperRun.x + exit.x) * 0.42, start.y, upperRun.z)
+      : makeVec(upperRun.x, start.y, (upperRun.z + exit.z) * 0.42);
+    const lowerTerrace = routeAlongX
+      ? makeVec(exit.x * 0.22, Math.max(0.34, exit.y + 0.04), (center.z + exit.z) * 0.32)
+      : makeVec((center.x + exit.x) * 0.22, Math.max(0.34, exit.y + 0.04), exit.z * 0.38);
+    const stairMid = routeAlongX
+      ? makeVec((upperRun.x + lowerTerrace.x) * 0.22, Math.max(0.64, center.y + 0.18), stairSide * depth * 0.24)
+      : makeVec(stairSide * width * 0.24, Math.max(0.64, center.y + 0.18), (upperRun.z + lowerTerrace.z) * 0.22);
+    const voidCenter = routeAlongX
+      ? makeVec((dropLip.x + lowerTerrace.x) * 0.5, 0.16, (dropLip.z + lowerTerrace.z) * 0.5)
+      : makeVec((dropLip.x + lowerTerrace.x) * 0.5, 0.16, (dropLip.z + lowerTerrace.z) * 0.5);
+    const voidSize = routeAlongX
+      ? [Math.max(5.4, Math.abs(lowerTerrace.x - dropLip.x) * 0.95), 6.0]
+      : [6.0, Math.max(5.4, Math.abs(lowerTerrace.z - dropLip.z) * 0.95)];
+
+    addWalkableTopBox(roomGroup, 'batch-descent-upper-run', routeAlongX ? [Math.max(6.2, width * 0.26), 4.2] : [4.2, Math.max(6.2, depth * 0.26)], upperRun, upperRun.y, MAT.bridge, 0.28, 0.05);
+    addWalkableTopBox(roomGroup, 'batch-descent-drop-lip', routeAlongX ? [4.6, 3.6] : [3.6, 4.6], dropLip, dropLip.y, MAT.bridge, 0.24, 0.05);
+    addWalkableTopBox(roomGroup, 'batch-descent-lower-terrace', routeAlongX ? [Math.max(6.6, width * 0.32), 5.0] : [5.0, Math.max(6.6, depth * 0.32)], lowerTerrace, lowerTerrace.y, MAT.platform, 0.30, 0.07);
+    addBeveledBox(roomGroup, 'batch-descent-void-cut', [voidSize[0], 0.18, voidSize[1]], [voidCenter.x, 0.08, voidCenter.z], MAT.void, false, 0.01, 1);
+
+    addBatchRouteSegment(roomGroup, 'batch-descent-entry-link', start, upperRun, upperRun.y + 0.04, 2.6, MAT.platform, 2.65);
+    addBatchRouteSegment(roomGroup, 'batch-descent-fast-line', upperRun, dropLip, dropLip.y + 0.04, 2.3, MAT.bridge, 2.65);
+    addBatchStairRun(roomGroup, 'batch-descent-stair-a', upperRun, stairMid, upperRun.y, stairMid.y, MAT.platform);
+    addBatchStairRun(roomGroup, 'batch-descent-stair-b', stairMid, lowerTerrace, stairMid.y, lowerTerrace.y, MAT.platform);
+    addBatchRouteSegment(roomGroup, 'batch-descent-exit-link', lowerTerrace, exit, Math.max(lowerTerrace.y + 0.05, exit.y + 0.06), 2.6, MAT.platform, 2.65);
+
+    const supportTop = start.y + 2.2;
+    const supportY = supportTop * 0.5;
+    const supportA = routeAlongX ? [dropLip.x - 1.6, supportY, dropLip.z - 1.2] : [dropLip.x - 1.2, supportY, dropLip.z - 1.6];
+    const supportB = routeAlongX ? [dropLip.x + 1.6, supportY, dropLip.z + 1.2] : [dropLip.x + 1.2, supportY, dropLip.z + 1.6];
+    addBeveledBox(roomGroup, 'batch-descent-support-a', [1.0, supportTop, 1.0], supportA, MAT.connectorWall, true, 0.04, 1);
+    addBeveledBox(roomGroup, 'batch-descent-support-b', [1.0, supportTop, 1.0], supportB, MAT.connectorWall, true, 0.04, 1);
+    addBeveledBox(roomGroup, 'batch-descent-stair-tower', routeAlongX ? [1.4, 3.2, 3.8] : [3.8, 3.2, 1.4], [stairMid.x, 1.6, stairMid.z], MAT.connectorWall, true, 0.04, 1);
+    addBrazier(roomGroup, 'batch-descent-lower-signal', [lowerTerrace.x, lowerTerrace.y, lowerTerrace.z], { kind: 'corpsefire' });
   } else if (hasUpper) {
     addWalkableTopBox(roomGroup, 'batch-lip-landing', [4.8, 3.8], midA, midA.y, MAT.platform, 0.28, 0.05);
     addBatchStairRun(roomGroup, 'batch-measured-rise', midA, midB, midA.y, Math.max(midA.y + 0.38, exit.y + 0.04), MAT.platform);
@@ -2244,7 +2424,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
     addBatchRouteSegment(roomGroup, 'batch-low-route-link-b', midB, exit, Math.max(midB.y + 0.06, exit.y + 0.08), 2.6, MAT.platform, 2.65);
   }
 
-  if (hasLower || role.includes('recovery') || role.includes('secret')) {
+  if (!isDescentRoom && (hasLower || role.includes('recovery') || role.includes('secret'))) {
     const side = Math.abs(start.x) < 1 ? (index % 2 ? 1 : -1) : -Math.sign(start.x);
     const low = makeVec(side * width * 0.30, 0.24, 0);
     addWalkableTopBox(roomGroup, 'batch-side-recovery-floor', [4.6, Math.max(7.0, depth * 0.34)], low, low.y, MAT.connectorFloor, 0.28, 0.07);
@@ -2259,6 +2439,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
     wantsCorner,
     hasUpper,
     hasLower,
+    isDescent: isDescentRoom,
   });
 
   addBatchVerticalPlayArea(roomGroup, 'batch-vertical-play', spec, width, depth, center, start, exit, {
@@ -2268,6 +2449,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
     hasLower,
     wantsHub,
     routeText,
+    isDescent: isDescentRoom,
   });
 
   const branchConnectors = [...new Set(pathBranchConnectors)].filter((c) => c !== spawnConnector && c !== terminalExitConnector);
@@ -2290,7 +2472,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
     addWalkableTopBox(roomGroup, 'batch-hub-east-footwork', [3.6, 7.8], makeVec(4.9, 0.3, 0), 0.3, MAT.platform, 0.24, 0.06);
   }
 
-  if (wantsCombat) {
+  if (wantsCombat && !wantsCorner) {
     addBeveledBox(roomGroup, 'batch-combat-route-mass', [1.8, 2.1, 1.3], [center.x, 1.05, center.z], MAT.connectorWall, true, 0.04, 1);
   } else {
     addBeveledBox(roomGroup, 'batch-route-buttress-left', [0.8, 2.4, 1.0], [-width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
@@ -2327,25 +2509,371 @@ function currentBatchSpec() {
   return GENERATED_ROOM_BATCH[index];
 }
 
-const BATCH_CHAPTER_SIZE = 12;
-const BATCH_CHAPTER_SPACING_Z = 330;
-const BATCH_CHAPTER_LAYOUT = [
-  [0, 0, 0], [0, 42, 0], [0, 84, 2.4],
-  [42, 84, 2.4], [84, 84, 4.8], [84, 126, 4.8],
-  [84, 168, 2.0], [42, 168, 2.0], [0, 168, 0.35],
-  [0, 210, 0.35], [42, 210, 3.1], [84, 210, 3.1],
-];
-const BATCH_CHAPTER_BRANCH_PAIRS = [[2, 8], [5, 11]];
+const DISTRICT_ARCHETYPES = {
+  intake: {
+    id: 'intake',
+    names: ['Toll Intake', 'Arrival Bridges', 'Chain Customs'],
+    purpose: 'sort arrivals and choke the safest approach into the settlement',
+    signal: 'flame',
+    preferredRoles: ['start', 'choice', 'ambush', 'corner', 'recovery_line'],
+  },
+  scaffolds: {
+    id: 'scaffolds',
+    names: ['Hanging Market', 'Scaffold Ward', 'Ropewalk Stalls'],
+    purpose: 'pack trade, ambush, and foot traffic onto hanging walkways',
+    signal: 'corpsefire',
+    preferredRoles: ['choice_t', 'fork', 'combat_choice', 'loop_node', 'combat'],
+  },
+  liftworks: {
+    id: 'liftworks',
+    names: ['Liftworks', 'Winch Towers', 'Counterweight Racks'],
+    purpose: 'haul salvage and bodies between tiers with lifts, cranes, and stairs',
+    signal: 'flame',
+    preferredRoles: ['vertical_transition', 'stairwell', 'switch', 'vertical_choice', 'climb'],
+  },
+  furnace: {
+    id: 'furnace',
+    names: ['Corpsefire Kilns', 'Furnace Tier', 'Ash Engines'],
+    purpose: 'burn refuse and feed the fire chain that keeps the town alive',
+    signal: 'hazard',
+    preferredRoles: ['hazard_crossing', 'timing', 'combat', 'locked_hub', 'descent'],
+  },
+  refuse: {
+    id: 'refuse',
+    names: ['Refuse Underworks', 'Sump Gutters', 'Waste Chutes'],
+    purpose: 'dump runoff below the homes and hide maintenance returns',
+    signal: 'corpsefire',
+    preferredRoles: ['secret', 'recovery_t', 'secret_tease', 'descent_corner', 'shortcut_receiver'],
+  },
+  shrine: {
+    id: 'shrine',
+    names: ['Shrine Rim', 'Skull Gate Ward', 'Abyss Chapel'],
+    purpose: 'guard the ritual rim and the settlement exit above the void',
+    signal: 'exit',
+    preferredRoles: ['vista', 'reward', 'hub', 'layered_hub', 'exit'],
+  },
+};
 
-function batchRoomLocalIndex(index) {
-  return ((index % BATCH_CHAPTER_SIZE) + BATCH_CHAPTER_SIZE) % BATCH_CHAPTER_SIZE;
+const DISTRICT_MIDDLE_ARCHETYPES = [
+  DISTRICT_ARCHETYPES.scaffolds,
+  DISTRICT_ARCHETYPES.liftworks,
+  DISTRICT_ARCHETYPES.furnace,
+  DISTRICT_ARCHETYPES.refuse,
+];
+
+const DISTRICT_ROOM_COUNT_PROFILES = [
+  [10, 12, 14, 12],
+  [12, 10, 12, 14],
+  [11, 13, 10, 14],
+  [9, 13, 12, 14],
+  [12, 11, 14, 11],
+];
+
+const DISTRICT_LOCAL_LAYOUTS = [
+  {
+    id: 'switchback-racks',
+    points: [
+      [0, 0, 0], [0, 42, 0], [32, 76, 1.1], [70, 76, 1.2], [106, 112, 2.7], [106, 154, 3.1], [70, 188, 1.9],
+      [30, 188, 1.8], [-6, 220, 0.6], [-6, 262, 0.6], [36, 300, 2.9], [78, 300, 3.0], [114, 338, 1.4], [78, 376, 1.4],
+    ],
+    branchPairs: [[2, 7], [5, 9], [8, 11]],
+  },
+  {
+    id: 'hanging-spine',
+    points: [
+      [0, 0, 0], [36, 32, 0.7], [74, 60, 1.6], [112, 92, 2.8], [112, 136, 2.6], [74, 174, 1.3], [32, 202, 0.3],
+      [-8, 238, 0.2], [-8, 280, 1.0], [30, 318, 2.1], [72, 348, 3.6], [118, 378, 3.8], [82, 414, 2.4], [40, 444, 2.4],
+    ],
+    branchPairs: [[1, 6], [4, 8], [7, 11]],
+  },
+  {
+    id: 'lift-fan',
+    points: [
+      [0, 0, 0], [0, 44, 0.4], [-36, 80, 1.5], [-72, 118, 2.7], [-36, 154, 3.2], [6, 190, 3.0], [48, 226, 1.6],
+      [88, 226, 1.5], [126, 264, 2.8], [126, 306, 4.2], [86, 340, 3.2], [44, 374, 1.4], [6, 408, 1.0], [-34, 438, 2.5],
+    ],
+    branchPairs: [[2, 5], [6, 10], [9, 12]],
+  },
+];
+
+const DISTRICT_LOCAL_LAYOUT_MAP = Object.fromEntries(DISTRICT_LOCAL_LAYOUTS.map((layout) => [layout.id, layout]));
+
+const DISTRICT_MACRO_TEMPLATES = {
+  intake: {
+    id: 'entry_toll',
+    elevationBand: 'mid',
+    layoutIds: ['switchback-racks'],
+    baseRange: [0.4, 3.4],
+    topRange: [6.0, 9.0],
+    xRange: [0, 18],
+    zRange: [0, 0],
+    supportStyle: 'chain_hangs',
+    landmarkRole: 'toll_gate',
+    approachType: 'arrival',
+    departureType: 'stair_climb',
+    routeType: 'traverse',
+    requiresVisibleBelow: false,
+    requiresVisibleAbove: true,
+  },
+  scaffolds: {
+    id: 'market_lattice',
+    elevationBand: 'climb_transition',
+    layoutIds: ['hanging-spine', 'switchback-racks'],
+    baseRange: [8.2, 12.4],
+    topRange: [16.0, 21.0],
+    xRange: [96, 154],
+    zRange: [176, 244],
+    supportStyle: 'scaffold_forest',
+    landmarkRole: 'market_core',
+    approachType: 'stair_ascent',
+    departureType: 'bridge_crossing',
+    routeType: 'climb',
+    requiresVisibleBelow: true,
+    requiresVisibleAbove: true,
+  },
+  liftworks: {
+    id: 'liftworks_spire',
+    elevationBand: 'high',
+    layoutIds: ['lift-fan'],
+    baseRange: [12.0, 17.4],
+    topRange: [21.0, 29.5],
+    xRange: [64, 120],
+    zRange: [188, 260],
+    supportStyle: 'lift_cage',
+    landmarkRole: 'lift_core',
+    approachType: 'winch_climb',
+    departureType: 'suspended_crossing',
+    routeType: 'climb',
+    requiresVisibleBelow: true,
+    requiresVisibleAbove: true,
+  },
+  furnace: {
+    id: 'furnace_drop',
+    elevationBand: 'descent_transition',
+    layoutIds: ['switchback-racks', 'hanging-spine'],
+    baseRange: [-6.8, -3.6],
+    topRange: [0.6, 4.8],
+    xRange: [-116, -52],
+    zRange: [184, 252],
+    supportStyle: 'buttress_stack',
+    landmarkRole: 'furnace_glow',
+    approachType: 'drop_to_lower_terrace',
+    departureType: 'maintenance_return',
+    routeType: 'descent',
+    requiresVisibleBelow: true,
+    requiresVisibleAbove: false,
+  },
+  refuse: {
+    id: 'refuse_underworks',
+    elevationBand: 'low',
+    layoutIds: ['switchback-racks'],
+    baseRange: [-5.6, -2.8],
+    topRange: [0.0, 3.2],
+    xRange: [-92, -36],
+    zRange: [136, 208],
+    supportStyle: 'counterweight_rig',
+    landmarkRole: 'waste_chute',
+    approachType: 'underpath_entry',
+    departureType: 'climb_return',
+    routeType: 'descent',
+    requiresVisibleBelow: true,
+    requiresVisibleAbove: true,
+  },
+  shrine: {
+    id: 'shrine_rim',
+    elevationBand: 'rim',
+    layoutIds: ['hanging-spine', 'lift-fan'],
+    baseRange: [16.0, 23.0],
+    topRange: [28.0, 36.0],
+    xRange: [112, 186],
+    zRange: [220, 312],
+    supportStyle: 'tower_legs',
+    landmarkRole: 'abyss_crown',
+    approachType: 'rim_climb',
+    departureType: 'exit_crown',
+    routeType: 'climb',
+    requiresVisibleBelow: true,
+    requiresVisibleAbove: false,
+  },
+};
+
+const DISTRICT_ARCHETYPE_TEMPLATES = {
+  intake: DISTRICT_MACRO_TEMPLATES.intake,
+  scaffolds: DISTRICT_MACRO_TEMPLATES.scaffolds,
+  liftworks: DISTRICT_MACRO_TEMPLATES.liftworks,
+  furnace: DISTRICT_MACRO_TEMPLATES.furnace,
+  refuse: DISTRICT_MACRO_TEMPLATES.refuse,
+  shrine: DISTRICT_MACRO_TEMPLATES.shrine,
+};
+
+function shuffleWithRng(items, rng) {
+  const list = [...items];
+  for (let i = list.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
 }
 
-function batchRoomWorldOffset(index) {
-  const chapter = Math.floor(index / BATCH_CHAPTER_SIZE);
-  const local = batchRoomLocalIndex(index);
-  const point = BATCH_CHAPTER_LAYOUT[local] || BATCH_CHAPTER_LAYOUT[BATCH_CHAPTER_LAYOUT.length - 1];
-  return makeVec(point[0], point[2] || 0, point[1] + chapter * BATCH_CHAPTER_SPACING_Z);
+function sampleRange(rng, range) {
+  return range[0] + (range[1] - range[0]) * rng();
+}
+
+function pickDistrictLayout(template, rng) {
+  const layoutId = pick(rng, template.layoutIds || DISTRICT_LOCAL_LAYOUTS.map((layout) => layout.id));
+  return DISTRICT_LOCAL_LAYOUT_MAP[layoutId] || DISTRICT_LOCAL_LAYOUTS[0];
+}
+
+function buildDistrictMacroOrigins(rng, templates) {
+  const origins = [];
+  let zCursor = 0;
+  for (let i = 0; i < templates.length; i += 1) {
+    const template = templates[i];
+    const x = i === 0 ? 0 : (i % 2 === 1 ? 1 : -1) * sampleRange(rng, template.xRange);
+    if (i > 0) zCursor += sampleRange(rng, template.zRange);
+    const baseElevation = sampleRange(rng, template.baseRange);
+    origins.push(makeVec(x, baseElevation, zCursor));
+  }
+  return origins;
+}
+
+function classifySpineRoute(fromDistrict, toDistrict) {
+  const delta = toDistrict.baseElevation - fromDistrict.baseElevation;
+  if (delta >= 3.5) return 'climb';
+  if (delta <= -3.5) return 'descent';
+  return 'traverse';
+}
+
+function generateDistrictPlan(levelIndex) {
+  const totalRooms = GENERATED_ROOM_BATCH.length;
+  const seed = buildLevelSeed(levelIndex) ^ 0x5f3759df;
+  const rng = rngFromSeed(seed);
+  const climbArchetype = pick(rng, [DISTRICT_ARCHETYPES.scaffolds, DISTRICT_ARCHETYPES.liftworks]);
+  const descentArchetype = pick(rng, [DISTRICT_ARCHETYPES.furnace, DISTRICT_ARCHETYPES.refuse]);
+  const archetypes = [DISTRICT_ARCHETYPES.intake, climbArchetype, descentArchetype, DISTRICT_ARCHETYPES.shrine];
+  const counts = [...pick(rng, DISTRICT_ROOM_COUNT_PROFILES)];
+  const templates = archetypes.map((archetype) => DISTRICT_ARCHETYPE_TEMPLATES[archetype.id] || DISTRICT_MACRO_TEMPLATES.intake);
+  const origins = buildDistrictMacroOrigins(rng, templates);
+  const districts = [];
+  const roomToDistrict = new Array(totalRooms).fill(0);
+  let roomStart = 0;
+
+  for (let i = 0; i < archetypes.length; i += 1) {
+    const archetype = archetypes[i];
+    const template = templates[i];
+    const layout = pickDistrictLayout(template, rng);
+    const roomCount = counts[i];
+    const baseElevation = origins[i]?.y ?? sampleRange(rng, template.baseRange);
+    const topElevation = Math.max(baseElevation + 4.0, sampleRange(rng, template.topRange));
+    const district = {
+      index: i,
+      id: archetype.id + '-' + (i + 1),
+      archetype: archetype.id,
+      name: pick(rng, archetype.names),
+      purpose: archetype.purpose,
+      signal: archetype.signal,
+      roomStart,
+      roomCount,
+      origin: origins[i] || makeVec(0, baseElevation, 0),
+      baseElevation,
+      topElevation,
+      elevationBand: template.elevationBand,
+      macroTemplateId: template.id,
+      approachType: template.approachType,
+      departureType: template.departureType,
+      supportStyle: template.supportStyle,
+      landmarkRole: template.landmarkRole,
+      requiresVisibleBelow: template.requiresVisibleBelow,
+      requiresVisibleAbove: template.requiresVisibleAbove,
+      layoutId: layout.id,
+      layoutPoints: layout.points,
+      branchPairs: layout.branchPairs.filter(([a, b]) => a < roomCount && b < roomCount),
+      preferredRoles: [...archetype.preferredRoles],
+    };
+    for (let j = 0; j < roomCount && roomStart + j < totalRooms; j += 1) roomToDistrict[roomStart + j] = i;
+    roomStart += roomCount;
+    districts.push(district);
+  }
+
+  if (roomStart < totalRooms && districts.length) {
+    const lastDistrict = districts[districts.length - 1];
+    lastDistrict.roomCount += totalRooms - roomStart;
+    for (let i = roomStart; i < totalRooms; i += 1) roomToDistrict[i] = districts.length - 1;
+  }
+
+  const mainSpineEdges = [];
+  const returnEdges = [];
+  const landmarkViews = [];
+  for (let i = 0; i < districts.length - 1; i += 1) {
+    const fromDistrict = districts[i];
+    const toDistrict = districts[i + 1];
+    const routeType = classifySpineRoute(fromDistrict, toDistrict);
+    mainSpineEdges.push({
+      id: fromDistrict.id + '->' + toDistrict.id,
+      from: fromDistrict.id,
+      to: toDistrict.id,
+      fromIndex: fromDistrict.index,
+      toIndex: toDistrict.index,
+      routeType,
+      verticalDelta: Number((toDistrict.baseElevation - fromDistrict.baseElevation).toFixed(2)),
+      supportStyle: routeType === 'descent' ? 'buttress_stack' : routeType === 'climb' ? 'lift_cage' : 'chain_hangs',
+    });
+    landmarkViews.push({
+      from: fromDistrict.id,
+      to: toDistrict.id,
+      fromIndex: fromDistrict.index,
+      toIndex: toDistrict.index,
+      lookDirection: toDistrict.baseElevation >= fromDistrict.baseElevation ? 'look_up' : 'look_down',
+      landmarkRole: toDistrict.landmarkRole,
+      routeType,
+    });
+  }
+  if (districts[2] && districts[0]) {
+    returnEdges.push({
+      id: districts[2].id + '->' + districts[0].id,
+      from: districts[2].id,
+      to: districts[0].id,
+      fromIndex: districts[2].index,
+      toIndex: districts[0].index,
+      routeType: 'maintenance_return',
+      note: 'low maintenance return back toward intake',
+    });
+  }
+  if (districts[3] && districts[1]) {
+    returnEdges.push({
+      id: districts[3].id + '->' + districts[1].id,
+      from: districts[3].id,
+      to: districts[1].id,
+      fromIndex: districts[3].index,
+      toIndex: districts[1].index,
+      routeType: 'overlook_return',
+      note: 'rim overlook back toward the climb district',
+    });
+  }
+
+  return { levelIndex, seed, districts, roomToDistrict, mainSpineEdges, returnEdges, landmarkViews };
+}
+
+function ensureDistrictPlan() {
+  if (!roomState.districtPlan || roomState.districtPlan.levelIndex !== roomState.levelIndex) {
+    roomState.districtPlan = generateDistrictPlan(roomState.levelIndex);
+  }
+  return roomState.districtPlan;
+}
+
+function districtInfoForRoomIndex(index, plan = roomState.districtPlan || ensureDistrictPlan()) {
+  const safeIndex = clamp(index, 0, GENERATED_ROOM_BATCH.length - 1);
+  const districtIndex = clamp(plan.roomToDistrict[safeIndex] || 0, 0, Math.max(0, plan.districts.length - 1));
+  const district = plan.districts[districtIndex] || plan.districts[0];
+  const localIndex = Math.max(0, safeIndex - (district?.roomStart || 0));
+  return { districtIndex, district, localIndex };
+}
+
+function batchRoomWorldOffset(index, plan = roomState.districtPlan || ensureDistrictPlan()) {
+  const info = districtInfoForRoomIndex(index, plan);
+  const points = info.district?.layoutPoints || DISTRICT_LOCAL_LAYOUTS[0].points;
+  const point = points[Math.min(info.localIndex, points.length - 1)] || points[points.length - 1] || [0, 0, 0];
+  return makeVec(info.district.origin.x + point[0], info.district.origin.y + (point[2] || 0), info.district.origin.z + point[1]);
 }
 
 function connectorTowardOffset(fromOffset, toOffset) {
@@ -2361,15 +2889,15 @@ function roomWantsBranch(index) {
   return /3c|4c|hub|junction|secret|shortcut|return|loop|reward|key|switch/.test(text);
 }
 
-function buildGauntletBranchLinks() {
+function buildDistrictBranchLinks(plan = roomState.districtPlan || ensureDistrictPlan()) {
   const links = [];
-  for (let chapterStart = 0; chapterStart < GENERATED_ROOM_BATCH.length; chapterStart += BATCH_CHAPTER_SIZE) {
-    for (const [fromLocal, toLocal] of BATCH_CHAPTER_BRANCH_PAIRS) {
-      const a = chapterStart + fromLocal;
-      const b = chapterStart + toLocal;
+  for (const district of plan.districts) {
+    for (const [fromLocal, toLocal] of district.branchPairs) {
+      const a = district.roomStart + fromLocal;
+      const b = district.roomStart + toLocal;
       if (a >= GENERATED_ROOM_BATCH.length || b >= GENERATED_ROOM_BATCH.length) continue;
-      const offsetA = batchRoomWorldOffset(a);
-      const offsetB = batchRoomWorldOffset(b);
+      const offsetA = batchRoomWorldOffset(a, plan);
+      const offsetB = batchRoomWorldOffset(b, plan);
       links.push({
         a,
         b,
@@ -2435,18 +2963,20 @@ function addWorldConnector(index, from, to, options = {}) {
 }
 
 function buildGeneratedGauntlet(startIndex = 0) {
+  const districtPlan = ensureDistrictPlan();
   const rooms = [];
   const linkKeys = new Set();
-  const branchLinks = buildGauntletBranchLinks();
+  const branchLinks = buildDistrictBranchLinks(districtPlan);
   const branchSides = Array.from({ length: GENERATED_ROOM_BATCH.length }, () => new Set());
   for (const link of branchLinks) {
     branchSides[link.a].add(link.sideA);
     branchSides[link.b].add(link.sideB);
   }
   for (let i = 0; i < GENERATED_ROOM_BATCH.length; i += 1) {
-    const offset = batchRoomWorldOffset(i);
-    const prevOffset = i > 0 ? batchRoomWorldOffset(i - 1) : null;
-    const nextOffset = i < GENERATED_ROOM_BATCH.length - 1 ? batchRoomWorldOffset(i + 1) : null;
+    const offset = batchRoomWorldOffset(i, districtPlan);
+    const prevOffset = i > 0 ? batchRoomWorldOffset(i - 1, districtPlan) : null;
+    const nextOffset = i < GENERATED_ROOM_BATCH.length - 1 ? batchRoomWorldOffset(i + 1, districtPlan) : null;
+    const districtInfo = districtInfoForRoomIndex(i, districtPlan);
     const path = {
       entryConnector: prevOffset ? connectorTowardOffset(offset, prevOffset) : null,
       exitConnector: nextOffset ? connectorTowardOffset(offset, nextOffset) : null,
@@ -2455,6 +2985,8 @@ function buildGeneratedGauntlet(startIndex = 0) {
     const built = withBatchBuildOffset(offset, () => buildGeneratedBatchRoom(GENERATED_ROOM_BATCH[i], i, path));
     rooms.push({
       spec: GENERATED_ROOM_BATCH[i],
+      district: districtInfo.district,
+      districtIndex: districtInfo.districtIndex,
       spawn: built.spawn.clone().add(offset),
       exit: built.exit.clone().add(offset),
       enemyPositions: built.enemyPositions.map((pos) => pos.clone().add(offset)),
@@ -2495,15 +3027,24 @@ function buildGeneratedGauntlet(startIndex = 0) {
   const maxX = Math.max(...rooms.map((room) => room.bounds.maxX), 14);
   const minZ = Math.min(...rooms.map((room) => room.bounds.minZ), -18);
   const maxZ = Math.max(...rooms.map((room) => room.bounds.maxZ), 18);
-  return { rooms, spawn: first.spawn, exit: last.exit, exitRadius: 2.35, enemyPositions: first.enemyPositions, bounds: { minX, maxX, minZ, maxZ } };
+  return {
+    rooms,
+    plan: districtPlan,
+    spawn: first.spawn,
+    exit: last.exit,
+    exitRadius: 2.35,
+    enemyPositions: first.enemyPositions,
+    bounds: { minX, maxX, minZ, maxZ },
+  };
 }
+
 
 function updateCurrentGauntletRoom() {
   if (!roomState.gauntletRooms?.length) return;
   let bestIndex = roomState.nodeIndex;
   let bestDist = Infinity;
   for (let i = 0; i < roomState.gauntletRooms.length; i += 1) {
-    const center = batchRoomWorldOffset(i);
+    const center = batchRoomWorldOffset(i, roomState.districtPlan || ensureDistrictPlan());
     const dx = player.position.x - center.x;
     const dz = player.position.z - center.z;
     const distSq = dx * dx + dz * dz;
@@ -2516,10 +3057,28 @@ function updateCurrentGauntletRoom() {
     roomState.nodeIndex = bestIndex;
     setNodeIndex(bestIndex);
     const spec = GENERATED_ROOM_BATCH[bestIndex];
-    roomState.spec = { index: bestIndex, connector: spec.id, type: spec.junction_class, roomRole: spec.semantic_role, landmark: spec.batch_prompt, routeSentence: spec.route_sentence };
-    setStatus('gauntlet room ' + (bestIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + spec.id);
+    const districtInfo = districtInfoForRoomIndex(bestIndex, roomState.districtPlan || ensureDistrictPlan());
+    roomState.spec = {
+      index: bestIndex,
+      connector: spec.id,
+      type: spec.junction_class,
+      roomRole: spec.semantic_role,
+      landmark: spec.batch_prompt,
+      routeSentence: spec.route_sentence,
+      districtId: districtInfo.district.id,
+      districtName: districtInfo.district.name,
+      districtPurpose: districtInfo.district.purpose,
+      districtIndex: districtInfo.districtIndex,
+      districtRoomIndex: districtInfo.localIndex,
+      districtElevationBand: districtInfo.district.elevationBand,
+      districtBaseElevation: districtInfo.district.baseElevation,
+      districtTopElevation: districtInfo.district.topElevation,
+      districtMacroTemplateId: districtInfo.district.macroTemplateId,
+    };
+    setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + (roomState.districtPlan?.districts.length || 0) + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (bestIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + spec.id);
   }
 }
+
 
 function completeGeneratedGauntlet() {
   roomState.levelIndex += 1;
@@ -2536,14 +3095,71 @@ function buildRoom(movePlayer = true) {
   roomState.transitionLock = 0.7;
   const startIndex = Math.max(0, Math.min(roomState.nodeIndex, GENERATED_ROOM_BATCH.length - 1));
   const built = buildGeneratedGauntlet(startIndex);
+  const districtPlan = built.plan;
   const spec = GENERATED_ROOM_BATCH[startIndex] || GENERATED_ROOM_BATCH[0];
+  const districtInfo = districtInfoForRoomIndex(startIndex, districtPlan);
+  roomState.districtPlan = districtPlan;
   roomState.plan = {
     levelIndex: roomState.levelIndex,
-    nodes: GENERATED_ROOM_BATCH.map((room, index) => ({ index, connector: room.id, type: room.junction_class })),
+    seed: districtPlan.seed,
+    districts: districtPlan.districts.map((district) => ({
+      id: district.id,
+      name: district.name,
+      purpose: district.purpose,
+      archetype: district.archetype,
+      roomStart: district.roomStart,
+      roomCount: district.roomCount,
+      layoutId: district.layoutId,
+      elevationBand: district.elevationBand,
+      baseElevation: district.baseElevation,
+      topElevation: district.topElevation,
+      macroTemplateId: district.macroTemplateId,
+      approachType: district.approachType,
+      departureType: district.departureType,
+      supportStyle: district.supportStyle,
+      landmarkRole: district.landmarkRole,
+      requiresVisibleBelow: district.requiresVisibleBelow,
+      requiresVisibleAbove: district.requiresVisibleAbove,
+    })),
+    mainSpineEdges: districtPlan.mainSpineEdges.map((edge) => ({ ...edge })),
+    returnEdges: districtPlan.returnEdges.map((edge) => ({ ...edge })),
+    landmarkViews: districtPlan.landmarkViews.map((view) => ({ ...view })),
+    nodes: GENERATED_ROOM_BATCH.map((room, index) => {
+      const info = districtInfoForRoomIndex(index, districtPlan);
+      return {
+        index,
+        connector: room.id,
+        type: room.junction_class,
+        districtId: info.district.id,
+        districtName: info.district.name,
+        districtPurpose: info.district.purpose,
+        districtElevationBand: info.district.elevationBand,
+        districtBaseElevation: info.district.baseElevation,
+        districtTopElevation: info.district.topElevation,
+        districtMacroTemplateId: info.district.macroTemplateId,
+      };
+    }),
   };
   roomState.gauntletRooms = built.rooms;
+  roomState.navGraph = buildRoomTraversalGraph(built.rooms, GENERATED_ROOM_BATCH, buildDistrictBranchLinks(districtPlan));
   roomState.nodeIndex = startIndex;
-  roomState.spec = { index: startIndex, connector: spec.id, type: spec.junction_class, roomRole: spec.semantic_role, landmark: spec.batch_prompt, routeSentence: spec.route_sentence };
+  roomState.spec = {
+    index: startIndex,
+    connector: spec.id,
+    type: spec.junction_class,
+    roomRole: spec.semantic_role,
+    landmark: spec.batch_prompt,
+    routeSentence: spec.route_sentence,
+    districtId: districtInfo.district.id,
+    districtName: districtInfo.district.name,
+    districtPurpose: districtInfo.district.purpose,
+    districtIndex: districtInfo.districtIndex,
+    districtRoomIndex: districtInfo.localIndex,
+    districtElevationBand: districtInfo.district.elevationBand,
+    districtBaseElevation: districtInfo.district.baseElevation,
+    districtTopElevation: districtInfo.district.topElevation,
+    districtMacroTemplateId: districtInfo.district.macroTemplateId,
+  };
   roomState.seed = hashRoomKey(spec.id || String(startIndex));
   roomState.spawn.copy(built.spawn);
   roomState.exit.copy(built.exit);
@@ -2564,8 +3180,9 @@ function buildRoom(movePlayer = true) {
     player.attack = null;
     player.attackTimer = 0;
   }
-  setStatus('legible chapter ' + (startIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | 2 branches | ' + spec.id);
+  setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + districtPlan.districts.length + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (startIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + districtInfo.district.purpose);
 }
+
 
 function buildEnemy() {
   if (enemy && enemy.parent) enemy.parent.remove(enemy);
@@ -2576,6 +3193,17 @@ function buildEnemy() {
   enemy.userData.hitTimer = 0;
   enemy.userData.dead = false;
   enemy.userData.deathTimer = 0;
+  enemy.userData.baseY = enemy.position.y;
+  enemy.userData.attackTimer = 0;
+  enemy.userData.attackElapsed = 0;
+  enemy.userData.attackCooldown = 0.75;
+  enemy.userData.attackHitDone = false;
+  enemy.userData.attackName = '';
+  enemy.userData.mode = 'approach';
+  enemy.userData.modeTimer = 0;
+  enemy.userData.commitTimer = ENEMY_COMMIT_INTERVAL * 0.55;
+  enemy.userData.commitElapsed = 0;
+  enemy.userData.orbitSign = 1;
 
   enemyPrimitiveVisual = new THREE.Group();
   enemyPrimitiveVisual.name = 'broken-knight-fallback';
@@ -2642,6 +3270,72 @@ function chooseClip(clips, names) {
   return clips[0] || null;
 }
 
+function interpolationFromName(name) {
+  const value = String(name || '').toLowerCase();
+  if (value.includes('discrete')) return THREE.InterpolateDiscrete;
+  if (value.includes('smooth')) return THREE.InterpolateSmooth;
+  return THREE.InterpolateLinear;
+}
+
+function deserializePoseClip(data, fallbackName = 'pose clip') {
+  const clipData = data?.clip || data;
+  if (!clipData || !Array.isArray(clipData.tracks)) return null;
+  const tracks = [];
+  for (const entry of clipData.tracks) {
+    const name = String(entry.name || '');
+    const interpolation = interpolationFromName(entry.interpolation);
+    const times = Float32Array.from(entry.times || []);
+    const values = entry.type === 'bool' || entry.type === 'string' ? Array.from(entry.values || []) : Float32Array.from(entry.values || []);
+    let track = null;
+    if (entry.type === 'quaternion' || name.endsWith('.quaternion')) track = new THREE.QuaternionKeyframeTrack(name, times, values, interpolation);
+    else if (entry.type === 'vector' || name.endsWith('.position') || name.endsWith('.scale')) track = new THREE.VectorKeyframeTrack(name, times, values, interpolation);
+    else if (entry.type === 'bool') track = new THREE.BooleanKeyframeTrack(name, times, values, interpolation);
+    else if (entry.type === 'string') track = new THREE.StringKeyframeTrack(name, times, values, interpolation);
+    else track = new THREE.NumberKeyframeTrack(name, times, values, interpolation);
+    tracks.push(track);
+  }
+  const clip = new THREE.AnimationClip(clipData.name || fallbackName, Number(clipData.duration || 0.001), tracks);
+  clip.userData = { ...(clipData.userData || {}), exportedAt: data?.exportedAt || '', actorKey: data?.actorKey || '', actorLabel: data?.actorLabel || '' };
+  return clip;
+}
+
+function loadPoseClip(path) {
+  return fetch(new URL(path, import.meta.url)).then((response) => {
+    if (!response.ok) throw new Error('failed to load pose clip ' + path + ' (' + response.status + ')');
+    return response.json();
+  }).then((data) => deserializePoseClip(data, path.split('/').pop().replace(/\.poseclip\.json$/i, '').replace(/\.[^.]+$/, '')));
+}
+
+function isRootOrHipPositionTrack(trackName) {
+  const name = String(trackName || '').toLowerCase();
+  if (!name.endsWith('.position')) return false;
+  const target = name.slice(0, -'.position'.length);
+  return target === 'hips'
+    || target === 'root'
+    || target.endsWith(':hips')
+    || target.endsWith('|hips')
+    || target.endsWith('/hips')
+    || target.endsWith('.hips')
+    || target.includes('mixamorig:hips')
+    || target.includes('mixamorig_hips')
+    || target.includes('mixamorighips');
+}
+
+function stripRootMotionXZ(clip) {
+  const clone = clip.clone();
+  for (const track of clone.tracks) {
+    if (!isRootOrHipPositionTrack(track.name) || track.values.length < 3) continue;
+    const baseX = track.values[0];
+    const baseZ = track.values[2];
+    for (let i = 0; i < track.values.length; i += 3) {
+      track.values[i] = baseX;
+      track.values[i + 2] = baseZ;
+    }
+  }
+  clone.resetDuration();
+  return clone;
+}
+
 function resolvePlayerSolids(position, velocity) {
   const radius = 0.38;
   const minY = position.y - PLAYER_EYE_HEIGHT + 0.15;
@@ -2681,6 +3375,518 @@ function resolveSupportHeight(x, z, feetY, velocityY) {
     if (!best || surface.topY > best.topY) best = surface;
   }
   return best;
+}
+
+function findEnemySupport(x, z, referenceY, stepUp = ENEMY_STEP_UP, stepDown = ENEMY_STEP_DOWN) {
+  let best = null;
+  for (const surface of walkableSurfaces) {
+    if (x < surface.minX - ENEMY_FLOOR_RADIUS || x > surface.maxX + ENEMY_FLOOR_RADIUS) continue;
+    if (z < surface.minZ - ENEMY_FLOOR_RADIUS || z > surface.maxZ + ENEMY_FLOOR_RADIUS) continue;
+    const deltaY = surface.topY - referenceY;
+    if (deltaY > stepUp || deltaY < -stepDown) continue;
+    if (!best || surface.topY > best.topY) best = surface;
+  }
+  return best;
+}
+
+function enemyBodyBlockedAt(x, z, floorY) {
+  const minY = floorY + 0.08;
+  const maxY = floorY + ORC_BERSERKER_TARGET_HEIGHT * 0.86;
+  for (const solid of solidColliders) {
+    if (maxY < solid.minY || minY > solid.maxY) continue;
+    if (x < solid.minX - ENEMY_SOLID_RADIUS || x > solid.maxX + ENEMY_SOLID_RADIUS) continue;
+    if (z < solid.minZ - ENEMY_SOLID_RADIUS || z > solid.maxZ + ENEMY_SOLID_RADIUS) continue;
+    return true;
+  }
+  return false;
+}
+
+function sampleEnemyMoveSupport(from, to) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const distance = Math.hypot(dx, dz);
+  const steps = Math.max(1, Math.ceil(distance / ENEMY_FLOOR_SAMPLE_STEP));
+  let referenceY = Number.isFinite(enemy?.userData?.baseY) ? enemy.userData.baseY : from.y;
+  let support = findEnemySupport(from.x, from.z, referenceY, ENEMY_STEP_UP, ENEMY_STEP_DOWN) || { topY: referenceY };
+  referenceY = support.topY;
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const x = from.x + dx * t;
+    const z = from.z + dz * t;
+    support = findEnemySupport(x, z, referenceY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    if (!support || enemyBodyBlockedAt(x, z, support.topY)) return null;
+    referenceY = support.topY;
+  }
+  return support;
+}
+
+function applyEnemyMove(direction, speed, dt) {
+  if (!enemy || direction.lengthSq() <= 0.0001 || speed <= 0) return false;
+  const step = direction.clone().normalize().multiplyScalar(speed * dt);
+  const next = enemy.position.clone().add(step);
+  const bounds = roomState.levelBounds;
+  if (bounds) {
+    next.x = clamp(next.x, bounds.minX + 0.65, bounds.maxX - 0.65);
+    next.z = clamp(next.z, bounds.minZ + 0.65, bounds.maxZ - 0.65);
+  }
+  const support = sampleEnemyMoveSupport(enemy.position, next);
+  if (!support) {
+    enemy.userData.pursuitStall = Math.min(48, (enemy.userData.pursuitStall || 0) + 1);
+    return false;
+  }
+  enemy.position.x = next.x;
+  enemy.position.z = next.z;
+  enemy.userData.baseY = support.topY;
+  enemy.userData.pursuitStall = 0;
+  return true;
+}
+
+function getEnemyNavState() {
+  if (!enemy) return null;
+  if (!enemy.userData.nav) {
+    enemy.userData.nav = {
+      goal: null,
+      waypoints: [],
+      waypointKinds: [],
+      routePath: [],
+      routeGraph: null,
+      mode: 'approach',
+      repathTimer: 0,
+      stallCount: 0,
+      lastSeenPlayer: null,
+      lastValidSupport: null,
+      jump: null,
+      lastEnemyRoomIndex: -1,
+      lastPlayerRoomIndex: -1,
+    };
+  }
+  return enemy.userData.nav;
+}
+
+function roomFloorPoint(room, key) {
+  const point = room?.[key];
+  if (!point) return null;
+  return makeVec(point.x, point.y - PLAYER_EYE_HEIGHT, point.z);
+}
+
+function roomSocketPoint(room, key) {
+  const point = room?.sockets?.[key];
+  if (!point) return null;
+  return makeVec(point.x, point.y - PLAYER_EYE_HEIGHT, point.z);
+}
+
+function roomWorldCenter(room) {
+  const bounds = room?.bounds;
+  if (bounds) return makeVec((bounds.minX + bounds.maxX) * 0.5, 0, (bounds.minZ + bounds.maxZ) * 0.5);
+  const fallback = room?.spawn || room?.exit || makeVec(0, 0, 0);
+  return makeVec(fallback.x, 0, fallback.z);
+}
+
+function roomTraversalKindForSpec(spec) {
+  const text = [spec?.junction_class, spec?.semantic_role, spec?.batch_prompt, ...(spec?.route_sentence || [])].join(' ').toLowerCase();
+  const overlays = new Set((spec?.vertical_overlays || []).map((value) => String(value).toUpperCase()));
+  if (overlays.has('D') || /drop|descent|lower|recovery|down/.test(text)) return 'drop';
+  if (overlays.has('U') || /stair|climb|ascent|upper|up/.test(text)) return 'stair';
+  if (/bridge|overpass|gallery|ledge|span|cross/.test(text)) return 'bridge';
+  if (/jump|gap|leap/.test(text)) return 'jump';
+  if (/branch|fork|loop|hub|switch|return|side/.test(text)) return 'branch';
+  return 'flat';
+}
+
+function roomTraversalEdgeKind(fromSpec, toSpec) {
+  const kindA = roomTraversalKindForSpec(fromSpec);
+  const kindB = roomTraversalKindForSpec(toSpec);
+  if (kindA === 'drop' || kindB === 'drop') return 'drop';
+  if (kindA === 'stair' || kindB === 'stair') return 'stair';
+  if (kindA === 'bridge' || kindB === 'bridge') return 'bridge';
+  if (kindA === 'jump' || kindB === 'jump') return 'jump';
+  if (kindA === 'branch' || kindB === 'branch') return 'branch';
+  return 'flat';
+}
+
+function roomTraversalSocketKeys(kind) {
+  switch (kind) {
+    case 'stair': return ['stair', 'ledge', 'bridge', 'gate'];
+    case 'drop': return ['drop', 'ledge', 'stair', 'gate'];
+    case 'bridge': return ['bridge', 'ledge', 'gate', 'stair'];
+    case 'jump': return ['ledge', 'bridge', 'gate', 'stair'];
+    case 'branch': return ['gate', 'bridge', 'ledge', 'stair'];
+    default: return ['gate', 'bridge', 'ledge', 'stair'];
+  }
+}
+
+function pickRoomSocketToward(room, targetPosition, fallbackKey, kind = 'flat') {
+  const sockets = room?.sockets || null;
+  const keys = [...new Set([...(fallbackKey ? [fallbackKey] : []), ...roomTraversalSocketKeys(kind)])];
+  if (!sockets) return roomSocketPoint(room, keys[0] || fallbackKey) || roomFloorPoint(room, keys[0] || fallbackKey);
+  let best = null;
+  let bestScore = Infinity;
+  for (const key of keys) {
+    const point = sockets[key];
+    if (!point) continue;
+    const candidate = makeVec(point.x, point.y - PLAYER_EYE_HEIGHT, point.z);
+    const score = targetPosition ? candidate.distanceToSquared(targetPosition) : 0;
+    if (score < bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  if (!best) {
+    for (const point of Object.values(sockets)) {
+      if (!point) continue;
+      const candidate = makeVec(point.x, point.y - PLAYER_EYE_HEIGHT, point.z);
+      const score = targetPosition ? candidate.distanceToSquared(targetPosition) : 0;
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+  }
+  return best || roomSocketPoint(room, keys[0] || fallbackKey) || roomFloorPoint(room, keys[0] || fallbackKey);
+}
+
+function findNearestGauntletRoomIndex(position) {
+  if (!roomState.gauntletRooms?.length) return -1;
+  let bestIndex = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < roomState.gauntletRooms.length; i += 1) {
+    const center = roomWorldCenter(roomState.gauntletRooms[i]);
+    const dx = position.x - center.x;
+    const dz = position.z - center.z;
+    const distSq = dx * dx + dz * dz;
+    if (distSq < bestDist) {
+      bestDist = distSq;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
+function buildRoomTraversalGraph(rooms, specs, branchLinks = []) {
+  const nodes = rooms.map((room, index) => ({
+    index,
+    kind: roomTraversalKindForSpec(specs[index]),
+    room,
+    spec: specs[index],
+    connectors: Object.keys(room?.sockets || {}),
+  }));
+  const adjacency = Array.from({ length: rooms.length }, () => []);
+  const connect = (from, to, kind, options = {}) => {
+    if (!rooms[from] || !rooms[to]) return;
+    adjacency[from].push({
+      from,
+      to,
+      kind,
+      fromKey: options.fromKey || 'exit',
+      toKey: options.toKey || 'spawn',
+      branch: Boolean(options.branch),
+      linear: Boolean(options.linear),
+    });
+  };
+  for (let i = 0; i < rooms.length - 1; i += 1) {
+    const kind = roomTraversalEdgeKind(specs[i], specs[i + 1]);
+    const fromKey = kind === 'drop' ? 'ledge' : (kind === 'stair' ? 'stair' : (kind === 'bridge' ? 'bridge' : 'exit'));
+    const toKey = kind === 'drop' ? 'ledge' : (kind === 'stair' ? 'stair' : (kind === 'bridge' ? 'bridge' : 'spawn'));
+    connect(i, i + 1, kind, { fromKey, toKey, linear: true });
+    connect(i + 1, i, kind, { fromKey: toKey, toKey: fromKey, linear: true });
+  }
+  for (const link of branchLinks) {
+    const fromSpec = specs[link.a];
+    const toSpec = specs[link.b];
+    const kind = roomTraversalEdgeKind(fromSpec, toSpec);
+    connect(link.a, link.b, kind, { fromKey: link.sideA, toKey: link.sideB, branch: true });
+    connect(link.b, link.a, kind, { fromKey: link.sideB, toKey: link.sideA, branch: true });
+  }
+  return { nodes, adjacency };
+}
+
+function findRoomTraversalPath(graph, startIndex, goalIndex) {
+  if (!graph?.adjacency?.length) return null;
+  if (startIndex === goalIndex) return [];
+  const count = graph.adjacency.length;
+  const seen = new Array(count).fill(false);
+  const prevEdge = new Array(count).fill(null);
+  const queue = [startIndex];
+  seen[startIndex] = true;
+  while (queue.length) {
+    const index = queue.shift();
+    if (index === goalIndex) break;
+    for (const edge of graph.adjacency[index] || []) {
+      if (seen[edge.to]) continue;
+      seen[edge.to] = true;
+      prevEdge[edge.to] = edge;
+      queue.push(edge.to);
+    }
+  }
+  if (!seen[goalIndex]) return null;
+  const path = [];
+  let cursor = goalIndex;
+  while (cursor !== startIndex) {
+    const edge = prevEdge[cursor];
+    if (!edge) return null;
+    path.push(edge);
+    cursor = edge.from;
+  }
+  path.reverse();
+  return path;
+}
+
+function clearEnemyRoute(nav) {
+  nav.waypoints.length = 0;
+  nav.waypointKinds.length = 0;
+  nav.routePath.length = 0;
+}
+
+function pushEnemyRouteWaypoint(nav, point, kind = 'flat') {
+  if (!point) return;
+  const last = nav.waypoints[nav.waypoints.length - 1];
+  if (last && last.distanceToSquared(point) < 0.16) return;
+  nav.waypoints.push(point.clone ? point.clone() : makeVec(point.x, point.y, point.z));
+  nav.waypointKinds.push(kind || 'flat');
+}
+
+function shiftEnemyRouteWaypoint(nav) {
+  if (!nav?.waypoints?.length) return null;
+  if (nav.waypointKinds.length) nav.waypointKinds.shift();
+  return nav.waypoints.shift();
+}
+
+function pushEnemyWaypoint(list, point) {
+  if (!point) return;
+  const last = list[list.length - 1];
+  if (last && last.distanceToSquared(point) < 0.16) return;
+  list.push(point.clone ? point.clone() : makeVec(point.x, point.y, point.z));
+}
+
+function enemyJumpDuration() {
+  return Math.max(0.42, enemyActions.get('jumping')?.getClip?.().duration || ENEMY_ATTACK_RECOVERY);
+}
+
+function enemyCanJumpBetween(from, to) {
+  if (!enemy) return false;
+  const refY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : from.y;
+  const targetSupport = findEnemySupport(to.x, to.z, refY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  if (!targetSupport) return false;
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < ENEMY_JUMP_MIN_DISTANCE || dist > ENEMY_JUMP_MAX_DISTANCE) return false;
+  if (Math.abs(targetSupport.topY - refY) > ENEMY_JUMP_MAX_HEIGHT) return false;
+  return !sampleEnemyMoveSupport(from, to);
+}
+
+function tryEnemyJumpTargets(targets) {
+  if (!enemy) return false;
+  const currentSupport = findEnemySupport(enemy.position.x, enemy.position.z, enemy.userData.baseY ?? enemy.position.y, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  const currentTopY = currentSupport?.topY ?? (enemy.userData.baseY ?? enemy.position.y);
+  for (const target of targets) {
+    if (!target) continue;
+    const landing = findEnemySupport(target.x, target.z, currentTopY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    if (!landing) continue;
+    const advance = target.distanceTo(enemy.position);
+    if (advance < ENEMY_JUMP_MIN_DISTANCE || advance > ENEMY_JUMP_MAX_DISTANCE) continue;
+    if (Math.abs(landing.topY - currentTopY) > ENEMY_JUMP_MAX_HEIGHT) continue;
+    const towardPlayer = player.position.clone().sub(enemy.position);
+    towardPlayer.y = 0;
+    const moveToTarget = target.clone().sub(enemy.position);
+    moveToTarget.y = 0;
+    if (towardPlayer.lengthSq() > 0.001 && moveToTarget.lengthSq() > 0.001) {
+      if (moveToTarget.dot(towardPlayer) < 0.35 * moveToTarget.length() * towardPlayer.length()) continue;
+    }
+    if (!sampleEnemyMoveSupport(enemy.position, makeVec(target.x, landing.topY, target.z)) && startEnemyJump(target)) return true;
+  }
+  return false;
+}
+
+function buildEnemyLocalRoute(room, from, to) {
+  if (!room) return [to.clone()];
+  if (sampleEnemyMoveSupport(from, to)) return [to.clone()];
+  const center = roomWorldCenter(room);
+  const bounds = room.bounds || null;
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const len = Math.hypot(dx, dz);
+  if (len < 0.001) return [to.clone()];
+  const ux = dx / len;
+  const uz = dz / len;
+  const perp = makeVec(-uz, 0, ux);
+  const span = bounds ? Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) : 24;
+  const detour = Math.max(3.2, Math.min(6.4, span * 0.18));
+  const anchors = [];
+  for (const key of ['spawn', 'exit']) {
+    const point = roomFloorPoint(room, key);
+    if (point) anchors.push(point);
+  }
+  if (room.sockets) {
+    for (const socket of Object.values(room.sockets)) {
+      if (!socket) continue;
+      anchors.push(makeVec(socket.x, socket.y - PLAYER_EYE_HEIGHT, socket.z));
+    }
+  }
+  anchors.push(center.clone());
+  anchors.push(center.clone().addScaledVector(perp, detour));
+  anchors.push(center.clone().addScaledVector(perp, -detour));
+  anchors.push(from.clone().addScaledVector(perp, detour));
+  anchors.push(from.clone().addScaledVector(perp, -detour));
+  anchors.push(to.clone().addScaledVector(perp, detour));
+  anchors.push(to.clone().addScaledVector(perp, -detour));
+
+  let best = null;
+  let bestScore = Infinity;
+  const refY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : from.y;
+  for (const candidate of anchors) {
+    if (!candidate) continue;
+    const support = findEnemySupport(candidate.x, candidate.z, refY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    if (!support) continue;
+    const point = makeVec(candidate.x, support.topY, candidate.z);
+    const fromClear = !!sampleEnemyMoveSupport(from, point);
+    const toClear = !!sampleEnemyMoveSupport(point, to);
+    const fromJump = !fromClear && enemyCanJumpBetween(from, point);
+    const toJump = !toClear && enemyCanJumpBetween(point, to);
+    if (!fromClear && !fromJump) continue;
+    if (!toClear && !toJump) continue;
+    const score = from.distanceTo(point) + point.distanceTo(to) + Math.abs(support.topY - refY) * 0.45;
+    if (score < bestScore) {
+      bestScore = score;
+      best = point;
+    }
+  }
+  if (!best) return [to.clone()];
+  return [best, to.clone()];
+}
+
+function rebuildEnemyRoute(force = false) {
+  if (!enemy) return;
+  const nav = getEnemyNavState();
+  if (!nav) return;
+  const goal = makeVec(player.position.x, player.position.y - PLAYER_EYE_HEIGHT, player.position.z);
+  nav.goal = goal.clone();
+  nav.lastSeenPlayer = player.position.clone();
+  nav.repathTimer = ENEMY_NAV_REPATH_INTERVAL;
+  nav.stallCount = 0;
+  nav.jump = null;
+  clearEnemyRoute(nav);
+  nav.mode = enemy.userData.mode || 'approach';
+
+  const rooms = roomState.gauntletRooms || [];
+  const specs = GENERATED_ROOM_BATCH || [];
+  const graph = roomState.navGraph;
+  const enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
+  const playerRoomIndex = findNearestGauntletRoomIndex(player.position);
+  nav.lastEnemyRoomIndex = enemyRoomIndex;
+  nav.lastPlayerRoomIndex = playerRoomIndex;
+  nav.routePath = graph ? findRoomTraversalPath(graph, enemyRoomIndex, playerRoomIndex) || [] : [];
+
+  if (!rooms.length || enemyRoomIndex < 0 || playerRoomIndex < 0) {
+    pushEnemyRouteWaypoint(nav, goal, 'flat');
+    return;
+  }
+
+  const pathEdges = nav.routePath;
+  if (pathEdges.length) {
+    const startRoom = rooms[enemyRoomIndex];
+    const firstEdge = pathEdges[0];
+    const firstTargetRoom = rooms[firstEdge.to];
+    const firstSource = pickRoomSocketToward(startRoom, roomWorldCenter(firstTargetRoom), firstEdge.fromKey, firstEdge.kind) || startRoom.spawn;
+    for (const point of buildEnemyLocalRoute(startRoom, enemy.position, firstSource)) pushEnemyRouteWaypoint(nav, point, firstEdge.kind);
+    for (const edge of pathEdges) {
+      const fromRoom = rooms[edge.from];
+      const toRoom = rooms[edge.to];
+      const source = pickRoomSocketToward(fromRoom, roomWorldCenter(toRoom), edge.fromKey, edge.kind) || fromRoom.exit;
+      const target = pickRoomSocketToward(toRoom, roomWorldCenter(fromRoom), edge.toKey, edge.kind) || toRoom.spawn;
+      pushEnemyRouteWaypoint(nav, source, edge.kind);
+      pushEnemyRouteWaypoint(nav, target, edge.kind);
+    }
+    const finalRoom = rooms[playerRoomIndex];
+    const tailStart = nav.waypoints.length ? nav.waypoints[nav.waypoints.length - 1] : enemy.position;
+    const tailRoute = buildEnemyLocalRoute(finalRoom, tailStart, goal);
+    for (const point of tailRoute) pushEnemyRouteWaypoint(nav, point, roomTraversalKindForSpec(specs[playerRoomIndex]));
+    if (!nav.waypoints.length) pushEnemyRouteWaypoint(nav, goal, 'flat');
+    return;
+  }
+
+  if (enemyRoomIndex === playerRoomIndex) {
+    for (const point of buildEnemyLocalRoute(rooms[enemyRoomIndex], enemy.position, goal)) pushEnemyRouteWaypoint(nav, point, roomTraversalKindForSpec(specs[enemyRoomIndex]));
+    if (!nav.waypoints.length) pushEnemyRouteWaypoint(nav, goal, 'flat');
+    return;
+  }
+
+  const step = enemyRoomIndex < playerRoomIndex ? 1 : -1;
+  for (let i = enemyRoomIndex; i !== playerRoomIndex; i += step) {
+    const room = rooms[i];
+    const nextRoom = rooms[i + step];
+    const roomCenter = roomWorldCenter(room);
+    const nextCenter = roomWorldCenter(nextRoom);
+    const edgeKind = roomTraversalEdgeKind(specs[i], specs[i + step]);
+    pushEnemyRouteWaypoint(nav, pickRoomSocketToward(room, nextCenter, step > 0 ? 'exit' : 'spawn', edgeKind), edgeKind);
+    pushEnemyRouteWaypoint(nav, pickRoomSocketToward(nextRoom, roomCenter, step > 0 ? 'spawn' : 'exit', edgeKind), edgeKind);
+  }
+
+  const finalRoom = rooms[playerRoomIndex];
+  const tailRoute = buildEnemyLocalRoute(finalRoom, nav.waypoints.length ? nav.waypoints[nav.waypoints.length - 1] : enemy.position, goal);
+  for (const point of tailRoute) pushEnemyRouteWaypoint(nav, point, roomTraversalKindForSpec(specs[playerRoomIndex]));
+  if (!nav.waypoints.length) pushEnemyRouteWaypoint(nav, goal, 'flat');
+}
+
+function startEnemyJump(target) {
+  if (!enemy) return false;
+  const nav = getEnemyNavState();
+  if (!nav) return false;
+  const refY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : enemy.position.y;
+  const landing = findEnemySupport(target.x, target.z, refY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  if (!landing) return false;
+  nav.jump = {
+    start: enemy.position.clone(),
+    target: makeVec(target.x, landing.topY, target.z),
+    startY: refY,
+    targetY: landing.topY,
+    elapsed: 0,
+    duration: enemyJumpDuration(),
+    arc: Math.max(0.58, Math.min(1.55, 0.45 + Math.abs(landing.topY - refY) * 0.52 + Math.hypot(target.x - enemy.position.x, target.z - enemy.position.z) * 0.08)),
+  };
+  enemy.userData.mode = 'jump';
+  enemy.userData.modeTimer = nav.jump.duration;
+  enemy.userData.attackCooldown = Math.max(0, enemy.userData.attackCooldown || 0);
+  enemy.userData.commitTimer = Math.max(0.15, enemy.userData.commitTimer || 0);
+  playEnemyAction('jumping', 0.05);
+  return true;
+}
+
+function advanceEnemyJump(dt) {
+  if (!enemy) return false;
+  const nav = getEnemyNavState();
+  const jump = nav?.jump;
+  if (!jump) return false;
+  jump.elapsed += dt;
+  const t = clamp(jump.elapsed / jump.duration, 0, 1);
+  const eased = t * t * (3 - 2 * t);
+  const lift = Math.sin(Math.PI * t) * jump.arc;
+  enemy.position.x = jump.start.x + (jump.target.x - jump.start.x) * eased;
+  enemy.position.z = jump.start.z + (jump.target.z - jump.start.z) * eased;
+  enemy.position.y = jump.startY + (jump.targetY - jump.startY) * eased + lift;
+  enemy.userData.baseY = jump.startY + (jump.targetY - jump.startY) * eased;
+  if (t < 1) return true;
+  enemy.position.copy(jump.target);
+  enemy.userData.baseY = jump.targetY;
+  nav.lastValidSupport = jump.target.clone();
+  nav.jump = null;
+  nav.repathTimer = 0.08;
+  if (nav.waypoints.length) nav.waypoints.shift();
+  enemy.userData.mode = 'approach';
+  enemy.userData.modeTimer = 0;
+  playEnemyAction('idle', 0.08);
+  return true;
+}
+
+function setEnemyMode(mode, timer = 0) {
+  if (!enemy || enemy.userData.mode === mode) return;
+  enemy.userData.mode = mode;
+  enemy.userData.modeTimer = timer;
+  if (mode === 'commit') enemy.userData.commitElapsed = 0;
+  if (mode === 'retreat') {
+    enemy.userData.orbitSign *= -1;
+    enemy.userData.commitTimer = ENEMY_COMMIT_INTERVAL;
+  }
 }
 
 function playArmAction(action, fade = 0.12, restart = false) {
@@ -2779,6 +3985,7 @@ function loadOrcBerserkerEnemy() {
     if (enemyMixer) {
       registerEnemyClip('idle', asset.animations);
       playEnemyAction('idle', 0.01);
+      loadProMeleeAxeEnemyClips();
     }
     enemy.add(enemyModel);
     if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
@@ -2811,10 +4018,12 @@ function configureMutantOrcModel(model) {
 
 function registerEnemyClip(name, clips, options = {}) {
   if (!enemyMixer || !clips?.length) return null;
-  const clip = clips[0].clone();
+  const sourceClip = clips[0];
+  const clip = options.stripRootMotionXZ ? stripRootMotionXZ(sourceClip) : sourceClip.clone();
   clip.name = name;
   const action = enemyMixer.clipAction(clip, enemyModel);
   action.enabled = true;
+  if (options.timeScale) action.timeScale = options.timeScale;
   if (options.once) {
     action.loop = THREE.LoopOnce;
     action.clampWhenFinished = true;
@@ -2832,11 +4041,34 @@ function playEnemyAction(name, fade = 0.16) {
 }
 
 function loadEnemyClip(name, path, options = {}) {
+  if (/\.poseclip\.json($|[?#])/i.test(path) || /\.json($|[?#])/i.test(path)) {
+    loadPoseClip(path).then((clip) => {
+      if (!clip) throw new Error('empty pose clip: ' + path);
+      registerEnemyClip(name, [clip], options);
+    }).catch((err) => {
+      console.warn('enemy clip failed', name, err);
+    });
+    return;
+  }
   fbxLoader.load(path, (asset) => {
     registerEnemyClip(name, asset.animations, options);
   }, undefined, (err) => {
-    console.warn('mutant orc clip failed', name, err);
+    console.warn('enemy clip failed', name, err);
   });
+}
+
+function loadProMeleeAxeEnemyClips() {
+  loadEnemyClip('idle', PRO_MELEE_AXE_CLIPS.idle, { stripRootMotionXZ: true });
+  loadEnemyClip('walk', PRO_MELEE_AXE_CLIPS.walk, { stripRootMotionXZ: true });
+  loadEnemyClip('sidestepLeft', PRO_MELEE_AXE_CLIPS.sidestepLeft, { stripRootMotionXZ: true });
+  loadEnemyClip('sidestepRight', PRO_MELEE_AXE_CLIPS.sidestepRight, { stripRootMotionXZ: true });
+  loadEnemyClip('run', PRO_MELEE_AXE_CLIPS.run, { stripRootMotionXZ: true, timeScale: 1.1 });
+  loadEnemyClip('jumping', PRO_MELEE_AXE_CLIPS.jumping, { once: true, stripRootMotionXZ: true });
+  loadEnemyClip('attackHorizontal', PRO_MELEE_AXE_CLIPS.attackHorizontal, { once: true });
+  loadEnemyClip('attackDownward', PRO_MELEE_AXE_CLIPS.attackDownward, { once: true });
+  loadEnemyClip('attackCombo', PRO_MELEE_AXE_CLIPS.attackCombo, { once: true });
+  loadEnemyClip('react', PRO_MELEE_AXE_CLIPS.react, { once: true });
+  loadEnemyClip('dying', PRO_MELEE_AXE_CLIPS.react, { once: true, timeScale: 0.72 });
 }
 
 function loadMutantOrcEnemy() {
@@ -3420,26 +4652,232 @@ function updatePlayer(dt) {
   }
 
   updateAttack(dt);
-  if (enemyMixer) {
-    enemyMixer.update(dt);
-    if (!enemy.userData.dead && enemyCurrentAction) {
-      const clipName = enemyCurrentAction.getClip().name;
-      if ((clipName === 'punch' || clipName === 'jumping') && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
-        playEnemyAction('idle', 0.12);
-      }
+  updateEnemyEngagement(dt);
+}
+
+
+function startEnemyAttack() {
+  if (!enemy || enemy.userData.attackTimer > 0) return;
+  const attackName = enemyActions.has('attackHorizontal') ? 'attackHorizontal' : (enemyActions.has('attackDownward') ? 'attackDownward' : (enemyActions.has('attackCombo') ? 'attackCombo' : 'idle'));
+  const clipDuration = enemyActions.get(attackName)?.getClip?.().duration || ENEMY_ATTACK_RECOVERY;
+  enemy.userData.attackName = attackName;
+  enemy.userData.attackTimer = Math.max(clipDuration, ENEMY_ATTACK_RECOVERY);
+  enemy.userData.attackElapsed = 0;
+  enemy.userData.attackHitDone = false;
+  playEnemyAction(attackName, 0.055);
+}
+
+function updateEnemyMixer(dt) {
+  if (!enemyMixer) return;
+  enemyMixer.update(dt);
+  if (!enemy.userData.dead && enemyCurrentAction) {
+    const clipName = enemyCurrentAction.getClip().name;
+    const oneShotReturns = ['jumping', 'react', 'attackDownward', 'attackCombo'];
+    if (oneShotReturns.includes(clipName) && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
+      playEnemyAction('idle', 0.12);
     }
-  }
-  enemy.userData.hitTimer = Math.max(0, enemy.userData.hitTimer - dt);
-  enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer || 0);
-  enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
-  enemy.position.y = Math.sin(performance.now() * 0.002) * 0.025;
-  enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
-  if (enemy.userData.dead && enemy.userData.deathTimer > 0) {
-    enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer - dt);
-    if (enemy.userData.deathTimer <= 0) enemy.visible = false;
   }
 }
 
+function updateEnemyEngagement(dt) {
+  if (!enemy) return;
+  updateEnemyMixer(dt);
+  enemy.userData.hitTimer = Math.max(0, enemy.userData.hitTimer - dt);
+  enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer || 0);
+  const nav = getEnemyNavState();
+  const baseY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : enemy.position.y;
+  enemy.position.y = baseY + Math.sin(performance.now() * 0.002) * 0.025;
+  enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
+  if (!enemy.visible) return;
+  if (enemy.userData.dead) {
+    if (enemy.userData.deathTimer > 0) {
+      enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer - dt);
+      if (enemy.userData.deathTimer <= 0) enemy.visible = false;
+    }
+    return;
+  }
+
+  const support = findEnemySupport(enemy.position.x, enemy.position.z, baseY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  if (support) {
+    enemy.userData.baseY = support.topY;
+    if (nav) nav.lastValidSupport = makeVec(enemy.position.x, support.topY, enemy.position.z);
+  }
+  const previousGoal = nav?.goal ? nav.goal.clone() : null;
+  const playerGoalY = player.grounded ? (player.position.y - PLAYER_EYE_HEIGHT) : (previousGoal?.y ?? (player.position.y - PLAYER_EYE_HEIGHT));
+  const playerFloorY = playerGoalY;
+  const verticalGap = playerFloorY - enemy.userData.baseY;
+
+  if (nav) {
+    nav.goal = makeVec(player.position.x, playerGoalY, player.position.z);
+    nav.lastSeenPlayer = player.position.clone();
+    nav.repathTimer = Math.max(0, nav.repathTimer - dt);
+    if (nav.jump) {
+      advanceEnemyJump(dt);
+      return;
+    }
+    const playerRoomIndex = findNearestGauntletRoomIndex(player.position);
+    const enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
+    const goalChanged = !previousGoal || (player.grounded ? previousGoal.distanceToSquared(nav.goal) > 0.36 : ((previousGoal.x - nav.goal.x) ** 2 + (previousGoal.z - nav.goal.z) ** 2 > 0.36));
+    const roomChanged = nav.lastEnemyRoomIndex !== enemyRoomIndex || nav.lastPlayerRoomIndex !== playerRoomIndex;
+    const staleRoute = nav.waypoints.length === 0 || nav.repathTimer <= 0 || roomChanged || goalChanged;
+    if (staleRoute) rebuildEnemyRoute(roomChanged || nav.waypoints.length === 0);
+    nav.lastEnemyRoomIndex = enemyRoomIndex;
+    nav.lastPlayerRoomIndex = playerRoomIndex;
+  }
+
+  const toPlayer = player.position.clone().sub(enemy.position);
+  toPlayer.y = 0;
+  const dist = toPlayer.length();
+  const toPlayerDir = dist > 0.001 ? toPlayer.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1);
+  enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
+
+  enemy.userData.attackCooldown = Math.max(0, (enemy.userData.attackCooldown || 0) - dt);
+  enemy.userData.commitTimer = Math.max(0, (enemy.userData.commitTimer || 0) - dt);
+  enemy.userData.modeTimer = Math.max(0, (enemy.userData.modeTimer || 0) - dt);
+  if (enemy.userData.hitTimer > 0) return;
+
+  if (enemy.userData.attackTimer > 0) {
+    enemy.userData.attackElapsed += dt;
+    enemy.userData.attackTimer = Math.max(0, enemy.userData.attackTimer - dt);
+    if (enemy.userData.attackElapsed >= ENEMY_ATTACK_WINDUP && enemy.userData.attackElapsed <= ENEMY_ATTACK_ACTIVE_END) {
+      applyEnemyMove(toPlayerDir, ENEMY_LUNGE_SPEED, dt);
+    }
+    if (!enemy.userData.attackHitDone && enemy.userData.attackElapsed >= ENEMY_ATTACK_WINDUP) {
+      enemy.userData.attackHitDone = true;
+      if (dist <= ENEMY_ATTACK_RANGE + 0.3) {
+        player.healthPulse = 0.45;
+        player.velocity.addScaledVector(toPlayerDir, 1.65);
+        playThud(1.05);
+      }
+    }
+    if (enemy.userData.attackTimer <= 0) {
+      enemy.userData.attackCooldown = ENEMY_ATTACK_COOLDOWN;
+      enemy.userData.attackName = '';
+      setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
+      playEnemyAction('idle', 0.12);
+    }
+    return;
+  }
+
+  const mode = enemy.userData.mode || 'approach';
+  const tangent = new THREE.Vector3(-toPlayerDir.z, 0, toPlayerDir.x).multiplyScalar(enemy.userData.orbitSign || 1);
+  const navTarget = nav?.waypoints?.length ? nav.waypoints[0].clone() : null;
+  const toNavTarget = navTarget ? navTarget.clone().sub(enemy.position) : null;
+  if (toNavTarget) toNavTarget.y = 0;
+  const navDist = toNavTarget ? toNavTarget.length() : dist;
+  const navDir = toNavTarget && navDist > 0.001 ? toNavTarget.clone().multiplyScalar(1 / navDist) : toPlayerDir;
+  const needsClimb = player.grounded && verticalGap > 0.22;
+
+  if (navTarget && navDist < 0.36) {
+    shiftEnemyRouteWaypoint(nav);
+    nav.repathTimer = 0;
+  }
+  if (nav?.jump) {
+    advanceEnemyJump(dt);
+    return;
+  }
+
+  if (needsClimb) {
+    setEnemyMode('approach');
+    const climbDir = navTarget ? navDir : toPlayerDir;
+    const moved = applyEnemyMove(climbDir, ENEMY_RUN_SPEED, dt);
+    playEnemyAction('run', 0.16);
+    if (!moved && nav) {
+      nav.stallCount += 1;
+      nav.repathTimer = 0;
+      rebuildEnemyRoute(true);
+    }
+    return;
+  }
+
+  if (dist <= ENEMY_ATTACK_RANGE && enemy.userData.attackCooldown <= 0 && mode !== 'retreat' && !needsClimb) {
+    startEnemyAttack();
+    return;
+  }
+
+  if (mode === 'commit') {
+    enemy.userData.commitElapsed += dt;
+    const moved = applyEnemyMove(navTarget ? navDir : toPlayerDir, ENEMY_RUN_SPEED, dt);
+    playEnemyAction('run', 0.12);
+    if (dist <= ENEMY_ATTACK_RANGE && enemy.userData.attackCooldown <= 0) {
+      startEnemyAttack();
+      return;
+    }
+    if (!moved || enemy.userData.commitElapsed >= ENEMY_COMMIT_TIMEOUT) {
+      setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
+      if (nav) nav.repathTimer = 0;
+    }
+    return;
+  }
+
+  if (mode === 'retreat') {
+    const retreatDir = toPlayerDir.clone().multiplyScalar(-0.85).addScaledVector(tangent, 0.42);
+    const moved = applyEnemyMove(retreatDir, ENEMY_RETREAT_SPEED, dt);
+    playEnemyAction(enemy.userData.orbitSign > 0 ? 'sidestepRight' : 'sidestepLeft', 0.14);
+    if (!moved || enemy.userData.modeTimer <= 0 || dist >= ENEMY_RING_RADIUS + ENEMY_RING_TOLERANCE) {
+      setEnemyMode('hold', 0.55);
+      if (nav) nav.repathTimer = 0;
+    }
+    return;
+  }
+
+  if (navTarget) {
+    const moved = applyEnemyMove(navDir, navDist > ENEMY_RING_RADIUS + 2.2 ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED, dt);
+    playEnemyAction(navDist > ENEMY_RING_RADIUS + 2.2 ? 'run' : 'walk', 0.16);
+    if (!moved) {
+      if (nav) {
+        nav.stallCount += 1;
+        nav.repathTimer = 0;
+        rebuildEnemyRoute(true);
+      }
+    } else if (nav) {
+      nav.stallCount = 0;
+      nav.lastValidSupport = makeVec(enemy.position.x, baseY, enemy.position.z);
+    }
+    return;
+  }
+
+  if (dist > ENEMY_RING_RADIUS + ENEMY_RING_TOLERANCE) {
+    setEnemyMode('approach');
+    const moved = applyEnemyMove(toPlayerDir, dist > ENEMY_RING_RADIUS + 2.2 ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED, dt);
+    playEnemyAction(dist > ENEMY_RING_RADIUS + 2.2 ? 'run' : 'walk', 0.16);
+    if (!moved) {
+      if (nav) {
+        nav.stallCount += 1;
+        nav.repathTimer = 0;
+        rebuildEnemyRoute(true);
+      }
+    }
+    return;
+  }
+
+  if (dist < ENEMY_ATTACK_RANGE * 0.78 && !needsClimb) {
+    setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
+    return;
+  }
+
+  setEnemyMode('hold');
+  if (enemy.userData.commitTimer <= 0 && enemy.userData.attackCooldown <= 0) {
+    setEnemyMode('commit');
+    return;
+  }
+
+  const radialError = dist - ENEMY_RING_RADIUS;
+  const holdMove = tangent.clone().addScaledVector(toPlayerDir, radialError * 0.22);
+  const moved = applyEnemyMove(holdMove, ENEMY_SIDESTEP_SPEED, dt);
+  if (!moved) {
+    enemy.userData.orbitSign *= -1;
+    enemy.userData.commitTimer = Math.min(enemy.userData.commitTimer || 0, 0.25);
+    if (nav) {
+      nav.stallCount += 1;
+      nav.repathTimer = 0;
+      if (nav.stallCount >= ENEMY_NAV_STALL_LIMIT) rebuildEnemyRoute(true);
+    }
+  } else if (nav) {
+    nav.stallCount = 0;
+  }
+  playEnemyAction(enemy.userData.orbitSign > 0 ? 'sidestepRight' : 'sidestepLeft', 0.18);
+}
 
 function updateAttack(dt) {
   player.attackTimer = Math.max(0, player.attackTimer - dt);
@@ -3458,7 +4896,7 @@ function updateAttack(dt) {
       enemy.userData.health -= def.damage;
       enemy.userData.hitTimer = 0.28;
       enemy.position.addScaledVector(attack.direction, 0.28 + def.damage * 0.12);
-      playEnemyAction('punch', 0.06);
+      playEnemyAction('react', 0.04);
       playThud(1.05 + def.damage * 0.16);
       if (enemy.userData.health <= 0) {
         enemy.userData.dead = true;
@@ -3523,7 +4961,8 @@ function render() {
     renderer.render(armsScene, armsCamera);
     const mode = player.attack?.def?.name || (input.jumpCharging ? 'jump-charge' : (player.isRunning ? 'run' : (!player.grounded ? 'air' : (player.runCharge > 0 ? 'build' : 'walk'))));
     const node = roomState.spec;
-    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'} | ${input.gyro ? 'gyro' : 'touch'}`;
+    const districtText = node?.districtName ? ` | D${(node.districtIndex ?? 0) + 1} ${node.districtName}${node.districtElevationBand ? `(${node.districtElevationBand})` : ''}` : '';
+    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'} | ${input.gyro ? 'gyro' : 'touch'}`;
   } catch (err) {
     console.error(err);
     setStatus('runtime error: ' + (err?.message || err));

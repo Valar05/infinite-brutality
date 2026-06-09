@@ -1,6 +1,6 @@
 # Infinite Brutality Room Batch Implementation
 
-Build: `0.8.22`
+Build: `0.8.30`
 
 The 48-room junction batch is now wired into runtime as a generated playable sequence.
 
@@ -9,6 +9,7 @@ The 48-room junction batch is now wired into runtime as a generated playable seq
 - `data/room_junction_batch.json`: source room prompt/spec list.
 - `src/generated_room_batch.js`: generated JS module consumed by the browser runtime.
 - `src/main.js`: imports `GENERATED_ROOM_BATCH`, builds the current batch room, and advances to the next room when the exit marker is reached.
+- `roomState.navGraph`: room-traversal graph built from room sockets and route kinds so pursuit can follow authored links instead of only local collision guesses.
 
 ## Behavior
 
@@ -18,6 +19,7 @@ The 48-room junction batch is now wired into runtime as a generated playable seq
 - Multi-connector rooms enter through the first connector and exit through the second; extra connectors become side branches.
 - Vertical overlays (`U` / `D`) add raised exits, stairs, recovery paths, or lower recovery space.
 - Reaching the exit advances through all 48 rooms, then wraps to room 1 and increments the level index.
+- Enemy pursuit now walks the same district graph used by the room batch, so the agent can chain authored sockets and route kinds across rooms before falling back to local support sampling.
 
 ## Generation Rules Preserved
 
@@ -34,6 +36,48 @@ The 48-room junction batch is now wired into runtime as a generated playable seq
 - Tune bridge widths/gaps for touch movement after screenshots/playtest.
 - Add per-room authored exceptions for any generated blockout that has the right topology but weak silhouette.
 - Decide whether to add a debug next-room button/key for fast review.
+
+## Build 0.8.30 Route Graph Pursuit
+
+Build `0.8.30` adds the explicit room-traversal graph used by the district spine. The runtime now classifies room links as `flat`, `stair`, `drop`, `bridge`, `jump`, or `branch`, stores a graph on `roomState`, and rebuilds enemy routes from authored socket targets instead of trying to invent the path from collision alone.
+
+This is the first slice of the "never quit" pursuit model. The top-level route decision is now graph-driven; the last-mile move still uses local support checks and collision validation.
+
+## Build 0.8.29 Height-Separated District Spine
+
+Build `0.8.29` replaces the mostly planar district placement pass with seeded elevation bands and a macro spine that intentionally climbs, drops, and climbs again across the run. Districts now carry explicit base and top elevations, approach/departure types, support styles, and landmark roles so the runtime can read the settlement as stacked over the abyss instead of just offset in X/Z.
+
+Runtime impact for this slice:
+
+- district plans now expose elevation bands, macro spine edges, return edges, and landmark views
+- status/readout now show the current district band and base elevation
+- descent rooms keep their dedicated silhouette while the spine pass moves the larger height read into district placement
+- the first pass keeps the existing room batch and combat flow intact while making the world read as taller and more layered
+
+## Build 0.8.28 Descent Silhouette Fix
+
+Build `0.8.28` responds to screenshot feedback from the seeded district pass: some `descent` and `high_low` rooms were technically generating vertical play, but they read on screen as haphazard floating wall slabs instead of a clear upper-to-lower route.
+
+The runtime now gives those rooms a dedicated descent layout with an upper run, visible drop lip, side stair tower, lower terrace, and a cut void between levels. The generic lower-recovery and vertical-clutter helpers are skipped for descent rooms so the silhouette stays legible at phone scale.
+
+## Build 0.8.27 Extended Vector Surface Set
+
+Build `0.8.27` expands the project-owned vector texture set beyond stone, bronze, and bone. The runtime now also loads deterministic SVG surfaces for iron, blood, flesh, and hazard materials, so supports, gore, organic corruption, and furnace beds stop falling back to plain tinted Lambert colors.
+
+This keeps the art direction on the same vector-first low-poly track as the district pass. The new textures are lightweight, tileable, and directly wired into the existing material loader, with the review sheet and asset manifest updated to cover the larger surface family.
+
+## Build 0.8.26 Seeded District Graph Slice
+
+Build `0.8.26` stops treating the 48-room batch as four fixed 12-room chapters. The runtime now generates a seeded district plan per level from the persisted level seed, then partitions the same room corpus into four purpose-driven districts with variable room counts, archetype names, local layout templates, and local branch pairs.
+
+This is intentionally a first slice, not the final open-world system. The current runtime still uses the existing generated room specs and one continuous physical gauntlet, but the top-level world structure is now district-first instead of chapter-first. Intake, scaffold/lift/furnace/refuse middles, and shrine-rim endings can now recombine between runs without rewriting room geometry from scratch.
+
+Runtime impact for this slice:
+
+- room offsets now come from district-local layout templates instead of one fixed chapter shape
+- branch links are generated per district instead of per fixed chapter
+- status/readout now identify the current district name and purpose
+- the full settlement path remains deterministic from the current level seed and phone-safe to render in one pass
 
 
 ## Build 0.8.3 Physical Gauntlet Fix
@@ -152,3 +196,25 @@ The runtime loads `assets/models/orc_berserker/standing_idle.fbx`, normalizes it
 ## Build 0.8.22 Orc Foot Grounding
 
 Build `0.8.22` keeps the standing-idle orc scale and facing from `0.8.21`, but applies a small local Y offset after bounding-box normalization so the visible feet sit on the runway instead of hovering above it.
+
+
+## Build 0.8.23 Pressure-Ring Orc Engagement
+
+Build `0.8.23` adds the first Gravity Fist-derived enemy pressure-ring behavior to the browser prototype. The single active orc now approaches into a ring around the player, orbits/holds that band, backs out when too close, and commits to cooldown-gated melee attacks instead of idling in place.
+
+The build also imports `/storage/emulated/0/Download/Pro Melee Axe Pack (3).zip` as `assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip` and extracts a narrow runtime subset under `assets/models/pro_melee_axe/`. Walk, run, and jump traversal clips are registered with root/hips XZ translation locked to their first frame so the runtime controller owns traversal, while hip Y motion and all child-bone motion remain intact. Attack clips are left as one-shot silhouette actions.
+
+
+## Build 0.8.24 Floor-Aware Commit/Retreat Enemy Pressure
+
+Build `0.8.24` keeps the no-navmesh direction and adds a lightweight floor-probe controller for the active orc. Enemy movement now samples the existing `walkableSurfaces` list along each attempted step, rejects unsupported gaps or excessive height changes, checks registered solid blockers, and updates the enemy floor/base Y from the accepted support surface.
+
+The pressure-ring AI is now stateful instead of permanent orbit. The orc approaches the ring, uses lateral sidestep clips as the hold/idle-pressure behavior, commits after a short timer, attacks inside melee range, then retreats before re-entering hold. Failed floor-aware moves flip the sidestep direction and accelerate the next commit attempt so the enemy does not endlessly circle without engaging.
+
+
+
+## Build 0.8.28 Follow-up: Flat-Graph Diagnosis
+
+Fresh screenshots after the descent silhouette fix showed that local descent readability improved, but the overall world still reads too flat. The district graph is still mostly planar, and verticality is still being carried by room-local features instead of the settlement spine.
+
+The next implementation step is therefore not another room-detail patch. The authoritative reset plan is `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`: move verticality into district elevation bands, macro spine generation, and validated over-under relationships before further dressing.

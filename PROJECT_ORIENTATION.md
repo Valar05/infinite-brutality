@@ -32,6 +32,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 - `data/room_junction_batch.json`: overnight batch list of room prompts by connector topology.
 - `docs/ROOM_JUNCTION_BATCH_LIST.md`: human-readable room junction build list.
 - `docs/ROOM_BATCH_IMPLEMENTATION.md`: runtime wiring notes for the generated room sequence.
+- `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`: district-level route graph and implementation status.
 
 ## Direction
 
@@ -40,3 +41,27 @@ Render the world normally, then render FPS arms in a separate camera-space pass 
 ## Thunder Brainstorm
 
 Durable design/runtime context is linked from `THUNDER_LINKS.md`. The main Thunder note is `../thunder-brainstorm/generated/session_learnings/2026-06-08_infinite_brutality_prototype_lessons.md`. Read it before changing level generation, movement feel, visual language, or lighting.
+
+Level-design workflow is split in two places:
+
+- general workflow: `../thunder-brainstorm/generated/skills/level_design_environment_grammar.md`
+- project-specific workflow: `docs/LEVEL_DESIGN_WORKFLOW.md`
+- realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
+- district graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
+
+When a level-design pass produces a durable critique/fix pattern, update the general Thunder note if it generalizes and this project-local note if it is Infinite Brutality-specific.
+
+Before making changes:
+
+1. Explain the problem.
+2. Explain the likely cause.
+3. List files involved.
+4. Propose a solution.
+5. Wait for approval.
+
+Before changing anything:
+
+- Explain the smallest possible change that solves the problem.
+- Prefer modification over replacement.
+- Prefer extension over refactor.
+- Prefer local fixes over global changes.

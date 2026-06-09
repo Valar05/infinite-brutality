@@ -199,12 +199,44 @@
       "prompt_summary": "wide panoramic Limbo skybox with distant impossible stone walls, brutalist gothic towers, jagged spires, suspended bridges, dark underworld haze, red-blue horizon, sparse corpsefire accents; no starscape, no text, no UI, no watermark"
     },
     {
-      "path": "assets/textures/ib-vector-material-sheet-20260608.svg",
-      "source": "assets/textures/ib-vector-stone-20260608.svg + assets/textures/ib-vector-bronze-20260608.svg + assets/textures/ib-vector-bone-20260608.svg + assets/textures/ib-vector-limbo-sky-20260608.svg",
-      "role": "review sheet for the flat vector material texture set",
+      "path": "assets/textures/ib-vector-iron-20260609.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector iron plate material texture for chains, braces, grates, and industrial supports",
       "tool": "Python local SVG generation",
-      "processing": "SVG sheet referencing the runtime vector material assets for quick inspection",
-      "prompt_summary": "not AI-generated; review sheet for project-owned vector material set"
+      "processing": "authored as SVG panels, rivets, and ridges with flat fills and strokes; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to give Infinite Brutality a project-owned iron surface family that matches the hard-edged low-poly material direction"
+    },
+    {
+      "path": "assets/textures/ib-vector-blood-20260609.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector blood slick material texture for gore runs, sacrificial stains, and dark ritual surfaces",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG pooled stains and rivulets with flat fills and strokes; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to add a readable blood material family without abandoning the vector-authored low-poly look"
+    },
+    {
+      "path": "assets/textures/ib-vector-flesh-20260609.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector flesh material texture for meat growths, body heaps, and organic corruption surfaces",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG soft shard plates and sinew marks with flat fills and strokes; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to add an organic material family compatible with the project low-poly/vector art rules"
+    },
+    {
+      "path": "assets/textures/ib-vector-hazard-20260609.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector furnace hazard material texture for heat beds, slag runs, and infernal warning surfaces",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG hot bands and ember shards with flat fills only; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to extend the settlement material set with a dedicated furnace and hazard surface family"
+    },
+    {
+      "path": "assets/textures/ib-vector-material-sheet-20260608.svg",
+      "source": "assets/textures/ib-vector-stone-20260608.svg + assets/textures/ib-vector-bronze-20260608.svg + assets/textures/ib-vector-bone-20260608.svg + assets/textures/ib-vector-iron-20260609.svg + assets/textures/ib-vector-blood-20260609.svg + assets/textures/ib-vector-flesh-20260609.svg + assets/textures/ib-vector-hazard-20260609.svg + assets/textures/ib-vector-limbo-sky-20260608.svg",
+      "role": "review sheet for the extended flat vector material texture set",
+      "tool": "Python local SVG generation",
+      "processing": "SVG sheet referencing the runtime vector material assets for quick inspection, including iron, blood, flesh, and hazard surfaces",
+      "prompt_summary": "not AI-generated; review sheet for the project-owned extended vector material set"
     },
     {
       "path": "assets/source/mutant_orc/mutant_dying_source.zip",
@@ -270,6 +302,100 @@
       "role": "active visible enemy model and standing idle animation source",
       "asset_class": "imported FBX skinned mesh and animation",
       "processing": "loaded by Three.js FBXLoader, auto-scaled to target enemy height by runtime bounding box, embedded idle clip registered on enemy AnimationMixer"
+    },
+    {
+      "path": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip",
+      "source": "/storage/emulated/0/Download/Pro Melee Axe Pack (3).zip",
+      "role": "source archive for Pro Melee Axe Pack Mixamo-rigged motion-only FBX animation set",
+      "asset_class": "downloaded/imported source archive",
+      "processing": "copied unchanged into project source assets; selected runtime FBX clips extracted into assets/models/pro_melee_axe/ and renamed to snake_case for browser loading",
+      "notes": "Archive contains 48 FBX clips. Current runtime subset uses standing idle/walk/run/jump, three melee attacks, and a large gut reaction. License/provenance beyond local download name is not yet documented."
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_idle.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing idle.fbx",
+      "role": "runtime enemy idle animation source for the pressure-ring orc",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered with root/hips XZ translation stripped while preserving hip Y motion"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_walk_forward.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing walk forward.fbx",
+      "role": "runtime enemy walk animation source for pressure-ring engagement",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered with root/hips XZ translation stripped while preserving hip Y motion"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_run_forward.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing run forward.fbx",
+      "role": "runtime enemy run animation source for pressure-ring approach",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered with root/hips XZ translation stripped while preserving hip Y motion"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_jump.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing jump.fbx",
+      "role": "runtime enemy jump animation source reserved for traversal beats",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered as a one-shot with root/hips XZ translation stripped while preserving hip Y motion"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_melee_attack_horizontal.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing melee attack horizontal.fbx",
+      "role": "runtime enemy pressure-ring melee attack animation",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered as a one-shot attack clip"
+    },
+    {
+      "path": "assets/source/orc_berserker/orc_standing_melee_attack_horizontal_smooth.poseclip.json",
+      "source": "/storage/emulated/0/Download/orc_standing_melee_attack_horizontal_smooth.poseclip.json",
+      "role": "edited cleanup export for the Infinite Brutality orc's standing melee horizontal swing",
+      "asset_class": "downloaded/exported pose clip JSON",
+      "processing": "copied unchanged from Pose Lab export into project source assets for later clip inspection and reuse",
+      "notes": "Exported from Pose Lab after deleting the tail gap and smoothing the swing seam. The clip payload is named standing_melee_attack_horizontal [smooth]."
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_melee_attack_horizontal_smooth.poseclip.json",
+      "source": "assets/source/orc_berserker/orc_standing_melee_attack_horizontal_smooth.poseclip.json",
+      "role": "runtime enemy pressure-ring melee attack animation for the cleaned horizontal swing",
+      "asset_class": "imported pose clip JSON",
+      "processing": "copied from the Pose Lab export and loaded at runtime through a JSON AnimationClip parser",
+      "notes": "This is the edited horizontal swing the user selected for Infinite Brutality."
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_melee_attack_downward.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing melee attack downward.fbx",
+      "role": "runtime enemy pressure-ring melee attack animation",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered as a one-shot attack clip"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_melee_combo_attack_v1.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing melee combo attack ver. 1.fbx",
+      "role": "runtime enemy pressure-ring combo attack animation",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered as a one-shot attack clip"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_react_large_gut.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing react large gut.fbx",
+      "role": "runtime enemy hit reaction and temporary death fallback animation",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered as one-shot react/dying actions"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_walk_left.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing walk left.fbx",
+      "role": "runtime enemy left sidestep idle-pressure animation",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered with root/hips XZ translation stripped while preserving hip Y motion"
+    },
+    {
+      "path": "assets/models/pro_melee_axe/standing_walk_right.fbx",
+      "source": "assets/source/pro_melee_axe/pro_melee_axe_pack_source.zip::standing walk right.fbx",
+      "role": "runtime enemy right sidestep idle-pressure animation",
+      "asset_class": "imported FBX motion clip",
+      "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered with root/hips XZ translation stripped while preserving hip Y motion"
     }
   ]
 }
