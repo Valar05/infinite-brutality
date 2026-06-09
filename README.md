@@ -16,7 +16,7 @@ http://127.0.0.1:8798/infinite-brutality/index.html
 
 ## Current Build
 
-Build `0.8.18` focuses on void-defined generated rooms, clearer connector stairs, and softened movement input.
+Build `0.8.19` adds the imported mutant/orc FBX enemy skin and animation set on top of the void-defined room and softened movement work.
 
 ## Validation
 

@@ -205,6 +205,56 @@
       "tool": "Python local SVG generation",
       "processing": "SVG sheet referencing the runtime vector material assets for quick inspection",
       "prompt_summary": "not AI-generated; review sheet for project-owned vector material set"
+    },
+    {
+      "path": "assets/source/mutant_orc/mutant_dying_source.zip",
+      "source": "/storage/emulated/0/Download/Mutant Dying.zip",
+      "role": "source archive for imported mutant/orc skinned FBX enemy mesh and animation set",
+      "asset_class": "downloaded/imported source archive",
+      "processing": "copied unchanged into project source assets; extracted runtime FBX files into assets/models/mutant_orc/",
+      "notes": "Archive contains Mutant Idle, Run, Walking, Jumping, Punch, and Dying FBX files. License/provenance beyond local download name is not yet documented."
+    },
+    {
+      "path": "assets/models/mutant_orc/mutant_idle.fbx",
+      "source": "assets/source/mutant_orc/mutant_dying_source.zip::Mutant Idle.fbx",
+      "role": "runtime enemy skinned mesh and idle animation source for mutant/orc opponent",
+      "asset_class": "imported FBX skinned mesh and animation",
+      "processing": "extracted from source archive and renamed to snake_case for browser loading; loaded through Three.js FBXLoader at runtime"
+    },
+    {
+      "path": "assets/models/mutant_orc/mutant_run.fbx",
+      "source": "assets/source/mutant_orc/mutant_dying_source.zip::Mutant Run.fbx",
+      "role": "runtime enemy run animation source",
+      "asset_class": "imported FBX animation",
+      "processing": "extracted from source archive and renamed to snake_case for browser loading; registered on the idle mesh AnimationMixer"
+    },
+    {
+      "path": "assets/models/mutant_orc/mutant_walking.fbx",
+      "source": "assets/source/mutant_orc/mutant_dying_source.zip::Mutant Walking.fbx",
+      "role": "runtime enemy walking animation source",
+      "asset_class": "imported FBX animation",
+      "processing": "extracted from source archive and renamed to snake_case for browser loading; registered on the idle mesh AnimationMixer"
+    },
+    {
+      "path": "assets/models/mutant_orc/mutant_jumping.fbx",
+      "source": "assets/source/mutant_orc/mutant_dying_source.zip::Mutant Jumping.fbx",
+      "role": "runtime enemy jumping animation source",
+      "asset_class": "imported FBX animation",
+      "processing": "extracted from source archive and renamed to snake_case for browser loading; registered on the idle mesh AnimationMixer"
+    },
+    {
+      "path": "assets/models/mutant_orc/mutant_punch.fbx",
+      "source": "assets/source/mutant_orc/mutant_dying_source.zip::Mutant Punch.fbx",
+      "role": "runtime enemy punch animation source",
+      "asset_class": "imported FBX animation",
+      "processing": "extracted from source archive and renamed to snake_case for browser loading; registered on the idle mesh AnimationMixer"
+    },
+    {
+      "path": "assets/models/mutant_orc/mutant_dying.fbx",
+      "source": "assets/source/mutant_orc/mutant_dying_source.zip::Mutant Dying.fbx",
+      "role": "runtime enemy death animation source",
+      "asset_class": "imported FBX animation",
+      "processing": "extracted from source archive and renamed to snake_case for browser loading; registered on the idle mesh AnimationMixer"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Infinite Brutality Room Batch Implementation
 
-Build: `0.8.18`
+Build: `0.8.19`
 
 The 48-room junction batch is now wired into runtime as a generated playable sequence.
 
@@ -126,3 +126,10 @@ The camera now follows short grounded position snaps with a tight visual lerp, w
 Build `0.8.18` stops incidental upper galleries from spawning over drop/secret/recovery stair routes. Upper floors now require an explicit upper/hub/corner route, and their footprint is narrower and farther to the side.
 
 Room-to-room connector climbs now put the height change on the longest useful horizontal leg of the connector. This prevents aligned room connectors from generating a vertical stack of stair treads at the landing.
+
+
+## Build 0.8.19 Mutant Orc Enemy Import
+
+Build `0.8.19` imports the `Mutant Dying.zip` FBX archive as a project-owned mutant/orc enemy asset set. The runtime now loads the idle FBX as the visible enemy mesh through Three.js `FBXLoader`, registers run/walk/jump/punch/dying FBX clips on the same mixer, and keeps the primitive broken-knight enemy as a fallback if the imported asset fails to load.
+
+The imported source archive and FBX files are tracked through Git LFS, and asset provenance is recorded in `assets/asset_manifest.json`.

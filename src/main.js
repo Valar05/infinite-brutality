@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.18';
+const BUILD = '0.8.19';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -57,6 +58,7 @@ armsScene.add(armsKey);
 
 const clock = new THREE.Clock();
 const loader = new GLTFLoader();
+const fbxLoader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 const world = new THREE.Group();
 scene.add(world);
@@ -1120,7 +1122,11 @@ function positionEnemy(position) {
   enemy.visible = true;
   enemy.userData.health = 3;
   enemy.userData.hitTimer = 0;
+  enemy.userData.dead = false;
+  enemy.userData.deathTimer = 0;
   enemy.position.copy(position);
+  enemy.scale.setScalar(1);
+  playEnemyAction('idle', 0.08);
 }
 
 function addDetailCube(parent, name, size, pos, mat, rx = 0, ry = 0, rz = 0, cast = true) {
@@ -1425,7 +1431,20 @@ const ROOM_DIMENSIONS = {
   switchback: { width: 34, depth: 28 },
   spire: { width: 30, depth: 30 },
 };
+const MUTANT_ORC_CLIPS = {
+  idle: 'assets/models/mutant_orc/mutant_idle.fbx',
+  run: 'assets/models/mutant_orc/mutant_run.fbx',
+  walking: 'assets/models/mutant_orc/mutant_walking.fbx',
+  jumping: 'assets/models/mutant_orc/mutant_jumping.fbx',
+  punch: 'assets/models/mutant_orc/mutant_punch.fbx',
+  dying: 'assets/models/mutant_orc/mutant_dying.fbx',
+};
 let enemy = null;
+let enemyPrimitiveVisual = null;
+let enemyModel = null;
+let enemyMixer = null;
+let enemyCurrentAction = null;
+const enemyActions = new Map();
 
 function getNodeLayoutOrigin(nodeOrIndex) {
   if (typeof nodeOrIndex === 'number') return makeVec(0, 0, nodeOrIndex * ROOM_LAYOUT_STEP);
@@ -2548,17 +2567,24 @@ function buildRoom(movePlayer = true) {
 function buildEnemy() {
   if (enemy && enemy.parent) enemy.parent.remove(enemy);
   enemy = new THREE.Group();
+  enemy.name = 'enemy-root';
   enemy.position.set(0, 0, 4.8);
   enemy.userData.health = 3;
   enemy.userData.hitTimer = 0;
-  addBox(enemy, 'broken-knight-torso', [0.9, 1.25, 0.42], [0, 1.18, 0], MAT.iron);
-  addBox(enemy, 'broken-knight-head', [0.58, 0.5, 0.5], [0, 2.15, 0], MAT.stone2);
-  addBox(enemy, 'broken-knight-left-arm', [0.32, 1.05, 0.32], [-0.74, 1.2, 0], MAT.iron).rotation.z = -0.28;
-  addBox(enemy, 'broken-knight-right-arm', [0.32, 1.05, 0.32], [0.74, 1.2, 0], MAT.iron).rotation.z = 0.28;
-  addBox(enemy, 'broken-knight-legs', [0.34, 1.0, 0.32], [-0.26, 0.48, 0], MAT.iron);
-  addBox(enemy, 'broken-knight-legs', [0.34, 1.0, 0.32], [0.26, 0.48, 0], MAT.iron);
-  const sword = addBox(enemy, 'execution-sword', [0.16, 1.9, 0.16], [1.25, 1.25, 0.08], MAT.bone);
+  enemy.userData.dead = false;
+  enemy.userData.deathTimer = 0;
+
+  enemyPrimitiveVisual = new THREE.Group();
+  enemyPrimitiveVisual.name = 'broken-knight-fallback';
+  addBox(enemyPrimitiveVisual, 'broken-knight-torso', [0.9, 1.25, 0.42], [0, 1.18, 0], MAT.iron);
+  addBox(enemyPrimitiveVisual, 'broken-knight-head', [0.58, 0.5, 0.5], [0, 2.15, 0], MAT.stone2);
+  addBox(enemyPrimitiveVisual, 'broken-knight-left-arm', [0.32, 1.05, 0.32], [-0.74, 1.2, 0], MAT.iron).rotation.z = -0.28;
+  addBox(enemyPrimitiveVisual, 'broken-knight-right-arm', [0.32, 1.05, 0.32], [0.74, 1.2, 0], MAT.iron).rotation.z = 0.28;
+  addBox(enemyPrimitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [-0.26, 0.48, 0], MAT.iron);
+  addBox(enemyPrimitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [0.26, 0.48, 0], MAT.iron);
+  const sword = addBox(enemyPrimitiveVisual, 'execution-sword', [0.16, 1.9, 0.16], [1.25, 1.25, 0.08], MAT.bone);
   sword.rotation.z = -0.42;
+  enemy.add(enemyPrimitiveVisual);
   enemy.traverse((node) => { if (node.isMesh) node.castShadow = USE_DYNAMIC_SHADOWS; });
   scene.add(enemy);
 }
@@ -2696,6 +2722,77 @@ function startJumpCharge(pointerId = null) {
   input.jumpPointerId = pointerId;
   input.jumpCharging = true;
   input.jumpHoldStart = performance.now();
+}
+
+function configureMutantOrcModel(model) {
+  model.name = 'mutant-orc-model';
+  model.scale.setScalar(0.012);
+  model.rotation.y = Math.PI;
+  model.position.set(0, 0, 0);
+  model.traverse((node) => {
+    if (!node.isMesh && !node.isSkinnedMesh) return;
+    node.castShadow = USE_DYNAMIC_SHADOWS;
+    node.receiveShadow = USE_DYNAMIC_SHADOWS;
+    node.frustumCulled = false;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.flatShading = true;
+      mat.roughness = Math.max(mat.roughness ?? 0.9, 0.82);
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+function registerEnemyClip(name, clips, options = {}) {
+  if (!enemyMixer || !clips?.length) return null;
+  const clip = clips[0].clone();
+  clip.name = name;
+  const action = enemyMixer.clipAction(clip, enemyModel);
+  action.enabled = true;
+  if (options.once) {
+    action.loop = THREE.LoopOnce;
+    action.clampWhenFinished = true;
+  }
+  enemyActions.set(name, action);
+  return action;
+}
+
+function playEnemyAction(name, fade = 0.16) {
+  const next = enemyActions.get(name) || enemyActions.get('idle');
+  if (!next || next === enemyCurrentAction) return;
+  next.reset().fadeIn(fade).play();
+  if (enemyCurrentAction) enemyCurrentAction.fadeOut(fade);
+  enemyCurrentAction = next;
+}
+
+function loadEnemyClip(name, path, options = {}) {
+  fbxLoader.load(path, (asset) => {
+    registerEnemyClip(name, asset.animations, options);
+  }, undefined, (err) => {
+    console.warn('mutant orc clip failed', name, err);
+  });
+}
+
+function loadMutantOrcEnemy() {
+  fbxLoader.load(MUTANT_ORC_CLIPS.idle, (asset) => {
+    enemyModel = asset;
+    configureMutantOrcModel(enemyModel);
+    enemyMixer = new THREE.AnimationMixer(enemyModel);
+    registerEnemyClip('idle', asset.animations);
+    enemy.add(enemyModel);
+    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
+    playEnemyAction('idle', 0.01);
+    loadEnemyClip('run', MUTANT_ORC_CLIPS.run);
+    loadEnemyClip('walking', MUTANT_ORC_CLIPS.walking);
+    loadEnemyClip('jumping', MUTANT_ORC_CLIPS.jumping, { once: true });
+    loadEnemyClip('punch', MUTANT_ORC_CLIPS.punch, { once: true });
+    loadEnemyClip('dying', MUTANT_ORC_CLIPS.dying, { once: true });
+    setStatus('mutant orc enemy imported');
+  }, undefined, (err) => {
+    console.warn('mutant orc enemy failed; keeping primitive fallback', err);
+    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+  });
 }
 
 function loadArms() {
@@ -3258,10 +3355,24 @@ function updatePlayer(dt) {
   }
 
   updateAttack(dt);
+  if (enemyMixer) {
+    enemyMixer.update(dt);
+    if (!enemy.userData.dead && enemyCurrentAction) {
+      const clipName = enemyCurrentAction.getClip().name;
+      if ((clipName === 'punch' || clipName === 'jumping') && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
+        playEnemyAction('idle', 0.12);
+      }
+    }
+  }
   enemy.userData.hitTimer = Math.max(0, enemy.userData.hitTimer - dt);
+  enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer || 0);
   enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
   enemy.position.y = Math.sin(performance.now() * 0.002) * 0.025;
   enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
+  if (enemy.userData.dead && enemy.userData.deathTimer > 0) {
+    enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer - dt);
+    if (enemy.userData.deathTimer <= 0) enemy.visible = false;
+  }
 }
 
 
@@ -3278,14 +3389,17 @@ function updateAttack(dt) {
     toEnemy.y = 0;
     const dist = toEnemy.length();
     const alignment = dist > 0.001 ? attack.direction.dot(toEnemy.normalize()) : 0;
-    if (enemy.visible && dist < def.range && alignment > 0.5) {
+    if (enemy.visible && !enemy.userData.dead && dist < def.range && alignment > 0.5) {
       enemy.userData.health -= def.damage;
       enemy.userData.hitTimer = 0.28;
       enemy.position.addScaledVector(attack.direction, 0.28 + def.damage * 0.12);
+      playEnemyAction('punch', 0.06);
       playThud(1.05 + def.damage * 0.16);
       if (enemy.userData.health <= 0) {
-        enemy.visible = false;
-        setStatus('broken knight down. survive another room.');
+        enemy.userData.dead = true;
+        enemy.userData.deathTimer = 1.35;
+        playEnemyAction('dying', 0.04);
+        setStatus('mutant orc down. survive another room.');
       }
     }
   }
@@ -3363,6 +3477,7 @@ function init() {
     window.addEventListener('resize', resize);
     placeActionPad();
     loadArms();
+    loadMutantOrcEnemy();
     setStatus('Limbo room ready');
     render();
   } catch (err) {
