@@ -1,6 +1,6 @@
 # Infinite Brutality Room Batch Implementation
 
-Build: `0.8.19`
+Build: `0.8.21`
 
 The 48-room junction batch is now wired into runtime as a generated playable sequence.
 
@@ -133,3 +133,17 @@ Room-to-room connector climbs now put the height change on the longest useful ho
 Build `0.8.19` imports the `Mutant Dying.zip` FBX archive as a project-owned mutant/orc enemy asset set. The runtime now loads the idle FBX as the visible enemy mesh through Three.js `FBXLoader`, registers run/walk/jump/punch/dying FBX clips on the same mixer, and keeps the primitive broken-knight enemy as a fallback if the imported asset fails to load.
 
 The imported source archive and FBX files are tracked through Git LFS, and asset provenance is recorded in `assets/asset_manifest.json`.
+
+
+## Build 0.8.20 Orc Berserker Visible Mesh
+
+Build `0.8.20` switches the active enemy visual from the animation-only mutant FBX set to the actual Meshy Orc Berserker textured FBX mesh. The runtime now auto-fits the imported orc to a target enemy height using its bounding box, then hides the primitive broken-knight fallback only after the real mesh loads.
+
+The mutant FBX files remain in the project as possible future animation sources, but they are not treated as a visible skinned mesh because the archive is motion-only.
+
+
+## Build 0.8.21 Standing Idle Orc
+
+Build `0.8.21` uses `/storage/emulated/0/Download/Standing Idle (4).fbx` as the active enemy model. This FBX contains geometry, `mixamorig` skeleton bones, skin deformers, bind pose, and an embedded idle animation, so it replaces the previous animation-only mutant import and the static Meshy texture FBX as the visible enemy source.
+
+The runtime loads `assets/models/orc_berserker/standing_idle.fbx`, normalizes it to a target enemy height using its bounding box, registers the embedded idle clip if present, and hides the primitive fallback only after this rigged orc loads successfully.

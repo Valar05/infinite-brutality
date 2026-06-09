@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.19';
+const BUILD = '0.8.21';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -1439,6 +1439,8 @@ const MUTANT_ORC_CLIPS = {
   punch: 'assets/models/mutant_orc/mutant_punch.fbx',
   dying: 'assets/models/mutant_orc/mutant_dying.fbx',
 };
+const ORC_BERSERKER_MODEL = 'assets/models/orc_berserker/standing_idle.fbx';
+const ORC_BERSERKER_TARGET_HEIGHT = 2.35;
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -2724,6 +2726,66 @@ function startJumpCharge(pointerId = null) {
   input.jumpHoldStart = performance.now();
 }
 
+function normalizeEnemyModelToHeight(model, targetHeight = 2.35) {
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (!Number.isFinite(size.y) || size.y <= 0.001) return null;
+  const scale = targetHeight / size.y;
+  model.scale.multiplyScalar(scale);
+  model.updateMatrixWorld(true);
+  const fitted = new THREE.Box3().setFromObject(model);
+  const center = new THREE.Vector3();
+  fitted.getCenter(center);
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= fitted.min.y;
+  return scale;
+}
+
+function configureOrcBerserkerModel(model) {
+  model.name = 'orc-berserker-model';
+  model.rotation.y = Math.PI;
+  model.position.set(0, 0, 0);
+  model.traverse((node) => {
+    if (!node.isMesh && !node.isSkinnedMesh) return;
+    node.castShadow = USE_DYNAMIC_SHADOWS;
+    node.receiveShadow = USE_DYNAMIC_SHADOWS;
+    node.frustumCulled = false;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      mat.flatShading = true;
+      mat.roughness = Math.max(mat.roughness ?? 0.9, 0.82);
+      mat.needsUpdate = true;
+    }
+  });
+  return normalizeEnemyModelToHeight(model, ORC_BERSERKER_TARGET_HEIGHT);
+}
+
+function loadOrcBerserkerEnemy() {
+  fbxLoader.load(ORC_BERSERKER_MODEL, (asset) => {
+    if (!enemy) return;
+    if (enemyModel?.parent) enemyModel.parent.remove(enemyModel);
+    enemyActions.clear();
+    enemyCurrentAction = null;
+    enemyModel = asset;
+    const scale = configureOrcBerserkerModel(enemyModel);
+    enemyMixer = asset.animations?.length ? new THREE.AnimationMixer(enemyModel) : null;
+    if (enemyMixer) {
+      registerEnemyClip('idle', asset.animations);
+      playEnemyAction('idle', 0.01);
+    }
+    enemy.add(enemyModel);
+    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
+    setStatus('standing idle orc imported' + (scale ? ' scale ' + scale.toFixed(3) : ''));
+  }, undefined, (err) => {
+    console.warn('standing idle orc failed; keeping primitive fallback', err);
+    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+  });
+}
+
 function configureMutantOrcModel(model) {
   model.name = 'mutant-orc-model';
   model.scale.setScalar(0.012);
@@ -3399,7 +3461,7 @@ function updateAttack(dt) {
         enemy.userData.dead = true;
         enemy.userData.deathTimer = 1.35;
         playEnemyAction('dying', 0.04);
-        setStatus('mutant orc down. survive another room.');
+        setStatus('orc berserker down. survive another room.');
       }
     }
   }
@@ -3477,7 +3539,7 @@ function init() {
     window.addEventListener('resize', resize);
     placeActionPad();
     loadArms();
-    loadMutantOrcEnemy();
+    loadOrcBerserkerEnemy();
     setStatus('Limbo room ready');
     render();
   } catch (err) {

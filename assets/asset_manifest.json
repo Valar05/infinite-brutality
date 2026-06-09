@@ -255,6 +255,21 @@
       "role": "runtime enemy death animation source",
       "asset_class": "imported FBX animation",
       "processing": "extracted from source archive and renamed to snake_case for browser loading; registered on the idle mesh AnimationMixer"
+    },
+    {
+      "path": "assets/source/orc_berserker/standing_idle_source.fbx",
+      "source": "/storage/emulated/0/Download/Standing Idle (4).fbx",
+      "role": "source copy for Mixamo-rigged standing idle orc enemy FBX",
+      "asset_class": "downloaded/imported source FBX",
+      "processing": "copied unchanged into project source assets; runtime copy stored at assets/models/orc_berserker/standing_idle.fbx",
+      "notes": "Inspected via FBX strings: contains geometry, mixamorig skeleton bones, skin deformers/clusters, bind pose, and an AnimationStack."
+    },
+    {
+      "path": "assets/models/orc_berserker/standing_idle.fbx",
+      "source": "assets/source/orc_berserker/standing_idle_source.fbx",
+      "role": "active visible enemy model and standing idle animation source",
+      "asset_class": "imported FBX skinned mesh and animation",
+      "processing": "loaded by Three.js FBXLoader, auto-scaled to target enemy height by runtime bounding box, embedded idle clip registered on enemy AnimationMixer"
     }
   ]
 }

@@ -16,7 +16,7 @@ http://127.0.0.1:8798/infinite-brutality/index.html
 
 ## Current Build
 
-Build `0.8.19` adds the imported mutant/orc FBX enemy skin and animation set on top of the void-defined room and softened movement work.
+Build `0.8.21` uses the Mixamo-rigged `Standing Idle (4).fbx` orc as the visible enemy, with automatic runtime scale fitting and its embedded idle animation.
 
 ## Validation
 
