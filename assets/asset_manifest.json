@@ -1,0 +1,210 @@
+{
+  "assets": [
+    {
+      "path": "assets/models/FPSPlayer.glb",
+      "source": "../pose-lab/assets/models/FPSPlayer.glb",
+      "role": "camera-space first-person low-poly arms and animation source",
+      "notes": "Copied from the Pose Lab FPSPlayer export. Used as the initial Infinite Brutality FPV rig and animation trove."
+    },
+    {
+      "path": "assets/textures/dalle-gothic-stone-20260608.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a2756d72054819aa01c61744f43b0af.png",
+      "role": "repeat-wrapped gothic stone texture for walls, floors, platforms, and connector architecture",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped and resized to 1024x1024 PNG for power-of-two WebGL repeat wrapping",
+      "prompt_summary": "seamless tileable low-poly gothic black stone texture, Quake/Hexen inspired, chiseled stone, subtle cracks, no text"
+    },
+    {
+      "path": "assets/textures/dalle-aged-bronze-20260608.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a2756fb6ff8819a92eb5bfeb7c52367.png",
+      "role": "repeat-wrapped aged bronze texture for bridge, trim, and execution architecture",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped and resized to 1024x1024 PNG for power-of-two WebGL repeat wrapping",
+      "prompt_summary": "seamless tileable aged bronze tarnished brass low-poly game texture with hammered panels and patina, no text"
+    },
+    {
+      "path": "assets/textures/dalle-old-bone-20260608.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a275745cd58819ab3983e0a559753aa.png",
+      "role": "repeat-wrapped old bone texture for skull gate, teeth, blade, and deformed cube meshes",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped and resized to 1024x1024 PNG for power-of-two WebGL repeat wrapping",
+      "prompt_summary": "seamless tileable old bone ivory low-poly dark fantasy texture with cracks, grime, and carved worn edges, no text"
+    },
+    {
+      "path": "assets/textures/dalle-gothic-stone-broad-20260608.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a275a7afd30819abe8a5b670ab33c58.png",
+      "role": "v2 broad repeat-wrapped gothic stone texture for world-scale UV floors, walls, platforms, and connectors",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped and resized to 1024x1024 PNG for power-of-two WebGL repeat wrapping",
+      "prompt_summary": "seamless tileable gothic black stone with large low-frequency fractured plates; avoided tiny cobbles, grids, repeated dots, and connect-four motifs"
+    },
+    {
+      "path": "assets/textures/dalle-aged-bronze-broad-20260608.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a275ac7c33c819a917e1d0e36274208.png",
+      "role": "v2 broad repeat-wrapped aged bronze texture for world-scale UV bridge, trim, and execution architecture",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped and resized to 1024x1024 PNG for power-of-two WebGL repeat wrapping",
+      "prompt_summary": "seamless tileable aged bronze with broad battered metal plates; avoided woven grid, tiny checker, dots, and high-frequency scratches"
+    },
+    {
+      "path": "assets/textures/dalle-old-bone-broad-20260608.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a275b253868819a9e9f88a25c650ffe.png",
+      "role": "v2 broad repeat-wrapped old bone texture for world-scale UV skull gate, teeth, blade, and deformed cube meshes",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped and resized to 1024x1024 PNG for power-of-two WebGL repeat wrapping",
+      "prompt_summary": "seamless tileable old bone with broad carved grain and cracks; avoided tooth rows, repeated ovals, honeycomb, and connect-four motifs"
+    },
+    {
+      "path": "assets/textures/dalle-gothic-stone-lowpoly-20260608.png",
+      "source": "assets/textures/dalle-gothic-stone-broad-20260608.png",
+      "role": "derived low-poly faceted stone texture for world-projected UV architecture",
+      "tool": "Pillow local processing derived from built-in image_gen output",
+      "processing": "sampled source into jittered triangle cells with flat fills, sparse hard seams, 1024x1024 PNG",
+      "prompt_summary": "derived from broad gothic stone generated texture; removes painterly gradients and crack paths in favor of low-poly facets"
+    },
+    {
+      "path": "assets/textures/dalle-aged-bronze-lowpoly-20260608.png",
+      "source": "assets/textures/dalle-aged-bronze-broad-20260608.png",
+      "role": "derived low-poly faceted bronze texture for bridge, trim, and execution architecture",
+      "tool": "Pillow local processing derived from built-in image_gen output",
+      "processing": "sampled source into jittered triangle cells with flat fills, sparse hard seams, 1024x1024 PNG",
+      "prompt_summary": "derived from broad aged bronze generated texture; removes woven/grid detail and painterly gradients in favor of low-poly facets"
+    },
+    {
+      "path": "assets/textures/dalle-old-bone-lowpoly-20260608.png",
+      "source": "assets/textures/dalle-old-bone-broad-20260608.png",
+      "role": "derived low-poly faceted bone texture for skull gate, teeth, blade, and deformed cube meshes",
+      "tool": "Pillow local processing derived from built-in image_gen output",
+      "processing": "sampled source into jittered triangle cells with flat fills, sparse hard seams, 1024x1024 PNG",
+      "prompt_summary": "derived from broad old bone generated texture; removes repeated cells and painterly cracks in favor of low-poly facets"
+    },
+    {
+      "path": "assets/textures/dalle-gothic-stone-stylized-20260608.png",
+      "source": "assets/textures/dalle-gothic-stone-broad-20260608.png + assets/textures/dalle-gothic-stone-lowpoly-20260608.png",
+      "role": "stylized stone texture balancing material detail with subtle low-poly facets",
+      "tool": "Pillow local processing derived from built-in image_gen outputs",
+      "processing": "posterized broad material texture, lightly blended with faceted derivative, sparse edge emphasis, 1024x1024 PNG",
+      "prompt_summary": "derived from broad gothic stone generated texture to avoid both painterly gradients and pure triangle wallpaper"
+    },
+    {
+      "path": "assets/textures/dalle-aged-bronze-stylized-20260608.png",
+      "source": "assets/textures/dalle-aged-bronze-broad-20260608.png + assets/textures/dalle-aged-bronze-lowpoly-20260608.png",
+      "role": "stylized bronze texture balancing plate-metal detail with subtle low-poly facets",
+      "tool": "Pillow local processing derived from built-in image_gen outputs",
+      "processing": "posterized broad material texture, lightly blended with faceted derivative, sparse edge emphasis, 1024x1024 PNG",
+      "prompt_summary": "derived from broad aged bronze generated texture to avoid woven grid and pure triangle wallpaper"
+    },
+    {
+      "path": "assets/textures/dalle-old-bone-stylized-20260608.png",
+      "source": "assets/textures/dalle-old-bone-broad-20260608.png + assets/textures/dalle-old-bone-lowpoly-20260608.png",
+      "role": "stylized bone texture balancing bone-grain detail with subtle low-poly facets",
+      "tool": "Pillow local processing derived from built-in image_gen outputs",
+      "processing": "posterized broad material texture, lightly blended with faceted derivative, sparse edge emphasis, 1024x1024 PNG",
+      "prompt_summary": "derived from broad old bone generated texture to avoid repeated cells and pure triangle wallpaper"
+    },
+    {
+      "path": "assets/textures/dalle-gothic-stone-delaunay-20260608.png",
+      "source": "assets/textures/dalle-gothic-stone-broad-20260608.png",
+      "role": "2D low-poly triangulated stone texture seeded from source color edges and broad source samples",
+      "tool": "Pillow local processing with custom Bowyer-Watson style triangulation",
+      "processing": "edge-biased point sampling, Delaunay-like triangulation, per-triangle average source color fills, subtle triangle seams, 1024x1024 PNG",
+      "prompt_summary": "derived from broad gothic stone generated texture to turn material blobs into colored low-poly triangles"
+    },
+    {
+      "path": "assets/textures/dalle-aged-bronze-delaunay-20260608.png",
+      "source": "assets/textures/dalle-aged-bronze-broad-20260608.png",
+      "role": "2D low-poly triangulated bronze texture seeded from source color edges and broad source samples",
+      "tool": "Pillow local processing with custom Bowyer-Watson style triangulation",
+      "processing": "edge-biased point sampling, Delaunay-like triangulation, per-triangle average source color fills, subtle triangle seams, 1024x1024 PNG",
+      "prompt_summary": "derived from broad aged bronze generated texture to turn metal color blobs into colored low-poly triangles"
+    },
+    {
+      "path": "assets/textures/dalle-old-bone-delaunay-20260608.png",
+      "source": "assets/textures/dalle-old-bone-broad-20260608.png",
+      "role": "2D low-poly triangulated bone texture seeded from source color edges and broad source samples",
+      "tool": "Pillow local processing with custom Bowyer-Watson style triangulation",
+      "processing": "edge-biased point sampling, Delaunay-like triangulation, per-triangle average source color fills, subtle triangle seams, 1024x1024 PNG",
+      "prompt_summary": "derived from broad old bone generated texture to turn bone color blobs into colored low-poly triangles"
+    },
+    {
+      "path": "assets/textures/dalle-gothic-stone-granular-20260608.png",
+      "source": "assets/textures/dalle-gothic-stone-stylized-20260608.png",
+      "role": "granular low-contrast stone texture for world-projected architecture that should read as stone before triangles",
+      "tool": "Pillow local processing derived from project-owned generated texture variants",
+      "processing": "contrast and sharpness pass, small jittered triangular facet overlay, subtle dark seams and mineral grain, 1024x1024 PNG",
+      "prompt_summary": "derived from stylized gothic stone generated texture to preserve stone cracks while reducing oversized triangle wallpaper"
+    },
+    {
+      "path": "assets/textures/dalle-aged-bronze-granular-20260608.png",
+      "source": "assets/textures/dalle-aged-bronze-stylized-20260608.png",
+      "role": "granular low-contrast bronze texture for bridge, trim, and execution architecture",
+      "tool": "Pillow local processing derived from project-owned generated texture variants",
+      "processing": "contrast and sharpness pass, small jittered triangular facet overlay, subtle dark seams and metal grain, 1024x1024 PNG",
+      "prompt_summary": "derived from stylized aged bronze generated texture to preserve battered metal plates while reducing oversized triangle wallpaper"
+    },
+    {
+      "path": "assets/textures/dalle-old-bone-granular-20260608.png",
+      "source": "assets/textures/dalle-old-bone-stylized-20260608.png",
+      "role": "granular low-contrast bone texture for skull gate, teeth, blade, and deformed cube meshes",
+      "tool": "Pillow local processing derived from project-owned generated texture variants",
+      "processing": "contrast and sharpness pass, small jittered triangular facet overlay, subtle dark seams and bone grain, 1024x1024 PNG",
+      "prompt_summary": "derived from stylized old bone generated texture to preserve cracked bone material while reducing oversized triangle wallpaper"
+    },
+    {
+      "path": "assets/textures/ib-vector-stone-20260608.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector stone material texture for low-poly architecture",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG polygons with flat fills and strokes; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to replace bitmap/gradient stone textures with vector-authored low-poly material art"
+    },
+    {
+      "path": "assets/textures/ib-vector-bronze-20260608.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector bronze plate material texture for bridge, trim, and execution architecture",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG polygons and rectangles with flat fills and strokes; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to replace bitmap/gradient bronze textures with vector-authored low-poly material art"
+    },
+    {
+      "path": "assets/textures/ib-vector-bone-20260608.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector bone shard material texture for skull gate, teeth, blades, and bone meshes",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG polygons and crack paths with flat fills and strokes; no gradients, filters, image-gen bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to replace bitmap/gradient bone textures with vector-authored low-poly material art"
+    },
+    {
+      "path": "assets/textures/ib-vector-limbo-sky-20260608.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector Limbo sky dome texture with dark bands, hard-edged clouds, and distant spires",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG rectangles and polygons with flat fills only; no gradients, filters, or bitmap source",
+      "prompt_summary": "not AI-generated; created to add skybox/world context while matching the hard-edged low-poly visual language"
+    },
+    {
+      "path": "assets/textures/ib-vector-limbo-panorama-20260609.svg",
+      "source": "locally authored deterministic SVG panorama",
+      "role": "flat vector Limbo panorama skybox texture with distant walls, spires, bridge silhouettes, and non-black horizon bands",
+      "tool": "Python local SVG authoring",
+      "processing": "authored as SVG rectangles and polygons with flat fills only; no gradients, filters, bitmap source, starscape, or copied external art",
+      "prompt_summary": "not AI-generated; created to replace the pure-black-feeling skybox void with a readable dark fantasy panorama matching the vector room art"
+    },
+    {
+      "path": "assets/textures/ib-real-limbo-skybox-20260609.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea9f0-2e3e-7901-b53f-28af45e03dba/ig_0af725679b306e69016a277f76f7d481949c00f6fe05e368b9.png",
+      "role": "real bitmap panoramic Limbo skybox background for the sky dome, replacing pure-black-feeling void behind gates",
+      "tool": "built-in image_gen plus local Pillow crop/resize",
+      "processing": "generated as wide dark fantasy panorama, center-cropped to 2:1 and resized to 2048x1024 PNG for WebGL sky dome use",
+      "prompt_summary": "wide panoramic Limbo skybox with distant impossible stone walls, brutalist gothic towers, jagged spires, suspended bridges, dark underworld haze, red-blue horizon, sparse corpsefire accents; no starscape, no text, no UI, no watermark"
+    },
+    {
+      "path": "assets/textures/ib-vector-material-sheet-20260608.svg",
+      "source": "assets/textures/ib-vector-stone-20260608.svg + assets/textures/ib-vector-bronze-20260608.svg + assets/textures/ib-vector-bone-20260608.svg + assets/textures/ib-vector-limbo-sky-20260608.svg",
+      "role": "review sheet for the flat vector material texture set",
+      "tool": "Python local SVG generation",
+      "processing": "SVG sheet referencing the runtime vector material assets for quick inspection",
+      "prompt_summary": "not AI-generated; review sheet for project-owned vector material set"
+    }
+  ]
+}

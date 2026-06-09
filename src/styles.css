@@ -1,0 +1,30 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #030304; color: #efe6d1; font-family: Inter, Roboto, system-ui, sans-serif; touch-action: none; }
+#app, #game { position: fixed; inset: 0; width: 100%; height: 100%; }
+#game { display: block; background: #050506; }
+#topHud { position: fixed; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); top: max(8px, env(safe-area-inset-top)); z-index: 12; display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; text-shadow: 0 2px 8px #000; }
+#topHud strong { font-size: clamp(16px, 3vw, 24px); letter-spacing: 0; }
+#topControls { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+#fsButton { min-width: 34px; width: 34px; height: 34px; padding: 0; border-radius: 8px; font-size: 16px; line-height: 1; }
+#status, #readout { font: 11px/1.25 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #b9e6dc; }
+#hint { position: fixed; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 38px); transform: translateX(-50%); z-index: 5; width: min(720px, 78vw); padding: 6px 9px; color: #d8c8aa; background: rgba(4,5,5,0.45); border: 1px solid rgba(214,166,66,0.22); text-align: center; font-size: 12px; pointer-events: none; opacity: 0.82; transition: opacity 260ms ease; }
+#readout { position: fixed; right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); z-index: 6; max-width: 42vw; padding: 6px 8px; background: rgba(2,3,3,0.54); border: 1px solid rgba(185,230,220,0.18); pointer-events: none; }
+.stick { position: fixed; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); z-index: 8; width: 132px; height: 132px; border-radius: 50%; border: 2px solid rgba(239,230,209,0.24); background: radial-gradient(circle at 50% 50%, rgba(214,166,66,0.1), rgba(4,4,5,0.28)); touch-action: none; opacity: 0; transform: scale(0.88); transition: opacity 120ms ease, transform 120ms ease; pointer-events: none; }
+.stick.active { opacity: 0.72; transform: scale(1); }
+.stick > div { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(214,166,66,0.86); border: 2px solid rgba(20,16,10,0.75); box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+#actionPad { position: fixed; left: auto; right: max(22px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); z-index: 9; display: grid; grid-template-columns: 92px 66px; grid-template-rows: 66px 92px; gap: 8px; width: 166px; height: 166px; opacity: 0.95; transform: scale(1); pointer-events: auto; }
+button { border: 1px solid rgba(239,230,209,0.28); color: #17120b; background: #d6a642; font: 900 12px/1 Inter, Roboto, system-ui, sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,0.42); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+button:active, button.active { transform: translateY(1px); background: #f0c760; }
+#attackButton, #jumpButton { border-radius: 999px; }
+#attackButton { grid-column: 2; grid-row: 2; width: 92px; height: 92px; font-size: 13px; justify-self: end; align-self: end; }
+#jumpButton { grid-column: 2; grid-row: 1; width: 66px; height: 66px; justify-self: end; align-self: start; background: #b8c5c8; }
+.top-button { min-width: 58px; min-height: 34px; border-radius: 8px; background: #90b7a8; font-size: 11px; }
+@media (orientation: portrait) {
+  #hint::after { content: ' Rotate to landscape for the intended controls.'; color: #f0c760; }
+  .stick { width: 116px; height: 116px; }
+  #actionPad { width: 154px; height: 154px; grid-template-columns: 84px 62px; grid-template-rows: 62px 84px; }
+  #attackButton { width: 84px; height: 84px; }
+  #jumpButton { width: 62px; height: 62px; }
+  #fsButton { width: 34px; height: 34px; }
+}

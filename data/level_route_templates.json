@@ -1,0 +1,1023 @@
+{
+  "schema": "infinite-brutality.route_templates.v1",
+  "source_curriculum": "/storage/emulated/0/Documents/GodotProjects/thunder-brainstorm/generated/quake_route_grammar/quake_route_grammar_curriculum.json",
+  "source_manifest": "/storage/emulated/0/Documents/GodotProjects/thunder-brainstorm/generated/external_sources/quake_map_sources/source_manifest.json",
+  "levels_processed": 63,
+  "playable_levels_trained": 41,
+  "prefab_or_item_sources_metadata_only": 22,
+  "status": "trained_from_legal_quake_map_sources",
+  "copyright_boundary": {
+    "rule": "Do not redistribute Quake map data, copied layouts, WADs, textures, or entity dumps. Store abstract route grammar only.",
+    "source_archive_kept_in": "/storage/emulated/0/Documents/GodotProjects/thunder-brainstorm/generated/external_sources/quake_map_sources/quake-maps-master.zip",
+    "game_data_contains": [
+      "route_sentence",
+      "movement_lesson",
+      "features",
+      "generator_biases",
+      "aggregate_counts"
+    ]
+  },
+  "generator_contract": {
+    "primary_reference": "authored triple-bridge skull guillotine hall",
+    "forbidden_pattern": "generic boxes with scattered junk",
+    "movement_vocab": [
+      "running_jump",
+      "jump_buffer",
+      "air_steering",
+      "bridge_lip",
+      "ramp_lip",
+      "stair_lip"
+    ],
+    "not_movement_vocab": [
+      "crouch_button",
+      "crouch_slide",
+      "duck_jump"
+    ]
+  },
+  "ml_level_design_lessons": {
+    "training_scope": "playable Quake maps only when present; item prefab maps are retained as source metadata but excluded from route-template training",
+    "feature_counts": {
+      "entity_vertical_pressure": 41,
+      "long_acceleration_lanes": 40,
+      "vertical_layering": 40,
+      "reward_breadcrumbing": 40,
+      "teleport_recontextualization": 38,
+      "lock_or_gate_pacing": 37,
+      "switch_route_change": 34,
+      "dense_combat_pressure": 32
+    },
+    "archetype_counts": {
+      "gate_loop_return": 34,
+      "layered_read": 6,
+      "vertical_bridge_line": 1
+    },
+    "generator_biases": [
+      "Prefer readable vertical layering with side recovery over flat box rooms.",
+      "Place long acceleration lanes before lips, bridges, stairs, or upper landings.",
+      "Show goals before blocking them, then create a physical return shortcut after the route change.",
+      "Use pickups and monsters as breadcrumbs along an already-valid movement sentence, not as random filler.",
+      "Keep teleport use as recontextualization or shortcut punctuation; do not rely on it as the only loop connector.",
+      "Exclude crouch vocabulary; bunny-hop feel comes from running jump timing, buffered jumps, air steering, and recoverable landings."
+    ]
+  },
+  "templates": [
+    {
+      "id": "quake_seq_01_layered_read",
+      "source_level_ref": "quake-maps/start.map",
+      "route_sentence": [
+        "entry_floor_read",
+        "visible_upper_goal",
+        "ramp_or_stair_lip",
+        "mid_height_recovery",
+        "upper_exit"
+      ],
+      "movement_lesson": "height changes should teach the next jump line before the player commits",
+      "infinite_brutality_use": "Use for readable stacked rooms where upper routes are visible before they are reached.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_02_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m1.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_03_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m2.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_04_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m3.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_05_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m4.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_06_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m5.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_07_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m6.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_08_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m7.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_09_gate_loop_return",
+      "source_level_ref": "quake-maps/e1m8.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_10_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m1.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_11_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m2.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_12_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m3.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_13_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m4.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_14_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m5.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_15_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m6.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_16_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m7.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_17_gate_loop_return",
+      "source_level_ref": "quake-maps/e2m10.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_18_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m1.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_19_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m2.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_20_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m3.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_21_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m4.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_22_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m5.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_23_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m6.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_24_gate_loop_return",
+      "source_level_ref": "quake-maps/e3m7.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_25_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m1.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_26_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m2.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_27_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m3.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_28_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m4.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_29_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m5.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_30_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m6.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_31_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m7.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_32_gate_loop_return",
+      "source_level_ref": "quake-maps/e4m8.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_33_gate_loop_return",
+      "source_level_ref": "quake-maps/dm1.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_34_gate_loop_return",
+      "source_level_ref": "quake-maps/dm2.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_35_layered_read",
+      "source_level_ref": "quake-maps/dm3.map",
+      "route_sentence": [
+        "entry_floor_read",
+        "visible_upper_goal",
+        "ramp_or_stair_lip",
+        "mid_height_recovery",
+        "upper_exit"
+      ],
+      "movement_lesson": "height changes should teach the next jump line before the player commits",
+      "infinite_brutality_use": "Use for readable stacked rooms where upper routes are visible before they are reached.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "teleport_recontextualization",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_36_layered_read",
+      "source_level_ref": "quake-maps/dm4.map",
+      "route_sentence": [
+        "entry_floor_read",
+        "visible_upper_goal",
+        "ramp_or_stair_lip",
+        "mid_height_recovery",
+        "upper_exit"
+      ],
+      "movement_lesson": "height changes should teach the next jump line before the player commits",
+      "infinite_brutality_use": "Use for readable stacked rooms where upper routes are visible before they are reached.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "teleport_recontextualization",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_37_gate_loop_return",
+      "source_level_ref": "quake-maps/dm5.map",
+      "route_sentence": [
+        "visible_locked_goal",
+        "side_loop_drop",
+        "switch_or_key_pressure",
+        "changed_route_read",
+        "return_shortcut",
+        "committed_exit_crossing"
+      ],
+      "movement_lesson": "route memory turns the second crossing into skill expression",
+      "infinite_brutality_use": "Use when the player should understand a destination early, earn it through a side route, then move faster on the return.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "switch_route_change",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_38_layered_read",
+      "source_level_ref": "quake-maps/dm6.map",
+      "route_sentence": [
+        "entry_floor_read",
+        "visible_upper_goal",
+        "ramp_or_stair_lip",
+        "mid_height_recovery",
+        "upper_exit"
+      ],
+      "movement_lesson": "height changes should teach the next jump line before the player commits",
+      "infinite_brutality_use": "Use for readable stacked rooms where upper routes are visible before they are reached.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_39_layered_read",
+      "source_level_ref": "quake-maps/dm7.map",
+      "route_sentence": [
+        "entry_floor_read",
+        "visible_upper_goal",
+        "ramp_or_stair_lip",
+        "mid_height_recovery",
+        "upper_exit"
+      ],
+      "movement_lesson": "height changes should teach the next jump line before the player commits",
+      "infinite_brutality_use": "Use for readable stacked rooms where upper routes are visible before they are reached.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_40_layered_read",
+      "source_level_ref": "quake-maps/dm8.map",
+      "route_sentence": [
+        "entry_floor_read",
+        "visible_upper_goal",
+        "ramp_or_stair_lip",
+        "mid_height_recovery",
+        "upper_exit"
+      ],
+      "movement_lesson": "height changes should teach the next jump line before the player commits",
+      "infinite_brutality_use": "Use for readable stacked rooms where upper routes are visible before they are reached.",
+      "features": [
+        "entity_vertical_pressure"
+      ]
+    },
+    {
+      "id": "quake_seq_41_vertical_bridge_line",
+      "source_level_ref": "quake-maps/end.map",
+      "route_sentence": [
+        "approach_lane",
+        "stair_or_ramp_lip",
+        "air_steer_gap",
+        "upper_bridge_landing",
+        "side_recovery_gallery",
+        "visible_exit"
+      ],
+      "movement_lesson": "running-jump bunny-hop line across vertical bridge targets",
+      "infinite_brutality_use": "Use for triple-bridge rooms with upper crossings and recoverable side galleries.",
+      "features": [
+        "long_acceleration_lanes",
+        "vertical_layering",
+        "lock_or_gate_pacing",
+        "teleport_recontextualization",
+        "dense_combat_pressure",
+        "reward_breadcrumbing",
+        "entity_vertical_pressure"
+      ]
+    }
+  ],
+  "runtime_notes": {
+    "movement": "No crouch button. Bunny-hop feel is merged into running jump, jump buffering, bridge/ramp/stair lips, and air steering.",
+    "level_generation": "Generate traversal sentences first; dress with props only after route grammar works.",
+    "current_reference_room": "authored skull guillotine triple-bridge hall",
+    "training_bias": "Quake-derived lessons strongly favor vertical layering, long acceleration lanes, visible gate loops, route changes, and reward/combat breadcrumbs."
+  }
+}

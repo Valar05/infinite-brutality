@@ -1,0 +1,3376 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
+
+const BUILD = '0.8.18';
+const USE_DYNAMIC_SHADOWS = false;
+const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
+const canvas = document.getElementById('game');
+const statusEl = document.getElementById('status');
+const readoutEl = document.getElementById('readout');
+const hintEl = document.getElementById('hint');
+const leftStick = document.getElementById('leftStick');
+const stickKnob = leftStick.querySelector('div');
+const actionPad = document.getElementById('actionPad');
+const attackButton = document.getElementById('attackButton');
+const jumpButton = document.getElementById('jumpButton');
+const gyroButton = document.getElementById('gyroButton');
+const fsButton = document.getElementById('fsButton');
+
+window.addEventListener('error', (event) => {
+  console.error(event.error || event.message);
+  setStatus('runtime error: ' + (event.error?.message || event.message || 'unknown'));
+  hintEl.textContent = 'Runtime error: ' + (event.error?.message || event.message || 'unknown');
+  hintEl.style.opacity = '1';
+});
+window.addEventListener('unhandledrejection', (event) => {
+  console.error(event.reason);
+  setStatus('promise error: ' + (event.reason?.message || event.reason || 'unknown'));
+  hintEl.textContent = 'Promise error: ' + (event.reason?.message || event.reason || 'unknown');
+  hintEl.style.opacity = '1';
+});
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(1.35, window.devicePixelRatio || 1));
+renderer.shadowMap.enabled = USE_DYNAMIC_SHADOWS;
+renderer.shadowMap.type = THREE.BasicShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.34;
+renderer.autoClear = false;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111722);
+scene.fog = new THREE.FogExp2(0x1a2230, 0.0068);
+
+const camera = new THREE.PerspectiveCamera(74, 1, 0.05, 160);
+camera.rotation.order = 'YXZ';
+
+const armsScene = new THREE.Scene();
+const armsCamera = new THREE.PerspectiveCamera(82, 1, 0.01, 12);
+armsCamera.up.set(0, 1, 0);
+armsCamera.lookAt(0, 0, 1);
+armsScene.add(new THREE.HemisphereLight(0xf2e8d3, 0x1b1110, 1.25));
+const armsKey = new THREE.DirectionalLight(0xffffff, 1.4);
+armsKey.position.set(-1.5, 2.5, -2);
+armsScene.add(armsKey);
+
+const clock = new THREE.Clock();
+const loader = new GLTFLoader();
+const textureLoader = new THREE.TextureLoader();
+const world = new THREE.Group();
+scene.add(world);
+let roomGroup = new THREE.Group();
+world.add(roomGroup);
+const batchBuildOffset = new THREE.Vector3();
+
+const JUMP_CHARGE_MAX = 0.18;
+const PLAYER_EYE_HEIGHT = 1.68;
+const WALK_JUMP_BASE_HEIGHT = 7.1;
+const WALK_JUMP_CHARGE_HEIGHT = 0.95;
+const RUN_JUMP_HORIZONTAL_BOOST = 4.45;
+const RUN_JUMP_VERTICAL_BOOST = 0.5;
+const JUMP_HOLD_ACCEL = 11.75;
+const GROUND_ACCEL = 28;
+const GROUND_FRICTION = 13.5;
+const AIR_ACCEL = 10.5;
+const GROUND_WISH_SPEED = 5.2;
+const RUN_WISH_SPEED = 8.8;
+const AIR_WISH_SPEED = 6.8;
+const KILL_Y = -10;
+const RUN_BUILD_TIME = 1.0;
+const SUPPORT_RADIUS = 0.56;
+const SUPPORT_SNAP_UP = 0.92;
+const SUPPORT_SNAP_DOWN = 1.65;
+const STICK_RESPONSE = 1.28;
+const MOVE_INPUT_SMOOTH_GROUND = 13.5;
+const MOVE_INPUT_SMOOTH_AIR = 9.5;
+const CAMERA_GROUND_SMOOTH = 18.0;
+const CAMERA_AIR_SMOOTH = 26.0;
+const AIR_CRUISE_SPEED = 6.2;
+const AIR_MAX_SPEED = 8.8;
+const AIR_TURN_ACCEL = 14.0;
+const AIR_BRAKE_ACCEL = 19.5;
+const AIR_DRAG = 3.4;
+
+const player = {
+  position: new THREE.Vector3(0, PLAYER_EYE_HEIGHT, -8.4),
+  visualPosition: new THREE.Vector3(0, PLAYER_EYE_HEIGHT, -8.4),
+  velocity: new THREE.Vector3(),
+  yaw: Math.PI,
+  pitch: 0,
+  grounded: true,
+  bob: 0,
+  stepClock: 0,
+  attackTimer: 0,
+  attack: null,
+  comboIndex: 0,
+  comboTimer: 0,
+  isRunning: false,
+  runCharge: 0,
+  lastRunIntent: false,
+  hitPause: 0,
+  healthPulse: 0,
+};
+
+const walkableSurfaces = [];
+const solidColliders = [];
+const diegeticLights = [];
+const bootParams = new URLSearchParams(window.location.search);
+if (bootParams.has('reset')) {
+  localStorage.setItem('infinite-brutality-level-index', '0');
+  localStorage.setItem('infinite-brutality-node-index', '0');
+}
+if (bootParams.has('room')) {
+  const roomIndex = clamp(Number(bootParams.get('room') || 1) - 1, 0, GENERATED_ROOM_BATCH.length - 1);
+  localStorage.setItem('infinite-brutality-node-index', String(Math.floor(roomIndex)));
+}
+const roomState = {
+  levelIndex: Number(localStorage.getItem('infinite-brutality-level-index') || 0) || 0,
+  nodeIndex: Number(localStorage.getItem('infinite-brutality-node-index') || 0) || 0,
+  seed: 0,
+  plan: null,
+  spec: null,
+  exit: new THREE.Vector3(),
+  exitRadius: 2.5,
+  spawn: new THREE.Vector3(0, PLAYER_EYE_HEIGHT, -8.4),
+  transitionLock: 0,
+  enemyPositions: [],
+};
+
+const input = {
+  moveX: 0,
+  moveY: 0,
+  smoothMoveX: 0,
+  smoothMoveY: 0,
+  stickPointer: null,
+  lookPointer: null,
+  lastLookX: 0,
+  lastLookY: 0,
+  gyro: false,
+  gyroYaw: 0,
+  gyroPitch: 0,
+  gyroBaseGamma: null,
+  gyroBaseBeta: null,
+  attackPointerId: null,
+  jumpPointerId: null,
+  jumpHoldStart: 0,
+  jumpCharging: false,
+};
+
+let audioCtx = null;
+let armsModel = null;
+let armsMixer = null;
+let armsCameraBone = null;
+let activeArmAction = null;
+let idleAction = null;
+let walkAction = null;
+let jumpAction = null;
+let runAction = null;
+let attackAction = null;
+let sprintAttackAction = null;
+let airAttackAction = null;
+let airForwardAttackAction = null;
+let crouchAttackAction = null;
+let normalAttackDefs = [];
+let sprintAttackDef = null;
+let airAttackDef = null;
+let airForwardAttackDef = null;
+let crouchAttackDef = null;
+
+function setStatus(text) {
+  statusEl.textContent = 'build ' + BUILD + ' | ' + text;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function cameraForwardYaw(yaw) {
+  return new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+}
+
+function cameraRightYaw(yaw) {
+  return new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+}
+
+function makeMat(color, roughness = 0.86, metalness = 0.04, lift = 0.055) {
+  return new THREE.MeshLambertMaterial({
+    color,
+    fog: true,
+    emissive: new THREE.Color(color).multiplyScalar(lift),
+    flatShading: true,
+  });
+}
+
+function makeGlowMat(color, intensity = 1.8) {
+  return new THREE.MeshBasicMaterial({ color, toneMapped: false });
+}
+
+function makeLightPoolMat(color, opacity = 0.22) {
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+    toneMapped: false,
+  });
+}
+
+const MAT = {
+  floor: makeMat(0x657382, 0.86, 0.04, 0.07),
+  wall: makeMat(0x2b3542, 0.9, 0.02, 0.045),
+  platform: makeMat(0x83909b, 0.82, 0.04, 0.065),
+  connectorFloor: makeMat(0x70818a, 0.84, 0.04, 0.07),
+  connectorWall: makeMat(0x2b3542, 0.9, 0.02, 0.045),
+  bridge: makeMat(0x9a7937, 0.74, 0.12, 0.06),
+  trim: makeMat(0xcbbd91, 0.78, 0.04, 0.07),
+  void: makeMat(0x202735, 0.95, 0.0, 0.035),
+  hazard: makeMat(0xc24d27, 0.66, 0.02, 0.08),
+  exit: makeMat(0x8de2b5, 0.66, 0.04, 0.08),
+  stone: makeMat(0x657382, 0.86, 0.04, 0.07),
+  stone2: makeMat(0x83909b, 0.82, 0.04, 0.065),
+  bronze: makeMat(0x9a7937, 0.74, 0.12, 0.06),
+  blood: makeMat(0x8a2020, 0.8, 0.02, 0.055),
+  bloodDark: makeMat(0x3c0b0e, 0.88, 0.01, 0.035),
+  bone: makeMat(0xd4c8ab, 0.8, 0.02, 0.07),
+  bonePlain: makeMat(0xb9aa88, 0.84, 0.02, 0.055),
+  green: makeMat(0x79d49a, 0.66, 0.05, 0.07),
+  orange: makeMat(0xc24d27, 0.5, 0.02, 0.08),
+  flame: makeGlowMat(0xffb04a, 2.4),
+  corpsefire: makeGlowMat(0x8ee8df, 2.0),
+  flamePool: makeLightPoolMat(0xff9a2f, 0.0),
+  corpsefirePool: makeLightPoolMat(0x7df4e9, 0.0),
+  hazardPool: makeLightPoolMat(0xb85a22, 0.0),
+  flesh: makeMat(0xc7a183, 0.84, 0.02),
+  iron: makeMat(0x2b2f34, 0.62, 0.06, 0.045),
+};
+
+function setMaterialUvScale(mat, scale) {
+  mat.userData.uvScale = scale;
+  return mat;
+}
+
+for (const mat of [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2]) setMaterialUvScale(mat, 0.125);
+for (const mat of [MAT.bridge, MAT.trim, MAT.bronze]) setMaterialUvScale(mat, 0.105);
+for (const mat of [MAT.bone, MAT.bonePlain]) setMaterialUvScale(mat, 0.112);
+setMaterialUvScale(MAT.iron, 0.075);
+setMaterialUvScale(MAT.blood, 0.055);
+
+function makeVoronoiTexture(seed, options = {}) {
+  const size = options.size ?? 96;
+  const cells = options.cells ?? 18;
+  const base = options.base ?? 0.76;
+  const contrast = options.contrast ?? 0.18;
+  const edgeDarken = options.edgeDarken ?? 0.28;
+  const edgeScale = options.edgeScale ?? 0.038;
+  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  ctx.canvas.width = size;
+  ctx.canvas.height = size;
+  const rng = rngFromSeed(seed);
+  const sites = [];
+  for (let i = 0; i < cells; i += 1) {
+    sites.push({ x: rng() * size, y: rng() * size, tint: 0.92 + rng() * 0.16 });
+  }
+  const image = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      let d1 = Infinity;
+      let d2 = Infinity;
+      let tint = 1;
+      for (const site of sites) {
+        const dx = x - site.x;
+        const dy = y - site.y;
+        const d = dx * dx + dy * dy;
+        if (d < d1) {
+          d2 = d1;
+          d1 = d;
+          tint = site.tint;
+        } else if (d < d2) {
+          d2 = d;
+        }
+      }
+      const cell = Math.min(1, Math.sqrt(d1) / (size * 0.34));
+      const border = Math.max(0, Math.min(1, 1 - (Math.sqrt(d2) - Math.sqrt(d1)) / (size * edgeScale)));
+      const grain = ((x * 13 + y * 7 + seed) % 11) / 10 - 0.5;
+      const value = Math.max(0.08, Math.min(0.98, (base - cell * contrast - border * edgeDarken) * tint + grain * 0.022));
+      const idx = (y * size + x) * 4;
+      const c = Math.floor(value * 255);
+      image.data[idx] = c;
+      image.data[idx + 1] = c;
+      image.data[idx + 2] = c;
+      image.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(ctx.canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(options.repeatX ?? 1, options.repeatY ?? 1);
+  texture.anisotropy = 2;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function applyProceduralSurfaceTextures() {
+  const floorNoise = makeVoronoiTexture(0x11a2d3, { size: 96, cells: 22, base: 0.82, contrast: 0.12, edgeDarken: 0.16, edgeScale: 0.032, repeatX: 4, repeatY: 4 });
+  const wallNoise = makeVoronoiTexture(0x334455, { size: 96, cells: 24, base: 0.74, contrast: 0.16, edgeDarken: 0.22, edgeScale: 0.032, repeatX: 5, repeatY: 4 });
+  const bronzeNoise = makeVoronoiTexture(0x7b5a26, { size: 96, cells: 16, base: 0.92, contrast: 0.07, edgeDarken: 0.1, edgeScale: 0.04, repeatX: 3, repeatY: 3 });
+  const boneNoise = makeVoronoiTexture(0xd4c8ab, { size: 96, cells: 18, base: 0.88, contrast: 0.1, edgeDarken: 0.12, edgeScale: 0.036, repeatX: 3, repeatY: 3 });
+  const ironNoise = makeVoronoiTexture(0x444746, { size: 96, cells: 20, base: 0.72, contrast: 0.12, edgeDarken: 0.18, edgeScale: 0.036, repeatX: 3, repeatY: 3 });
+  for (const mat of [MAT.floor, MAT.stone, MAT.connectorFloor]) {
+    mat.map = floorNoise;
+    mat.needsUpdate = true;
+  }
+  for (const mat of [MAT.wall, MAT.connectorWall, MAT.platform, MAT.stone2]) {
+    mat.map = mat === MAT.wall || mat === MAT.connectorWall ? wallNoise : floorNoise;
+    mat.needsUpdate = true;
+  }
+  for (const mat of [MAT.bronze, MAT.bridge, MAT.trim]) {
+    mat.map = bronzeNoise;
+    mat.needsUpdate = true;
+  }
+  MAT.bone.map = boneNoise;
+  MAT.bone.needsUpdate = true;
+  MAT.iron.map = ironNoise;
+  MAT.iron.needsUpdate = true;
+}
+
+function loadWrappedTexture(path, repeatX, repeatY, onTexture) {
+  const url = new URL(path, import.meta.url).href;
+  textureLoader.load(url, (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeatX, repeatY);
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.anisotropy = Math.min(2, renderer.capabilities.getMaxAnisotropy?.() || 1);
+    texture.needsUpdate = true;
+    onTexture(texture);
+  }, undefined, (error) => {
+    console.warn('surface texture failed; procedural fallback remains', path, error);
+  });
+}
+
+function applyTextureToMaterials(texture, materials, tint = 0xffffff) {
+  for (const mat of materials) {
+    mat.map = texture;
+    mat.color.setHex(tint);
+    mat.needsUpdate = true;
+  }
+}
+
+function applyGeneratedSurfaceTextures() {
+  loadWrappedTexture('../assets/textures/ib-vector-stone-20260608.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-bronze-20260608.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.bridge, MAT.trim, MAT.bronze], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-bone-20260608.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.bone, MAT.bonePlain], 0xd4c39f);
+  });
+}
+
+applyProceduralSurfaceTextures();
+applyGeneratedSurfaceTextures();
+
+function loadSkyDomeTexture(material) {
+  const url = new URL('../assets/textures/ib-real-limbo-skybox-20260609.png', import.meta.url).href;
+  textureLoader.load(url, (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.needsUpdate = true;
+    material.map = texture;
+    material.color.setHex(0xffffff);
+    material.needsUpdate = true;
+  }, undefined, (error) => {
+    console.warn('vector sky texture failed; flat fallback remains', error);
+  });
+}
+
+function buildLimboSkyDome() {
+  const geometry = new THREE.SphereGeometry(145, 36, 18);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x182133,
+    side: THREE.BackSide,
+    depthWrite: false,
+    depthTest: false,
+    fog: false,
+    toneMapped: false,
+  });
+  loadSkyDomeTexture(material);
+  const dome = new THREE.Mesh(geometry, material);
+  dome.name = 'limbo-sky-dome';
+  dome.renderOrder = -1000;
+  dome.frustumCulled = false;
+  return dome;
+}
+
+const skyDome = buildLimboSkyDome();
+scene.add(skyDome);
+
+
+function applyWorldProjectedUvs(geometry, scale) {
+  const geo = geometry.index ? geometry.toNonIndexed() : geometry;
+  const pos = geo.getAttribute('position');
+  const normal = geo.getAttribute('normal');
+  const uvs = [];
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const nx = Math.abs(normal.getX(i));
+    const ny = Math.abs(normal.getY(i));
+    const nz = Math.abs(normal.getZ(i));
+    if (ny >= nx && ny >= nz) uvs.push(x * scale, z * scale);
+    else if (nx >= nz) uvs.push(z * scale, y * scale);
+    else uvs.push(x * scale, y * scale);
+  }
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  return geo;
+}
+
+function materialUvScale(mat) {
+  return mat?.userData?.uvScale ?? 0.1;
+}
+
+function offsetArray(pos) {
+  return [pos[0] + batchBuildOffset.x, pos[1] + batchBuildOffset.y, pos[2] + batchBuildOffset.z];
+}
+
+function offsetVec(vec) {
+  return makeVec(vec.x + batchBuildOffset.x, vec.y + batchBuildOffset.y, vec.z + batchBuildOffset.z);
+}
+
+function withBatchBuildOffset(offset, buildFn) {
+  const previous = batchBuildOffset.clone();
+  batchBuildOffset.copy(offset);
+  try { return buildFn(); }
+  finally { batchBuildOffset.copy(previous); }
+}
+
+function addBox(parent, name, size, pos, mat, cast = true) {
+  const geo = applyWorldProjectedUvs(new THREE.BoxGeometry(size[0], size[1], size[2]), materialUvScale(mat));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(pos[0] + batchBuildOffset.x, pos[1] + batchBuildOffset.y, pos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS && cast;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function makeBeveledBoxGeometry(size, bevel = 0.06, bevelSegments = 2) {
+  const width = size[0];
+  const height = size[1];
+  const depth = size[2];
+  const inset = Math.max(0.001, Math.min(bevel, width * 0.24, height * 0.24, depth * 0.24));
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2 + inset, -height / 2);
+  shape.lineTo(width / 2 - inset, -height / 2);
+  shape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + inset);
+  shape.lineTo(width / 2, height / 2 - inset);
+  shape.quadraticCurveTo(width / 2, height / 2, width / 2 - inset, height / 2);
+  shape.lineTo(-width / 2 + inset, height / 2);
+  shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - inset);
+  shape.lineTo(-width / 2, -height / 2 + inset);
+  shape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + inset, -height / 2);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelThickness: inset,
+    bevelSize: inset,
+    bevelSegments,
+    curveSegments: 4,
+  });
+  geo.center();
+  return geo;
+}
+
+function addBeveledBox(parent, name, size, pos, mat, cast = true, bevel = 0.06, bevelSegments = 2) {
+  const geo = applyWorldProjectedUvs(makeBeveledBoxGeometry(size, bevel, bevelSegments), materialUvScale(mat));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(pos[0] + batchBuildOffset.x, pos[1] + batchBuildOffset.y, pos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS && cast;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addDeformedCube(parent, name, points, depth, pos, mat, cast = true) {
+  const halfDepth = depth * 0.5;
+  const vertices = [];
+  const uvs = [];
+  const uvScale = materialUvScale(mat);
+  for (const p of points) {
+    vertices.push(p[0], p[1], -halfDepth);
+    uvs.push(p[0] * uvScale, p[1] * uvScale);
+  }
+  for (const p of points) {
+    vertices.push(p[0], p[1], halfDepth);
+    uvs.push(p[0] * uvScale, p[1] * uvScale);
+  }
+
+  const indices = [];
+  for (let i = 1; i < points.length - 1; i += 1) indices.push(0, i, i + 1);
+  const backOffset = points.length;
+  for (let i = 1; i < points.length - 1; i += 1) indices.push(backOffset, backOffset + i + 1, backOffset + i);
+  for (let i = 0; i < points.length; i += 1) {
+    const next = (i + 1) % points.length;
+    indices.push(i, next, backOffset + next);
+    indices.push(i, backOffset + next, backOffset + i);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(pos[0] + batchBuildOffset.x, pos[1] + batchBuildOffset.y, pos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS && cast;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addExtrudedPolygon(parent, name, points, depth, pos, mat, cast = true) {
+  return addDeformedCube(parent, name, points, depth, pos, mat, cast);
+}
+
+function addCylinder(parent, name, radius, depth, pos, mat, radial = 6) {  const geo = new THREE.CylinderGeometry(radius, radius, depth, radial, 1, false);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(pos[0] + batchBuildOffset.x, pos[1] + batchBuildOffset.y, pos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function anchorGeometryBottomCenter(geometry) {
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox;
+  if (!box) return geometry;
+  geometry.translate(
+    -((box.min.x + box.max.x) * 0.5),
+    -box.min.y,
+    -((box.min.z + box.max.z) * 0.5),
+  );
+  return geometry;
+}
+
+function addGroundedBox(parent, name, size, basePos, mat, cast = true) {
+  const geo = anchorGeometryBottomCenter(new THREE.BoxGeometry(size[0], size[1], size[2]));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(basePos[0] + batchBuildOffset.x, basePos[1] + batchBuildOffset.y, basePos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS && cast;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addGroundedBeveledBox(parent, name, size, basePos, mat, cast = true, bevel = 0.06, bevelSegments = 2) {
+  const geo = anchorGeometryBottomCenter(makeBeveledBoxGeometry(size, bevel, bevelSegments));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(basePos[0] + batchBuildOffset.x, basePos[1] + batchBuildOffset.y, basePos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS && cast;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addGroundedCylinder(parent, name, radius, depth, basePos, mat, radial = 6) {
+  const geo = anchorGeometryBottomCenter(new THREE.CylinderGeometry(radius, radius, depth, radial, 1, false));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(basePos[0] + batchBuildOffset.x, basePos[1] + batchBuildOffset.y, basePos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function worldOffset() {
+  const base = roomGroup?.position || new THREE.Vector3();
+  return makeVec(base.x + batchBuildOffset.x, base.y + batchBuildOffset.y, base.z + batchBuildOffset.z);
+}
+
+function registerWalkable(size, pos, margin = 0.12) {
+  const offset = worldOffset();
+  walkableSurfaces.push({
+    minX: pos[0] + offset.x - size[0] / 2 + margin,
+    maxX: pos[0] + offset.x + size[0] / 2 - margin,
+    minZ: pos[2] + offset.z - size[2] / 2 + margin,
+    maxZ: pos[2] + offset.z + size[2] / 2 - margin,
+    topY: pos[1] + offset.y + size[1] / 2,
+  });
+}
+
+function registerSolid(size, pos, margin = 0.0) {
+  const offset = worldOffset();
+  solidColliders.push({
+    minX: pos[0] + offset.x - size[0] / 2 - margin,
+    maxX: pos[0] + offset.x + size[0] / 2 + margin,
+    minY: pos[1] + offset.y - size[1] / 2,
+    maxY: pos[1] + offset.y + size[1] / 2,
+    minZ: pos[2] + offset.z - size[2] / 2 - margin,
+    maxZ: pos[2] + offset.z + size[2] / 2 + margin,
+  });
+}
+
+function addWallBox(parent, name, size, pos, mat, cast = false) {
+  const mesh = addBox(parent, name, size, pos, mat, cast);
+  registerSolid(size, pos, 0.02);
+  return mesh;
+}
+
+function addPortalWall(parent, prefix, z, width, height, mat, gapWidth = 6.4) {
+  const sideWidth = Math.max(0.1, (width - gapWidth) * 0.5);
+  const x = gapWidth * 0.5 + sideWidth * 0.5;
+  addWallBox(parent, prefix + '-left', [sideWidth, height, 0.5], [-x, height * 0.5, z], mat, false);
+  addWallBox(parent, prefix + '-right', [sideWidth, height, 0.5], [x, height * 0.5, z], mat, false);
+  addWallBox(parent, prefix + '-lintel', [gapWidth, Math.max(0.8, height - 4.2), 0.5], [0, 4.2 + Math.max(0.8, height - 4.2) * 0.5, z], mat, false);
+  addBeveledBox(parent, prefix + '-threshold', [gapWidth + 1.2, 0.22, 0.72], [0, 0.11, z], MAT.trim, false, 0.025, 1);
+}
+
+function addSidePortalWall(parent, prefix, x, depth, height, mat, gapWidth = 6.4) {
+  const sideDepth = Math.max(0.1, (depth - gapWidth) * 0.5);
+  const z = gapWidth * 0.5 + sideDepth * 0.5;
+  addWallBox(parent, prefix + '-front', [0.5, height, sideDepth], [x, height * 0.5, -z], mat, false);
+  addWallBox(parent, prefix + '-back', [0.5, height, sideDepth], [x, height * 0.5, z], mat, false);
+  addWallBox(parent, prefix + '-lintel', [0.5, Math.max(0.8, height - 4.2), gapWidth], [x, 4.2 + Math.max(0.8, height - 4.2) * 0.5, 0], mat, false);
+  addBeveledBox(parent, prefix + '-threshold', [0.72, 0.22, gapWidth + 1.2], [x, 0.11, 0], MAT.trim, false, 0.025, 1);
+}
+
+function addFullWall(parent, prefix, side, width, depth, height, mat) {
+  if (side === 'north') addWallBox(parent, prefix, [width, height, 0.5], [0, height * 0.5, depth / 2], mat, false);
+  if (side === 'south') addWallBox(parent, prefix, [width, height, 0.5], [0, height * 0.5, -depth / 2], mat, false);
+  if (side === 'west') addWallBox(parent, prefix, [0.5, height, depth], [-width / 2, height * 0.5, 0], mat, false);
+  if (side === 'east') addWallBox(parent, prefix, [0.5, height, depth], [width / 2, height * 0.5, 0], mat, false);
+}
+
+function addSealedPortal(parent, prefix, side, width, depth, height, mat) {
+  addFullWall(parent, prefix + '-solid', side, width, depth, height, mat);
+  const z = side === 'north' ? depth / 2 - 0.28 : -depth / 2 + 0.28;
+  const x = side === 'east' ? width / 2 - 0.28 : -width / 2 + 0.28;
+  if (side === 'north' || side === 'south') {
+    addBeveledBox(parent, prefix + '-blocked-arch', [4.8, 3.0, 0.22], [0, 1.5, z], MAT.connectorWall, false, 0.04, 1);
+    addBeveledBox(parent, prefix + '-seal-cross', [5.4, 0.24, 0.3], [0, 2.45, z + (side === 'north' ? -0.04 : 0.04)], MAT.trim, false, 0.03, 1);
+    addRubbleLine(parent, prefix + '-rubble', side, width, depth, 0);
+  } else {
+    addBeveledBox(parent, prefix + '-blocked-arch', [0.22, 3.0, 4.8], [x, 1.5, 0], MAT.connectorWall, false, 0.04, 1);
+    addBeveledBox(parent, prefix + '-seal-cross', [0.3, 0.24, 5.4], [x + (side === 'east' ? -0.04 : 0.04), 2.45, 0], MAT.trim, false, 0.03, 1);
+    addRubbleLine(parent, prefix + '-rubble', side, width, depth, 0);
+  }
+}
+
+function addRubbleLine(parent, prefix, side, width, depth, baseY) {
+  const count = 5;
+  for (let i = 0; i < count; i += 1) {
+    const t = (i - (count - 1) * 0.5) / count;
+    const sx = 0.42 + (i % 2) * 0.22;
+    const h = 0.2 + (i % 3) * 0.08;
+    const mat = i % 2 ? MAT.platform : MAT.trim;
+    if (side === 'north' || side === 'south') {
+      const z = side === 'north' ? depth / 2 - 0.66 : -depth / 2 + 0.66;
+      addGroundedBeveledBox(parent, prefix + '-' + i, [sx, h, 0.42], [t * 5.4, baseY, z], mat, true, 0.02, 1);
+    } else {
+      const x = side === 'east' ? width / 2 - 0.66 : -width / 2 + 0.66;
+      addGroundedBeveledBox(parent, prefix + '-' + i, [0.42, h, sx], [x, baseY, t * 5.4], mat, true, 0.02, 1);
+    }
+  }
+}
+
+function addCeilingFrame(parent, prefix, width, depth, mat = MAT.wall) {
+  const y = 8.9;
+  addBeveledBox(parent, prefix + '-north', [width, 0.58, 1.1], [0, y, depth / 2 - 0.58], mat, false, 0.04, 1);
+  addBeveledBox(parent, prefix + '-south', [width, 0.58, 1.1], [0, y, -depth / 2 + 0.58], mat, false, 0.04, 1);
+  addBeveledBox(parent, prefix + '-west', [1.1, 0.58, depth], [-width / 2 + 0.58, y, 0], mat, false, 0.04, 1);
+  addBeveledBox(parent, prefix + '-east', [1.1, 0.58, depth], [width / 2 - 0.58, y, 0], mat, false, 0.04, 1);
+  const ribCount = Math.max(2, Math.floor(depth / 11));
+  for (let i = 1; i <= ribCount; i += 1) {
+    const z = -depth / 2 + (depth * i) / (ribCount + 1);
+    addBeveledBox(parent, prefix + '-rib-' + i, [width * 0.62, 0.34, 0.44], [0, y - 0.42, z], MAT.connectorWall, false, 0.03, 1);
+  }
+}
+
+function addRoomShell(parent, width, depth, mat = MAT.stone, options = {}) {
+  const height = 10;
+  const openSides = options.openSides || new Set(['north', 'south', 'west', 'east']);
+  const isOpen = (side) => openSides === 'all' || openSides.has?.(side);
+  if (isOpen('north')) addPortalWall(parent, 'north-wall', depth / 2, width, height, mat); else addSealedPortal(parent, 'north-wall', 'north', width, depth, height, mat);
+  if (isOpen('south')) addPortalWall(parent, 'south-wall', -depth / 2, width, height, mat); else addSealedPortal(parent, 'south-wall', 'south', width, depth, height, mat);
+  if (isOpen('west')) addSidePortalWall(parent, 'west-wall', -width / 2, depth, height, mat); else addSealedPortal(parent, 'west-wall', 'west', width, depth, height, mat);
+  if (isOpen('east')) addSidePortalWall(parent, 'east-wall', width / 2, depth, height, mat); else addSealedPortal(parent, 'east-wall', 'east', width, depth, height, mat);
+  addCeilingFrame(parent, 'ceiling-frame', width, depth, mat);
+}
+
+function addWalkableBox(parent, name, size, pos, mat, cast = true, margin = 0.12) {
+  const mesh = addBeveledBox(parent, name, size, pos, mat, cast, 0.04, 1);
+  registerWalkable(size, pos, margin);
+  return mesh;
+}
+
+function clearGroup(group) {
+  while (group.children.length) group.remove(group.children[0]);
+}
+
+function resetWalkableBounds() {
+  walkableSurfaces.length = 0;
+  solidColliders.length = 0;
+  diegeticLights.length = 0;
+}
+
+function rngFromSeed(seed) {
+  let t = seed >>> 0;
+  if (t === 0) t = 0x6d2b79f5;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ t >>> 15, 1 | t);
+    r ^= r + Math.imul(r ^ r >>> 7, 61 | r);
+    return ((r ^ r >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function hashRoomKey(key) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function pick(rng, items) {
+  return items[Math.floor(rng() * items.length) % items.length];
+}
+
+function makeVec(x, y, z) {
+  return new THREE.Vector3(x, y, z);
+}
+
+function levelIndexKey() {
+  return 'infinite-brutality-level-index';
+}
+
+function nodeIndexKey() {
+  return 'infinite-brutality-node-index';
+}
+
+function levelSeedKey(index) {
+  return 'infinite-brutality-level-seed-' + index;
+}
+
+function setLevelIndex(value) {
+  localStorage.setItem(levelIndexKey(), String(value));
+}
+
+function setNodeIndex(value) {
+  localStorage.setItem(nodeIndexKey(), String(value));
+}
+
+const ROOM_LIBRARY = {
+  chasm: {
+    names: ['Chasm Walk', 'Bridge Test', 'Gloam Span'],
+    entrySockets: ['gate', 'arch', 'bridge'],
+    exitSockets: ['bridge', 'ledge', 'gate'],
+    roomRole: 'crossing',
+    landmark: 'split span over a chasm',
+    toy: 'a narrow beam over fire',
+  },
+  switchback: {
+    names: ['Switchback Hall', 'Turnblade Route', 'Forked Rise'],
+    entrySockets: ['stair', 'gate', 'arch', 'ledge'],
+    exitSockets: ['stair', 'gate', 'bridge', 'ledge'],
+    roomRole: 'climb',
+    landmark: 'a climbing loop around a central mass',
+    toy: 'a switchback ledge chain',
+  },
+  spire: {
+    names: ['Spire Ascent', 'Broken Shaft', 'Tower Climb'],
+    entrySockets: ['gate', 'ledge', 'stair', 'drop'],
+    exitSockets: ['gate', 'drop', 'ledge', 'bridge'],
+    roomRole: 'vertical',
+    landmark: 'a central spire or tower core',
+    toy: 'a vertical drop or launch edge',
+  },
+};
+
+const ROOM_SEQUENCE_ROLES = ['crossing', 'climb', 'vertical'];
+const ROOM_PORTAL_MAP = {
+  chasm: {
+    spawn: {
+      gate: [0, PLAYER_EYE_HEIGHT, -13.0],
+      bridge: [0, PLAYER_EYE_HEIGHT + 0.56, -5.0],
+      arch: [0, PLAYER_EYE_HEIGHT, -13.0],
+      ledge: [-11.0, PLAYER_EYE_HEIGHT + 1.9, 1.4],
+      stair: [-7.4, PLAYER_EYE_HEIGHT + 0.74, -6.1],
+      drop: [0, PLAYER_EYE_HEIGHT + 0.56, -5.0],
+    },
+    exit: {
+      gate: [0, 2.82, 13.0],
+      bridge: [7.2, 3.08, 7.4],
+      arch: [0, 2.08, 8.7],
+      ledge: [-6.3, 2.33, 7.8],
+      stair: [0, 2.82, 13.0],
+      drop: [0, -1.95, 0.9],
+    },
+    exitRadius: {
+      gate: 2.4,
+      bridge: 1.5,
+      arch: 1.4,
+      ledge: 1.2,
+      stair: 2.3,
+      drop: 1.0,
+    },
+  },
+  switchback: {
+    spawn: {
+      gate: [-11.2, PLAYER_EYE_HEIGHT, -10.0],
+      bridge: [-11.2, PLAYER_EYE_HEIGHT, -8.0],
+      arch: [-3.6, PLAYER_EYE_HEIGHT, -1.2],
+      ledge: [-1.5, PLAYER_EYE_HEIGHT, 1.1],
+      stair: [2.2, PLAYER_EYE_HEIGHT, 6.8],
+      drop: [0, PLAYER_EYE_HEIGHT, -1.0],
+    },
+    exit: {
+      gate: [0, 4.7, 13.0],
+      bridge: [6.6, 3.9, 8.6],
+      arch: [-1.5, 2.1, 1.1],
+      ledge: [-1.5, 2.1, 1.1],
+      stair: [-11.2, 3.1, 10.2],
+      drop: [0, -1.95, 2.0],
+    },
+    exitRadius: {
+      gate: 2.5,
+      bridge: 1.5,
+      arch: 1.2,
+      ledge: 1.4,
+      stair: 2.2,
+      drop: 1.0,
+    },
+  },
+  spire: {
+    spawn: {
+      gate: [0, PLAYER_EYE_HEIGHT, -10.8],
+      bridge: [8.4, PLAYER_EYE_HEIGHT, -1.8],
+      arch: [-0.6, PLAYER_EYE_HEIGHT, -5.2],
+      ledge: [8.4, PLAYER_EYE_HEIGHT, -1.8],
+      stair: [-4.0, PLAYER_EYE_HEIGHT, 0.2],
+      drop: [0, PLAYER_EYE_HEIGHT, 5.0],
+    },
+    exit: {
+      gate: [0, 6.2, 10.4],
+      bridge: [8.4, 2.4, -1.8],
+      arch: [0, 3.4, 1.4],
+      ledge: [0, 3.4, 1.4],
+      stair: [0.4, 5.4, 10.4],
+      drop: [0, 0.2, 0.2],
+    },
+    exitRadius: {
+      gate: 2.6,
+      bridge: 1.8,
+      arch: 1.4,
+      ledge: 1.4,
+      stair: 2.0,
+      drop: 1.1,
+    },
+  },
+};
+
+const SOCKET_HEIGHT = {
+  gate: 0,
+  arch: 0.2,
+  bridge: 0.42,
+  stair: 0.82,
+  ledge: 1.05,
+  drop: -1.15,
+  shaft: -0.72,
+};
+
+function buildLevelSeed(index) {
+  const seedKey = localStorage.getItem(levelSeedKey(index)) || (Date.now().toString(16) + '-' + index + '-limbo');
+  localStorage.setItem(levelSeedKey(index), seedKey);
+  return hashRoomKey(seedKey);
+}
+
+function buildPortal(type, kind, socket, fallback = [0, 0, 0]) {
+  const map = ROOM_PORTAL_MAP[type]?.[kind] || {};
+  const point = map[socket];
+  return makeVec(point?.[0] ?? fallback[0], point?.[1] ?? fallback[1], point?.[2] ?? fallback[2]);
+}
+
+function pickRoomTypeForSocket(rng, entrySocket, finalNode = false, context = {}) {
+  const options = Object.keys(ROOM_LIBRARY).filter((type) => ROOM_LIBRARY[type].entrySockets.includes(entrySocket));
+  const fallback = ['chasm', 'switchback', 'spire'];
+  const pool = options.length ? options : fallback;
+  if (finalNode && pool.includes('spire')) return 'spire';
+  const lastRole = context.lastRole || null;
+  const previousType = context.previousType || null;
+  const rolesUsed = context.rolesUsed || {};
+  const mandatoryRole = context.mandatoryRole || null;
+  const roleBias = { crossing: 0.68, climb: 0.74, vertical: 0.8 };
+  const weights = pool.map((type) => {
+    const profile = ROOM_LIBRARY[type];
+    let weight = 1;
+    if (type === previousType) weight *= 0.52;
+    if (mandatoryRole && profile.roomRole === mandatoryRole) weight *= 2.2;
+    if (profile.roomRole === lastRole) weight *= 0.48;
+    if (!rolesUsed[profile.roomRole]) weight *= 1.25;
+    weight *= roleBias[profile.roomRole] || 1;
+    return weight;
+  });
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  let target = rng() * total;
+  for (let i = 0; i < pool.length; i += 1) {
+    target -= weights[i];
+    if (target <= 0) return pool[i];
+  }
+  return pick(pool, weights);
+}
+
+function pickExitSocketForRoom(rng, roomType, currentSocket, isFinalNode = false) {
+  const profile = ROOM_LIBRARY[roomType];
+  const options = profile.exitSockets.filter((socket) => socket !== currentSocket);
+  const fallback = profile.exitSockets.length ? profile.exitSockets : ['gate'];
+  const pool = options.length ? options : fallback;
+  if (isFinalNode) {
+    const endingPool = pool.filter((socket) => socket === 'gate' || socket === 'ledge' || socket === 'bridge');
+    if (endingPool.length) return pick(rng, endingPool);
+  }
+  return pick(rng, pool);
+}
+
+function remainingMandatoryRole(rolesUsed, nodesRemaining) {
+  const missing = ROOM_SEQUENCE_ROLES.filter((role) => !rolesUsed[role]);
+  if (!missing.length) return null;
+  if (missing.length <= nodesRemaining) return null;
+  return missing[0];
+}
+
+function assignDungeonLayout(nodes, rng) {
+  const patterns = [
+    [[0, 0, 0], [0, 0, 1], [1, 0, 1], [1, 1, 2], [0, 1, 2], [-1, 0, 2]],
+    [[0, 0, 0], [1, 0, 0], [1, 0, 1], [2, 1, 1], [2, 1, 0], [3, 0, 0]],
+    [[0, 0, 0], [0, 0, 1], [-1, 1, 1], [-1, 1, 2], [0, 0, 2], [1, 0, 2]],
+    [[0, 0, 0], [-1, 0, 0], [-1, 1, 1], [0, 1, 1], [0, 0, 2], [1, 0, 2]],
+  ];
+  const pattern = patterns[Math.floor(rng() * patterns.length)] || patterns[0];
+  for (let i = 0; i < nodes.length; i += 1) {
+    const cell = pattern[i % pattern.length];
+    nodes[i].grid = { x: cell[0], y: cell[1], z: cell[2] };
+    nodes[i].layoutOrigin = makeVec(cell[0] * ROOM_LAYOUT_STEP, cell[1] * ROOM_VERTICAL_STEP, cell[2] * ROOM_LAYOUT_STEP);
+  }
+}
+
+function generateLevelPlan(levelIndex) {
+  const seed = buildLevelSeed(levelIndex);
+  const rng = rngFromSeed(seed);
+  const nodeCount = 6;
+  const nodes = [];
+  let entrySocket = 'gate';
+  const rolesUsed = {};
+  let previousType = null;
+  let previousRole = null;
+  for (let i = 0; i < nodeCount; i += 1) {
+    const isFinalNode = i === nodeCount - 1;
+    const mandatoryRole = remainingMandatoryRole(rolesUsed, nodeCount - i);
+    const roomType = pickRoomTypeForSocket(rng, entrySocket, isFinalNode, {
+      previousType,
+      lastRole: previousRole,
+      rolesUsed,
+      mandatoryRole,
+    });
+    const roomProfile = ROOM_LIBRARY[roomType];
+    const exitSocket = pickExitSocketForRoom(rng, roomType, entrySocket, isFinalNode);
+    const nodeSeed = hashRoomKey(`${seed}:${i}:${roomType}:${entrySocket}->${exitSocket}`);
+    nodes.push({
+      index: i,
+      type: roomType,
+      name: pick(rng, roomProfile.names),
+      roomRole: roomProfile.roomRole,
+      landmark: roomProfile.landmark,
+      toy: roomProfile.toy,
+      entrySocket,
+      exitSocket,
+      seed: nodeSeed,
+      exitRadiusHint: ROOM_PORTAL_MAP[roomType]?.exitRadius?.[exitSocket] || 2.3,
+      connector: `${entrySocket}->${exitSocket}`,
+    });
+    rolesUsed[roomProfile.roomRole] = true;
+    previousType = roomType;
+    previousRole = roomProfile.roomRole;
+    entrySocket = exitSocket;
+  }
+  assignDungeonLayout(nodes, rng);
+  return { levelIndex, seed, nodes };
+}
+
+function ensureLevelPlan() {
+  if (!roomState.plan || roomState.plan.levelIndex !== roomState.levelIndex) {
+    roomState.plan = generateLevelPlan(roomState.levelIndex);
+  }
+  return roomState.plan;
+}
+
+function getCurrentNode() {
+  const plan = ensureLevelPlan();
+  return plan.nodes[Math.min(roomState.nodeIndex, plan.nodes.length - 1)] || plan.nodes[0];
+}
+
+function advanceLevelNode() {
+  const plan = ensureLevelPlan();
+  const nextIndex = roomState.nodeIndex + 1;
+  if (nextIndex >= plan.nodes.length) {
+    roomState.levelIndex += 1;
+    roomState.nodeIndex = 0;
+    roomState.plan = null;
+  } else {
+    roomState.nodeIndex = nextIndex;
+  }
+  setLevelIndex(roomState.levelIndex);
+  setNodeIndex(roomState.nodeIndex);
+  return roomState.nodeIndex;
+}
+
+function addMarker(parent, pos, color = MAT.green, scale = 1) {
+  const orb = new THREE.Mesh(new THREE.OctahedronGeometry(0.26 * scale, 0), color);
+  orb.position.copy(pos);
+  parent.add(orb);
+  return orb;
+}
+
+function addGate(parent, pos, scale = 1) {
+  const gate = new THREE.Group();
+  gate.position.copy(pos);
+  gate.scale.setScalar(scale);
+  addBeveledBox(gate, 'gate-pillar-left', [0.24, 2.8, 0.24], [-1.1, 1.4, 0], MAT.trim, true, 0.03, 1);
+  addBeveledBox(gate, 'gate-pillar-right', [0.24, 2.8, 0.24], [1.1, 1.4, 0], MAT.trim, true, 0.03, 1);
+  addBeveledBox(gate, 'gate-top', [2.6, 0.2, 0.28], [0, 2.75, 0], MAT.trim, true, 0.03, 1);
+  addBeveledBox(gate, 'gate-keystone', [0.72, 0.24, 0.34], [0, 2.35, 0.04], MAT.exit, true, 0.02, 1);
+  const rune = addGroundedBeveledBox(gate, 'gate-rune', [0.34, 0.12, 0.1], [0, 1.35, 0.06], MAT.flame, false, 0.01, 1);
+  rune.userData.phase = pos.x * 0.37 + pos.z * 0.19;
+  diegeticLights.push({ flame: rune, phase: rune.userData.phase });
+  parent.add(gate);
+  return gate;
+}
+
+function addGlowPool(parent, prefix, pos, radius = 2.4, kind = 'flame') {
+  return null;
+}
+
+function addBrazier(parent, prefix, pos, options = {}) {
+  const kind = options.kind || 'flame';
+  const mat = kind === 'corpsefire' ? MAT.corpsefire : MAT.flame;
+  const baseY = pos[1] || 0;
+  const group = new THREE.Group();
+  group.position.set(pos[0], 0, pos[2]);
+  addGroundedCylinder(group, prefix + '-post', 0.08, 0.9, [0, baseY, 0], MAT.iron, 5);
+  addGroundedBeveledBox(group, prefix + '-sconce', [0.46, 0.18, 0.28], [0, baseY + 0.9, 0], MAT.trim, false, 0.025, 1);
+  const signal = addGroundedBeveledBox(group, prefix + '-signal', [0.22, 0.16, 0.22], [0, baseY + 1.08, 0], mat, false, 0.015, 1);
+  signal.name = prefix + '-signal';
+  diegeticLights.push({ flame: signal, phase: 0 });
+  parent.add(group);
+  return group;
+}
+
+function addRoomLightSet(parent, prefix, width, depth, rng, options = {}) {
+  const y = options.y || 0;
+  const kind = options.kind || 'flame';
+  const insetX = Math.max(4.2, width * 0.34);
+  const insetZ = Math.max(4.2, depth * 0.34);
+  const points = [
+    [-insetX, y, -insetZ],
+    [insetX, y, -insetZ],
+    [-insetX, y, insetZ],
+    [insetX, y, insetZ],
+  ];
+  for (let i = 0; i < points.length; i += 1) {
+    if (rng && rng() < 0.18) continue;
+    addBrazier(parent, prefix + '-brazier-' + i, points[i], { kind: i === 2 && kind === 'flame' ? 'corpsefire' : kind, intensity: 1.18, distance: 12 });
+  }
+}
+
+function updateDiegeticLights(time) {
+  for (const source of diegeticLights) {
+    const flame = source.userData?.flame || source.flame;
+    if (flame) flame.scale.setScalar(1.0);
+  }
+}
+
+function positionEnemy(position) {
+  if (!enemy) return;
+  enemy.visible = true;
+  enemy.userData.health = 3;
+  enemy.userData.hitTimer = 0;
+  enemy.position.copy(position);
+}
+
+function addDetailCube(parent, name, size, pos, mat, rx = 0, ry = 0, rz = 0, cast = true) {
+  const mesh = addBox(parent, name, size, pos, mat, cast);
+  mesh.rotation.set(rx, ry, rz);
+  return mesh;
+}
+
+function addTileField(parent, prefix, center, spanX, spanZ, cols, rows, topY, mats, rng, options = {}) {
+  // Dense floor overlays fought the base floor and made the scene muddy. Keep only a few raised gothic insets.
+  const count = Math.max(2, Math.floor((cols + rows) * 0.18));
+  for (let i = 0; i < count; i += 1) {
+    const sizeX = spanX * (0.08 + rng() * 0.1);
+    const sizeZ = spanZ * (0.04 + rng() * 0.08);
+    const x = center[0] + (rng() - 0.5) * spanX * 0.72;
+    const z = center[2] + (rng() - 0.5) * spanZ * 0.72;
+    const h = 0.09 + rng() * 0.06;
+    const tile = addGroundedBeveledBox(parent, prefix + '-inset-' + i, [sizeX, h, sizeZ], [x, topY + 0.08, z], mats[i % mats.length], true, 0.025, 1);
+    tile.rotation.y = (rng() - 0.5) * 0.2;
+  }
+}
+
+function addPillarStack(parent, prefix, x, z, baseY, height, mats, rng) {
+  const baseH = Math.max(0.18, height * 0.22);
+  const shaftH = Math.max(0.28, height * 0.5);
+  const capH = Math.max(0.12, height * 0.14);
+  const swayX = (rng() - 0.5) * 0.12;
+  const swayZ = (rng() - 0.5) * 0.12;
+  addGroundedBeveledBox(parent, prefix + '-base', [1.34, baseH, 1.34], [x, baseY, z], mats[0], true, 0.04, 1);
+  addGroundedBeveledBox(parent, prefix + '-shaft', [0.92, shaftH, 0.92], [x + swayX, baseY + baseH, z + swayZ], mats[1], true, 0.035, 1);
+  addGroundedBeveledBox(parent, prefix + '-cap', [1.56, capH, 1.56], [x, baseY + baseH + shaftH, z], mats[0], true, 0.04, 1);
+  if (rng() > 0.55) {
+    const a = addGroundedBeveledBox(parent, prefix + '-buttress-a', [0.32, shaftH * 0.62, 0.84], [x + 0.82, baseY + baseH + shaftH * 0.19, z], mats[1], true, 0.02, 1);
+    a.rotation.z = -0.14;
+  }
+  if (rng() > 0.55) {
+    const b = addGroundedBeveledBox(parent, prefix + '-buttress-b', [0.84, shaftH * 0.62, 0.32], [x, baseY + baseH + shaftH * 0.19, z + 0.82], mats[1], true, 0.02, 1);
+    b.rotation.x = 0.14;
+  }
+}
+
+function addButtressRow(parent, prefix, startX, endX, z, y, step, mats, rng) {
+  let index = 0;
+  for (let x = startX; x <= endX; x += step) {
+    const h = 1.2 + rng() * 1.8;
+    addPillarStack(parent, prefix + '-' + index, x, z, y, h, mats, rng);
+    index += 1;
+  }
+}
+
+function addLinearRidge(parent, prefix, start, end, count, mat, rng, options = {}) {
+  const size = options.size || [0.42, 0.12, 0.42];
+  const bevel = options.bevel ?? 0.02;
+  const lift = options.lift ?? -0.01;
+  for (let i = 0; i < count; i += 1) {
+    const t = count <= 1 ? 0 : i / (count - 1);
+    const x = start[0] + (end[0] - start[0]) * t;
+    const y = start[1] + (end[1] - start[1]) * t + lift + (rng() - 0.5) * (options.yJitter ?? 0.03);
+    const z = start[2] + (end[2] - start[2]) * t + (rng() - 0.5) * (options.zJitter ?? 0.03);
+    const sx = size[0] * (0.8 + rng() * 0.35);
+    const sy = size[1] * (0.8 + rng() * 0.3);
+    const sz = size[2] * (0.8 + rng() * 0.35);
+    const ridge = addBeveledBox(parent, prefix + '-' + i, [sx, sy, sz], [x, y + lift, z], mat, true, bevel, 1);
+    ridge.rotation.y += (rng() - 0.5) * (options.spin ?? 0.3);
+    ridge.rotation.x += (rng() - 0.5) * (options.pitch ?? 0.08);
+    ridge.rotation.z += (rng() - 0.5) * (options.roll ?? 0.08);
+  }
+}
+
+function addHangingChain(parent, prefix, x, z, topY, links, mat, rng, options = {}) {
+  const length = options.length ?? 1.8;
+  const sway = options.sway ?? 0.06;
+  const count = Math.max(2, links);
+  const linkGeo = new THREE.TorusGeometry(0.14, 0.05, 4, 6);
+  for (let i = 0; i < count; i += 1) {
+    const t = count <= 1 ? 0 : i / (count - 1);
+    const y = topY - t * length;
+    const ring = new THREE.Mesh(linkGeo, mat);
+    ring.position.set(x + Math.sin(i * 0.85) * sway, y, z + Math.cos(i * 0.55) * sway);
+    ring.scale.set(1.05, 1.35, 1.05);
+    ring.rotation.set(Math.PI / 2, 0, 0);
+    ring.rotation.y = i % 2 ? Math.PI / 2 : 0;
+    ring.castShadow = USE_DYNAMIC_SHADOWS;
+    ring.receiveShadow = USE_DYNAMIC_SHADOWS;
+    parent.add(ring);
+  }
+  if (options.dropStone !== false) {
+    addGroundedBeveledBox(parent, prefix + '-weight', [0.16, 0.24, 0.16], [x, topY - length - 0.12, z], mat, true, 0.01, 1);
+  }
+}
+
+function addBrokenSlab(parent, prefix, pos, size, mat, rng) {
+  const sink = 0.06;
+  const floorY = pos[1];
+  const slab = addGroundedBeveledBox(parent, prefix + '-slab', size, [pos[0], floorY - sink, pos[2]], mat, true, 0.03, 1);
+  slab.rotation.set((rng() - 0.5) * 0.12, (rng() - 0.5) * 0.45, (rng() - 0.5) * 0.12);
+  const chipCount = 1 + Math.floor(rng() * 2);
+  for (let i = 0; i < chipCount; i += 1) {
+    addGroundedBeveledBox(parent, prefix + '-chip-' + i, [size[0] * 0.22, size[1] * 0.26, size[2] * 0.18], [pos[0] + (rng() - 0.5) * size[0] * 0.45, floorY + size[1] * 0.45 - sink, pos[2] + (rng() - 0.5) * size[2] * 0.45], mat, true, 0.015, 1);
+  }
+}
+
+function addRubbleScatter(parent, prefix, center, spanX, spanZ, baseY, count, mats, rng) {
+  const pieceCount = Math.max(4, count);
+  const coreCount = Math.max(2, Math.floor(pieceCount * 0.35));
+  for (let i = 0; i < pieceCount; i += 1) {
+    const core = i < coreCount;
+    const t = pieceCount <= 1 ? 0 : i / (pieceCount - 1);
+    const angle = t * Math.PI * 2 + (rng() - 0.5) * 0.8;
+    const radiusX = spanX * (0.16 + rng() * 0.38);
+    const radiusZ = spanZ * (0.16 + rng() * 0.38);
+    const x = center[0] + Math.cos(angle) * radiusX + (rng() - 0.5) * spanX * 0.22;
+    const z = center[2] + Math.sin(angle * 1.17) * radiusZ + (rng() - 0.5) * spanZ * 0.22;
+    const h = core ? 0.16 + rng() * 0.22 : 0.08 + rng() * 0.12;
+    const w = core ? 0.18 + rng() * 0.24 : 0.08 + rng() * 0.14;
+    const d = core ? 0.16 + rng() * 0.24 : 0.08 + rng() * 0.14;
+    const piece = addGroundedBeveledBox(parent, prefix + '-' + i, [w, h, d], [x, baseY, z], mats[i % mats.length], true, 0.015, 1);
+    piece.rotation.set((rng() - 0.5) * 0.35, (rng() - 0.5) * 1.2, (rng() - 0.5) * 0.25);
+    if (core && rng() > 0.6) {
+      const chip = addGroundedBeveledBox(parent, prefix + '-' + i + '-chip', [w * 0.45, h * 0.32, d * 0.45], [x + (rng() - 0.5) * 0.14, baseY + h * 0.82, z + (rng() - 0.5) * 0.14], mats[(i + 1) % mats.length], true, 0.01, 1);
+      chip.rotation.set((rng() - 0.5) * 0.45, (rng() - 0.5) * 1.4, (rng() - 0.5) * 0.3);
+    }
+  }
+}
+
+function addBridgeGalleryStructure(parent, rng) {
+  // Quake-style blockout: one dominant void, one supported bridge, one readable side loop.
+  addWallBox(parent, 'gallery-left-buttress-a', [1.2, 4.8, 4.2], [-10.8, 2.4, -8.8], MAT.connectorWall, false);
+  addWallBox(parent, 'gallery-left-buttress-b', [1.2, 4.8, 4.2], [-10.8, 2.4, 1.2], MAT.connectorWall, false);
+  addWallBox(parent, 'gallery-left-buttress-c', [1.2, 4.8, 4.2], [-10.8, 2.4, 10.2], MAT.connectorWall, false);
+  addWallBox(parent, 'gallery-right-buttress-a', [1.2, 4.8, 4.2], [10.8, 2.4, -8.8], MAT.connectorWall, false);
+  addWallBox(parent, 'gallery-right-buttress-b', [1.2, 4.8, 4.2], [10.8, 2.4, 1.2], MAT.connectorWall, false);
+  addWallBox(parent, 'gallery-right-buttress-c', [1.2, 4.8, 4.2], [10.8, 2.4, 10.2], MAT.connectorWall, false);
+  addBeveledBox(parent, 'gallery-crossbeam-front', [22.0, 0.62, 0.76], [0, 5.1, -8.8], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, 'gallery-crossbeam-mid', [22.0, 0.62, 0.76], [0, 5.1, 1.2], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, 'gallery-crossbeam-back', [22.0, 0.62, 0.76], [0, 5.1, 10.2], MAT.trim, false, 0.04, 1);
+  addGroundedBeveledBox(parent, 'gallery-execution-dais', [5.2, 0.82, 3.2], [0, 0, -7.4], MAT.trim, true, 0.05, 1);
+  addGroundedBeveledBox(parent, 'gallery-blood-channel', [0.7, 0.1, 11.4], [0, 0.08, -0.7], MAT.blood, false, 0.02, 1);
+  for (let i = 0; i < 3; i += 1) {
+    addHangingChain(parent, 'gallery-chain-' + i, -4 + i * 4, 4.4 + i * 0.7, 7.4, 6, MAT.iron, rng, { length: 3.2, sway: 0.02, dropStone: i === 1 });
+  }
+}
+
+function buildChasmRoom(spec) {
+  const rng = rngFromSeed(spec.seed);
+  const width = 28;
+  const depth = 34;
+  addWalkableBox(roomGroup, 'gallery-floor-start', [width, 0.3, 8.4], [0, -0.15, -12.8], MAT.floor, false, 0.08);
+  addWalkableBox(roomGroup, 'gallery-floor-end', [width, 0.3, 7.8], [0, 2.45, 12.1], MAT.platform, false, 0.08);
+  addWalkableBox(roomGroup, 'gallery-left-walk', [4.8, 0.3, 23.2], [-11.0, 1.75, 1.4], MAT.platform, false, 0.08);
+  addWalkableBox(roomGroup, 'gallery-right-walk', [4.2, 0.3, 17.2], [10.6, 2.3, 3.6], MAT.platform, false, 0.08);
+  addRoomShell(roomGroup, width, depth, MAT.wall, { openSides: spec.openSides });
+  addRoomLightSet(roomGroup, 'gallery', width, depth, rng, { kind: 'flame' });
+  addBridgeGalleryStructure(roomGroup, rng);
+
+  addBox(roomGroup, 'gallery-void', [15.2, 0.42, 19.6], [0, -2.0, 0.9], MAT.void, false);
+  addBox(roomGroup, 'gallery-hazard-bed', [13.4, 0.05, 17.2], [0, -2.72, 0.9], MAT.hazard, false);
+
+  addWalkableBox(roomGroup, 'gallery-main-bridge-a', [6.4, 0.42, 8.8], [0, 0.35, -5.0], MAT.bridge, true, 0.05);
+  addWalkableBox(roomGroup, 'gallery-main-bridge-b', [6.4, 0.42, 8.8], [0, 1.1, 2.8], MAT.bridge, true, 0.05);
+  addWalkableBox(roomGroup, 'gallery-main-bridge-c', [6.4, 0.42, 7.6], [0, 1.85, 8.7], MAT.bridge, true, 0.05);
+  addWalkableBox(roomGroup, 'gallery-left-ramp-low', [4.8, 0.36, 7.0], [-7.4, 0.55, -6.1], MAT.platform, true, 0.06);
+  addWalkableBox(roomGroup, 'gallery-left-ramp-high', [4.8, 0.36, 8.0], [-7.4, 1.25, 0.4], MAT.platform, true, 0.06);
+  addWalkableBox(roomGroup, 'gallery-left-balcony-link', [6.6, 0.36, 4.0], [-6.3, 2.15, 7.8], MAT.platform, true, 0.06);
+  addWalkableBox(roomGroup, 'gallery-right-overlook', [5.8, 0.36, 5.2], [7.2, 2.9, 7.4], MAT.platform, true, 0.06);
+  addWalkableBox(roomGroup, 'gallery-exit-landing', [9.6, 0.42, 4.8], [0, 2.6, 13.0], MAT.bridge, true, 0.05);
+
+  addBeveledBox(roomGroup, 'gallery-bridge-support-a', [1.0, 3.5, 1.0], [-3.8, -0.2, -1.2], MAT.connectorWall, true, 0.04, 1);
+  addBeveledBox(roomGroup, 'gallery-bridge-support-b', [1.0, 3.8, 1.0], [3.8, 0.2, 3.7], MAT.connectorWall, true, 0.04, 1);
+  addBeveledBox(roomGroup, 'gallery-bridge-support-c', [1.0, 5.0, 1.0], [-3.6, 0.9, 8.8], MAT.connectorWall, true, 0.04, 1);
+
+  addGate(roomGroup, makeVec(0, 0, 15.2), 1.1);
+  addMarker(roomGroup, makeVec(0, 2.82, 13.0), MAT.exit, 1.4);
+  addMarker(roomGroup, makeVec(-6.3, 2.33, 7.8), MAT.trim, 0.9);
+  addMarker(roomGroup, makeVec(7.2, 3.08, 7.4), MAT.exit, 0.85);
+
+  return { spawn: makeVec(0, PLAYER_EYE_HEIGHT, -13.0), exit: makeVec(0, 2.82, 13.0), exitRadius: 2.8, enemyPositions: [makeVec(0, 1.1, -6.8), makeVec(7.2, 3.2, 7.4)] };
+}
+
+function buildSwitchbackRoom(spec) {
+  const rng = rngFromSeed(spec.seed ^ 0x9e3779b9);
+  const width = 34;
+  const depth = 28;
+  addWalkableBox(roomGroup, 'rim-floor', [width, 0.3, depth], [0, -0.15, 0], MAT.floor, false, 0.08);
+  addRoomShell(roomGroup, width, depth, MAT.wall, { openSides: spec.openSides });
+  addRoomLightSet(roomGroup, 'switch', width, depth, rng, { kind: 'flame' });
+
+  const path = [[-11.5, -7.6, -8.0], [-7.8, -4.5, -2.8], [-3.6, -1.2, 2.2], [2.1, 1.8, 6.8], [8.0, 3.1, 10.2]];
+  for (let i = 0; i < path.length; i += 1) {
+    const p = path[i];
+    const sizeX = 3.8 + (rng() - 0.5) * 0.8;
+    const sizeZ = 2.8 + (rng() - 0.5) * 0.5;
+    addWalkableBox(roomGroup, 'switch-step-' + i, [sizeX, 0.34, sizeZ], [p[0], i * 0.74, p[2]], i % 2 ? MAT.bridge : MAT.platform, true, 0.05);
+  }
+  addWalkableBox(roomGroup, 'switch-long-beam', [1.0, 0.24, 10.6], [-1.5, 2.1, 1.1], MAT.bridge, true, 0.02);
+  addWalkableBox(roomGroup, 'switch-upper', [6.8, 0.38, 4.0], [6.6, 3.9, 8.6], MAT.platform, true, 0.04);
+  addWalkableBox(roomGroup, 'switch-finish', [9.4, 0.42, 4.6], [0, 4.7, 13.0], MAT.bridge, true, 0.04);
+
+  addGlowPool(roomGroup, 'switch-pit', [0, -0.68, 2.0], 6.2, 'hazard');
+  addBox(roomGroup, 'switch-chasm', [18.0, 0.36, 8.8], [0, -1.95, 2.0], MAT.void, false);
+  addGate(roomGroup, makeVec(0, 0, 14.2), 1.15);
+  addMarker(roomGroup, makeVec(0, 4.7, 13.0), MAT.exit, 1.4);
+  addMarker(roomGroup, makeVec(-1.5, 2.1, 1.1), MAT.trim, 1.0);
+  dressSwitchbackRoom(rng);
+
+  return { spawn: makeVec(-11.2, PLAYER_EYE_HEIGHT, -10.0), exit: makeVec(0, 4.7, 13.0), exitRadius: 2.5, enemyPositions: [makeVec(-3.6, 1.8, 2.2), makeVec(6.6, 3.9, 8.6)] };
+}
+
+function buildSpireRoom(spec) {
+  const rng = rngFromSeed(spec.seed ^ 0x85ebca6b);
+  const width = 30;
+  const depth = 30;
+  addWalkableBox(roomGroup, 'rim-floor', [width, 0.3, depth], [0, -0.15, 0], MAT.floor, false, 0.08);
+  addRoomShell(roomGroup, width, depth, MAT.wall, { openSides: spec.openSides });
+  addRoomLightSet(roomGroup, 'spire', width, depth, rng, { kind: 'corpsefire' });
+
+  const heights = [0.2, 0.95, 1.8, 2.7, 3.7, 4.7];
+  const radii = [7.5, 6.4, 5.1, 4.0, 2.7, 1.4];
+  for (let i = 0; i < heights.length; i += 1) {
+    const angle = i * 0.9 + (rng() - 0.5) * 0.25;
+    const x = Math.cos(angle) * radii[i];
+    const z = Math.sin(angle) * radii[i];
+    addWalkableBox(roomGroup, 'spire-ring-' + i, [3.4 - i * 0.25, 0.34, 2.8 - i * 0.15], [x, heights[i], z], i % 2 ? MAT.bridge : MAT.platform, true, 0.04);
+  }
+  addWalkableBox(roomGroup, 'spire-top', [5.4, 0.4, 4.6], [0.4, 5.4, 0.2], MAT.bridge, true, 0.04);
+  addWalkableBox(roomGroup, 'spire-side-ledge', [2.2, 0.28, 8.0], [8.4, 2.4, -1.8], MAT.platform, true, 0.03);
+  addWalkableBox(roomGroup, 'spire-finish', [8.4, 0.42, 4.4], [0, 6.2, 10.4], MAT.platform, true, 0.04);
+
+  const core = addCylinder(roomGroup, 'spire-core', 1.4, 10.5, [0, 4.8, 0.2], MAT.iron, 6);
+  core.rotation.y = Math.PI / 6;
+  registerSolid([2.9, 10.5, 2.9], [0, 4.8, 0.2], 0.08);
+  addGlowPool(roomGroup, 'spire-core-glow', [0, 0.04, 0.2], 3.6, 'corpsefire');
+  addGate(roomGroup, makeVec(0, 0, 11.8), 1.05);
+  addMarker(roomGroup, makeVec(0, 6.2, 10.4), MAT.exit, 1.3);
+  addMarker(roomGroup, makeVec(8.4, 2.4, -1.8), MAT.trim, 1.0);
+  dressSpireRoom(rng);
+
+  return { spawn: makeVec(0, PLAYER_EYE_HEIGHT, -10.8), exit: makeVec(0, 6.2, 10.4), exitRadius: 2.6, enemyPositions: [makeVec(0.4, 1.8, 0.2), makeVec(0, 5.4, 10.4)] };
+}
+
+
+function dressChasmRoom(rng) {
+  addTileField(roomGroup, 'chasm-rim-north', [0, 0.03, -8.8], 24.8, 5.8, 14, 4, 0, [MAT.platform, MAT.floor], rng, { minH: 0.05, maxH: 0.16, jitter: 0.05, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'chasm-rim-south', [0, 0.03, 8.9], 24.8, 5.0, 14, 4, 0, [MAT.floor, MAT.bridge], rng, { minH: 0.05, maxH: 0.18, jitter: 0.05, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'chasm-west-run', [-10.6, 0.04, 0], 5.2, 24.8, 4, 13, 0, [MAT.platform, MAT.floor], rng, { minH: 0.05, maxH: 0.14, jitter: 0.04, rotY: 0.06, inset: 0.03 });
+  addTileField(roomGroup, 'chasm-east-run', [10.7, 0.04, 0], 5.2, 24.8, 4, 13, 0, [MAT.platform, MAT.bridge], rng, { minH: 0.05, maxH: 0.14, jitter: 0.04, rotY: 0.06, inset: 0.03 });
+  addTileField(roomGroup, 'chasm-main-deck', [0.6, 3.93, 5.2], 6.6, 4.0, 6, 3, 0, [MAT.platform, MAT.bridge], rng, { minH: 0.05, maxH: 0.15, jitter: 0.06, rotY: 0.12, inset: 0.03 });
+  addTileField(roomGroup, 'chasm-finish-deck', [0, 4.86, 11.5], 8.0, 3.4, 7, 3, 0, [MAT.bridge, MAT.platform], rng, { minH: 0.05, maxH: 0.16, jitter: 0.05, rotY: 0.1, inset: 0.03 });
+  addTileField(roomGroup, 'chasm-side-perch', [8.8, 2.68, 7.6], 2.0, 2.0, 2, 2, 0, [MAT.floor, MAT.bridge], rng, { minH: 0.04, maxH: 0.12, jitter: 0.03, rotY: 0.08, inset: 0.02 });
+  addPillarStack(roomGroup, 'chasm-pill-nw', -12.0, -11.6, 0, 4.6, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'chasm-pill-ne', 12.0, -11.6, 0, 4.2, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'chasm-pill-sw', -12.0, 11.4, 0, 4.0, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'chasm-pill-se', 12.0, 11.4, 0, 4.4, [MAT.platform, MAT.bridge], rng);
+  addHangingChain(roomGroup, 'chasm-chain-center', 0.0, 0.4, 8.2, 8, MAT.iron, rng, { length: 4.0, sway: 0.03 });
+  addHangingChain(roomGroup, 'chasm-chain-left', -4.5, -0.5, 7.4, 7, MAT.iron, rng, { length: 3.3, sway: 0.03 });
+  addHangingChain(roomGroup, 'chasm-chain-right', 4.7, 0.6, 7.1, 7, MAT.iron, rng, { length: 3.5, sway: 0.03 });
+  addBrokenSlab(roomGroup, 'chasm-slab-left', [-6.8, 0.18, 6.5], [2.1, 0.22, 1.0], MAT.platform, rng);
+  addBrokenSlab(roomGroup, 'chasm-slab-right', [6.2, 0.18, -1.0], [1.8, 0.22, 0.9], MAT.bridge, rng);
+  addRubbleScatter(roomGroup, 'chasm-rubble-left', [-7.8, 0, 6.2], 3.0, 2.2, 0, 14, [MAT.platform, MAT.bridge, MAT.iron], rng);
+  addRubbleScatter(roomGroup, 'chasm-rubble-right', [6.8, 0, -0.2], 2.2, 2.6, 0, 12, [MAT.platform, MAT.bridge, MAT.iron], rng);
+  addRubbleScatter(roomGroup, 'chasm-rubble-finish', [0, 4.95, 11.0], 2.6, 1.4, 0, 8, [MAT.bridge, MAT.platform], rng);
+}
+
+function dressSwitchbackRoom(rng) {
+  addTileField(roomGroup, 'switch-base', [0, 0.03, 0], 30.8, 24.8, 15, 10, 0, [MAT.floor, MAT.platform], rng, { minH: 0.04, maxH: 0.14, jitter: 0.05, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'switch-start', [-10.8, -7.56, -8.1], 5.8, 4.6, 5, 4, 0, [MAT.platform, MAT.bridge], rng, { minH: 0.04, maxH: 0.14, jitter: 0.04, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'switch-middle', [-3.6, -1.16, 2.0], 7.0, 5.2, 6, 4, 0, [MAT.platform, MAT.bridge], rng, { minH: 0.04, maxH: 0.16, jitter: 0.05, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'switch-upper', [6.6, 3.94, 8.6], 6.4, 3.6, 6, 3, 0, [MAT.bridge, MAT.platform], rng, { minH: 0.05, maxH: 0.16, jitter: 0.05, rotY: 0.1, inset: 0.03 });
+  addPillarStack(roomGroup, 'switch-wall-a', -13.6, -7.5, 0, 4.0, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'switch-wall-b', -13.6, 0.5, 0, 3.6, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'switch-wall-c', 13.6, -4.0, 0, 4.1, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'switch-wall-d', 13.6, 6.0, 0, 4.3, [MAT.platform, MAT.bridge], rng);
+  addButtressRow(roomGroup, 'switch-buttress-north', -10.0, 10.0, 13.3, 0, 6.5, [MAT.platform, MAT.bridge], rng);
+  addHangingChain(roomGroup, 'switch-chain-a', -6.2, -0.3, 6.6, 8, MAT.iron, rng, { length: 4.1, sway: 0.03 });
+  addHangingChain(roomGroup, 'switch-chain-b', 0.2, 1.0, 6.9, 8, MAT.iron, rng, { length: 4.3, sway: 0.03 });
+  addHangingChain(roomGroup, 'switch-chain-c', 6.4, -0.7, 6.5, 8, MAT.iron, rng, { length: 4.0, sway: 0.03 });
+  addBrokenSlab(roomGroup, 'switch-slab-a', [-8.6, 0.18, -1.4], [2.0, 0.2, 0.9], MAT.platform, rng);
+  addBrokenSlab(roomGroup, 'switch-slab-b', [2.8, 0.18, 5.7], [2.4, 0.2, 1.0], MAT.bridge, rng);
+  addRubbleScatter(roomGroup, 'switch-rubble', [0, 0, 2.0], 14, 6, 0, 16, [MAT.platform, MAT.bridge, MAT.iron], rng);
+}
+
+function dressSpireRoom(rng) {
+  addTileField(roomGroup, 'spire-base', [0, 0.03, 0], 26.8, 26.8, 14, 14, 0, [MAT.floor, MAT.platform], rng, { minH: 0.04, maxH: 0.14, jitter: 0.04, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'spire-ring-low', [0, 0.2, 0], 13.2, 13.2, 9, 9, 0, [MAT.bridge, MAT.platform], rng, { minH: 0.05, maxH: 0.16, jitter: 0.04, rotY: 0.08, inset: 0.03 });
+  addTileField(roomGroup, 'spire-top-pad', [0.4, 5.42, 0.2], 4.8, 4.0, 4, 4, 0, [MAT.bridge, MAT.platform], rng, { minH: 0.05, maxH: 0.14, jitter: 0.04, rotY: 0.08, inset: 0.03 });
+  addPillarStack(roomGroup, 'spire-core-a', 0.0, 0.0, 0, 6.5, [MAT.iron, MAT.trim], rng);
+  addPillarStack(roomGroup, 'spire-core-b', 0.9, 0.4, 0, 5.4, [MAT.platform, MAT.bridge], rng);
+  addPillarStack(roomGroup, 'spire-core-c', -0.9, -0.4, 0, 4.9, [MAT.platform, MAT.iron], rng);
+  addHangingChain(roomGroup, 'spire-chain-a', 0.0, -4.2, 8.2, 8, MAT.iron, rng, { length: 4.4, sway: 0.03 });
+  addHangingChain(roomGroup, 'spire-chain-b', 4.0, 0.0, 8.0, 8, MAT.iron, rng, { length: 4.0, sway: 0.03 });
+  addHangingChain(roomGroup, 'spire-chain-c', -4.1, 0.4, 8.1, 8, MAT.iron, rng, { length: 4.1, sway: 0.03 });
+  addBrokenSlab(roomGroup, 'spire-slab-a', [2.8, 0.18, -2.6], [1.8, 0.18, 0.8], MAT.bridge, rng);
+  addBrokenSlab(roomGroup, 'spire-slab-b', [-3.0, 0.18, 2.9], [2.0, 0.18, 0.9], MAT.platform, rng);
+  addRubbleScatter(roomGroup, 'spire-rubble', [0, 0, 0], 10, 10, 0, 16, [MAT.platform, MAT.bridge, MAT.iron], rng);
+}
+
+const ROOM_LAYOUT_STEP = 40;
+const ROOM_VERTICAL_STEP = 2.2;
+const CONNECTOR_FLOOR_DROP = 0.09;
+const ROOM_DIMENSIONS = {
+  chasm: { width: 28, depth: 34 },
+  switchback: { width: 34, depth: 28 },
+  spire: { width: 30, depth: 30 },
+};
+let enemy = null;
+
+function getNodeLayoutOrigin(nodeOrIndex) {
+  if (typeof nodeOrIndex === 'number') return makeVec(0, 0, nodeOrIndex * ROOM_LAYOUT_STEP);
+  return nodeOrIndex.layoutOrigin?.clone?.() || makeVec(0, 0, nodeOrIndex.index * ROOM_LAYOUT_STEP);
+}
+
+function addConnectorLanding(parent, name, x, z, floorY) {
+  addWalkableBox(parent, name + '-threshold', [8.2, 0.3, 8.2], [x, floorY - 0.15 - CONNECTOR_FLOOR_DROP, z], MAT.connectorFloor, true, 0.04);
+  addBeveledBox(parent, name + '-lip-a', [8.6, 0.22, 0.36], [x, floorY + 0.08 - CONNECTOR_FLOOR_DROP, z - 4.18], MAT.trim, false, 0.02, 1);
+  addBeveledBox(parent, name + '-lip-b', [8.6, 0.22, 0.36], [x, floorY + 0.08 - CONNECTOR_FLOOR_DROP, z + 4.18], MAT.trim, false, 0.02, 1);
+}
+
+function addConnectorRibs(parent, name, start, end, floorY, horizontal, length) {
+  const ribCount = Math.max(1, Math.min(5, Math.floor(length / 9)));
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  for (let i = 1; i <= ribCount; i += 1) {
+    const t = i / (ribCount + 1);
+    const x = start.x + dx * t;
+    const z = start.z + dz * t;
+    const y = floorY + 1.72 - CONNECTOR_FLOOR_DROP;
+    if (horizontal) {
+      addBeveledBox(parent, name + '-rib-' + i + '-left', [0.34, 2.3, 0.34], [x, y - 0.35, z - 4.05], MAT.trim, false, 0.025, 1);
+      addBeveledBox(parent, name + '-rib-' + i + '-right', [0.34, 2.3, 0.34], [x, y - 0.35, z + 4.05], MAT.trim, false, 0.025, 1);
+      addBeveledBox(parent, name + '-rib-' + i + '-top', [0.42, 0.34, 8.6], [x, y + 0.88, z], MAT.connectorWall, false, 0.025, 1);
+    } else {
+      addBeveledBox(parent, name + '-rib-' + i + '-left', [0.34, 2.3, 0.34], [x - 4.05, y - 0.35, z], MAT.trim, false, 0.025, 1);
+      addBeveledBox(parent, name + '-rib-' + i + '-right', [0.34, 2.3, 0.34], [x + 4.05, y - 0.35, z], MAT.trim, false, 0.025, 1);
+      addBeveledBox(parent, name + '-rib-' + i + '-top', [8.6, 0.34, 0.42], [x, y + 0.88, z], MAT.connectorWall, false, 0.025, 1);
+    }
+  }
+}
+
+function addConnectorSegment(parent, name, start, end, floorY) {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const horizontal = Math.abs(dx) >= Math.abs(dz);
+  const length = Math.max(2.0, Math.abs(horizontal ? dx : dz) + 1.6);
+  const cx = (start.x + end.x) * 0.5;
+  const cz = (start.z + end.z) * 0.5;
+  if (horizontal) {
+    addWalkableBox(parent, name + '-floor', [length, 0.34, 7.6], [cx, floorY - 0.17 - CONNECTOR_FLOOR_DROP, start.z], MAT.connectorFloor, true, 0.03);
+    addWallBox(parent, name + '-wall-a', [length, 1.56, 0.56], [cx, floorY + 0.78 - CONNECTOR_FLOOR_DROP, start.z - 4.05], MAT.connectorWall, true);
+    addWallBox(parent, name + '-wall-b', [length, 1.56, 0.56], [cx, floorY + 0.78 - CONNECTOR_FLOOR_DROP, start.z + 4.05], MAT.connectorWall, true);
+  } else {
+    addWalkableBox(parent, name + '-floor', [7.6, 0.34, length], [start.x, floorY - 0.17 - CONNECTOR_FLOOR_DROP, cz], MAT.connectorFloor, true, 0.03);
+    addWallBox(parent, name + '-wall-a', [0.56, 1.56, length], [start.x - 4.05, floorY + 0.78 - CONNECTOR_FLOOR_DROP, cz], MAT.connectorWall, true);
+    addWallBox(parent, name + '-wall-b', [0.56, 1.56, length], [start.x + 4.05, floorY + 0.78 - CONNECTOR_FLOOR_DROP, cz], MAT.connectorWall, true);
+  }
+  addConnectorRibs(parent, name, start, end, floorY, horizontal, length);
+}
+
+function addConnectorStairs(parent, name, start, end, startY, endY) {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const horizontal = Math.abs(dx) >= Math.abs(dz);
+  const span = Math.max(4.0, Math.abs(horizontal ? dx : dz));
+  const steps = Math.max(3, Math.ceil(Math.abs(endY - startY) / 0.34));
+  const dir = Math.sign(horizontal ? dx : dz) || 1;
+  for (let i = 0; i < steps; i += 1) {
+    const t0 = i / steps;
+    const t1 = (i + 1) / steps;
+    const mid = (t0 + t1) * 0.5;
+    const floorY = startY + (endY - startY) * t1;
+    const sx = start.x + dx * mid;
+    const sz = start.z + dz * mid;
+    const stepLen = span / steps + 0.18;
+    const size = horizontal ? [stepLen, 0.34, 7.6] : [7.6, 0.34, stepLen];
+    addWalkableBox(parent, name + '-step-' + i, size, [sx, floorY - 0.17 - CONNECTOR_FLOOR_DROP, sz], i % 2 ? MAT.bridge : MAT.connectorFloor, true, 0.03);
+  }
+  addConnectorSegment(parent, name + '-guard', start, end, Math.min(startY, endY));
+}
+
+function addConnectorSpan(parent, index, from, to) {
+  const fromFloor = from.y;
+  const toFloor = to.y - PLAYER_EYE_HEIGHT;
+  const vertical = Math.abs(toFloor - fromFloor) > 0.35;
+  const useXForStairs = vertical && Math.abs(to.z - from.z) < 6 && Math.abs(to.x - from.x) > 6;
+  const corner = useXForStairs ? makeVec(from.x, from.y, to.z) : makeVec(to.x, from.y, from.z);
+  addConnectorLanding(parent, 'level-connector-' + index + '-start', from.x, from.z, fromFloor);
+  if (Math.hypot(corner.x - from.x, corner.z - from.z) > 1.0) addConnectorSegment(parent, 'level-connector-' + index + '-a', from, corner, fromFloor);
+  addConnectorLanding(parent, 'level-connector-' + index + '-corner', corner.x, corner.z, fromFloor);
+  const endOnFromLevel = makeVec(to.x, from.y, to.z);
+  if (Math.abs(toFloor - fromFloor) > 0.35) {
+    addConnectorStairs(parent, 'level-connector-' + index + '-b', corner, endOnFromLevel, fromFloor, toFloor);
+  } else if (Math.hypot(endOnFromLevel.x - corner.x, endOnFromLevel.z - corner.z) > 1.0) {
+    addConnectorSegment(parent, 'level-connector-' + index + '-b', corner, endOnFromLevel, fromFloor);
+  }
+  addConnectorLanding(parent, 'level-connector-' + index + '-end', to.x, to.z, toFloor);
+}
+
+function nodeSidePortalWorld(node, other) {
+  const dims = ROOM_DIMENSIONS[node.type] || ROOM_DIMENSIONS.spire;
+  const dx = Math.sign(other.origin.x - node.origin.x);
+  const dz = Math.sign(other.origin.z - node.origin.z);
+  const floorY = node.origin.y;
+  if (Math.abs(dx) > Math.abs(dz)) return makeVec(node.origin.x + dx * (dims.width / 2 + 0.4), floorY, node.origin.z);
+  return makeVec(node.origin.x, floorY, node.origin.z + dz * (dims.depth / 2 + 0.4));
+}
+
+function buildLoopLinks(nodes) {
+  const links = [];
+  for (let i = 0; i < nodes.length; i += 1) {
+    for (let j = i + 2; j < nodes.length; j += 1) {
+      if (j === i + 1) continue;
+      const a = nodes[i].grid;
+      const b = nodes[j].grid;
+      if (!a || !b) continue;
+      const horizontal = Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+      const vertical = Math.abs(a.y - b.y);
+      if (horizontal === 1 && vertical <= 1) links.push([i, j]);
+    }
+  }
+  return links.slice(0, 2);
+}
+
+function activateLevelNode(nodeIndex, movePlayer = true) {
+  const plan = ensureLevelPlan();
+  const node = plan.nodes[Math.min(nodeIndex, plan.nodes.length - 1)] || plan.nodes[0];
+  if (!node) return null;
+  roomState.nodeIndex = node.index;
+  setNodeIndex(roomState.nodeIndex);
+  roomState.spec = node;
+  roomState.seed = node.seed;
+  roomState.spawn.copy(node.spawnWorld);
+  roomState.exit.copy(node.exitWorld);
+  roomState.exitRadius = node.exitRadiusWorld;
+  roomState.enemyPositions = [node.enemyWorld.clone()];
+  positionEnemy(node.enemyWorld);
+  if (movePlayer) {
+    roomState.transitionLock = 0.5;
+    player.position.copy(roomState.spawn);
+    player.visualPosition.copy(player.position);
+    player.velocity.set(0, 0, 0);
+    input.smoothMoveX = 0;
+    input.smoothMoveY = 0;
+    player.grounded = true;
+    player.runCharge = 0;
+    player.lastRunIntent = false;
+    player.attack = null;
+    player.attackTimer = 0;
+  }
+  setStatus('L' + (plan.levelIndex + 1) + '.' + (node.index + 1) + '/' + plan.nodes.length + ' ' + node.name + ' (' + node.roomRole + ') | ' + node.landmark + ' | ' + node.entrySocket + ' -> ' + node.exitSocket + ' | ' + node.type);
+  return node;
+}
+
+function sideTowardNode(fromNode, toNode) {
+  const a = fromNode.layoutOrigin || fromNode.origin || makeVec(0, 0, 0);
+  const b = toNode.layoutOrigin || toNode.origin || makeVec(0, 0, 0);
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  if (Math.abs(dx) > Math.abs(dz)) return dx > 0 ? 'east' : 'west';
+  return dz > 0 ? 'north' : 'south';
+}
+
+function markRoomConnection(a, b) {
+  if (!a.openSides) a.openSides = new Set();
+  if (!b.openSides) b.openSides = new Set();
+  a.openSides.add(sideTowardNode(a, b));
+  b.openSides.add(sideTowardNode(b, a));
+}
+
+function assignOpenSides(plan, loopLinks) {
+  for (const node of plan.nodes) node.openSides = new Set();
+  for (let i = 1; i < plan.nodes.length; i += 1) markRoomConnection(plan.nodes[i - 1], plan.nodes[i]);
+  for (const [aIndex, bIndex] of loopLinks) markRoomConnection(plan.nodes[aIndex], plan.nodes[bIndex]);
+}
+
+function addGoldPortalWall(parent, prefix, z, width, height, gapWidth = 7.2, gapHeight = 5.4) {
+  const sideWidth = Math.max(0.1, (width - gapWidth) * 0.5);
+  const x = gapWidth * 0.5 + sideWidth * 0.5;
+  addWallBox(parent, prefix + '-left', [sideWidth, height, 0.72], [-x, height * 0.5, z], MAT.wall, false);
+  addWallBox(parent, prefix + '-right', [sideWidth, height, 0.72], [x, height * 0.5, z], MAT.wall, false);
+  addWallBox(parent, prefix + '-lintel', [gapWidth, height - gapHeight, 0.72], [0, gapHeight + (height - gapHeight) * 0.5, z], MAT.wall, false);
+  addBeveledBox(parent, prefix + '-left-jamb', [0.55, gapHeight, 0.92], [-gapWidth * 0.5 - 0.28, gapHeight * 0.5, z], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, prefix + '-right-jamb', [0.55, gapHeight, 0.92], [gapWidth * 0.5 + 0.28, gapHeight * 0.5, z], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, prefix + '-cap', [gapWidth + 1.1, 0.5, 0.98], [0, gapHeight - 0.18, z], MAT.trim, false, 0.04, 1);
+}
+
+function addGoldSideWall(parent, prefix, x, depth, height) {
+  addWallBox(parent, prefix + '-solid', [0.72, height, depth], [x, height * 0.5, 0], MAT.wall, false);
+  for (let i = 0; i < 4; i += 1) {
+    const z = -depth * 0.36 + i * depth * 0.24;
+    addBeveledBox(parent, prefix + '-buttress-' + i, [1.2, 7.8, 1.1], [x + (x > 0 ? -0.68 : 0.68), 3.9, z], MAT.connectorWall, false, 0.04, 1);
+  }
+}
+
+function addGoldStairRun(parent, prefix, x, startZ, stepCount, stepWidth, stepDepth, baseY, stepH, mat = MAT.platform) {
+  for (let i = 0; i < stepCount; i += 1) {
+    const topY = baseY + (i + 1) * stepH;
+    addWalkableBox(parent, prefix + '-step-' + i, [stepWidth, stepH, stepDepth], [x, topY - stepH * 0.5, startZ + i * stepDepth], i % 2 ? mat : MAT.bridge, true, 0.04);
+  }
+}
+
+function addGoldCeiling(parent, width, depth, height) {
+  addBeveledBox(parent, 'gold-ceiling-south-slab', [width, 0.62, 11.0], [0, height - 0.32, -depth * 0.38], MAT.wall, false, 0.04, 1);
+  addBeveledBox(parent, 'gold-ceiling-north-slab', [width, 0.62, 11.0], [0, height - 0.32, depth * 0.38], MAT.wall, false, 0.04, 1);
+  for (let i = 0; i < 5; i += 1) {
+    const z = -depth * 0.34 + i * depth * 0.17;
+    addBeveledBox(parent, 'gold-ceiling-rib-' + i, [width - 3.0, 0.7, 0.72], [0, height - 1.35, z], MAT.trim, false, 0.04, 1);
+  }
+}
+
+function addGoldHangingBlade(parent, z = -1.8) {
+  const frameY = 11.6;
+  addBeveledBox(parent, 'blade-frame-left', [0.92, 10.8, 0.92], [-4.85, frameY - 5.4, z], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, 'blade-frame-right', [0.92, 10.8, 0.92], [4.85, frameY - 5.4, z], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, 'blade-frame-top', [11.3, 0.82, 1.08], [0, frameY, z], MAT.trim, false, 0.04, 1);
+  addBeveledBox(parent, 'blade-frame-back-top', [10.2, 0.36, 1.0], [0, frameY - 1.35, z - 0.08], MAT.iron, false, 0.03, 1);
+  addBeveledBox(parent, 'blade-chain-a', [0.24, 2.8, 0.24], [-0.95, 9.65, z], MAT.iron, false, 0.02, 1);
+  addBeveledBox(parent, 'blade-chain-b', [0.24, 2.8, 0.24], [0.95, 9.65, z], MAT.iron, false, 0.02, 1);
+  const blade = addExtrudedPolygon(parent, 'deadfall-iron-blade-body', [
+    [-3.65, 2.05],
+    [3.65, 2.05],
+    [3.35, -0.55],
+    [0.0, -3.35],
+    [-3.35, -0.55],
+  ], 0.5, [0, 6.7, z], MAT.iron, false);
+  blade.rotation.y = 0;
+  addExtrudedPolygon(parent, 'deadfall-bronze-face-left', [
+    [-2.9, 1.45],
+    [-0.28, 1.45],
+    [-0.55, -0.75],
+    [-2.62, -0.38],
+  ], 0.52, [-0.08, 6.72, z - 0.035], MAT.trim, false);
+  addExtrudedPolygon(parent, 'deadfall-bronze-face-right', [
+    [0.28, 1.45],
+    [2.9, 1.45],
+    [2.62, -0.38],
+    [0.55, -0.75],
+  ], 0.52, [0.08, 6.72, z - 0.04], MAT.trim, false);
+  addExtrudedPolygon(parent, 'deadfall-bloodied-cutting-edge', [
+    [-2.75, -0.48],
+    [0, -2.78],
+    [2.75, -0.48],
+    [2.36, -0.72],
+    [0, -2.44],
+    [-2.36, -0.72],
+  ], 0.56, [0, 6.5, z - 0.08], MAT.bloodDark, false);
+  addBeveledBox(parent, 'deadfall-lower-dark-slot', [7.9, 0.22, 0.18], [0, 3.44, z - 0.32], MAT.void, false, 0.01, 1);
+  addBeveledBox(parent, 'deadfall-guide-left', [0.26, 5.9, 0.22], [-3.95, 5.8, z - 0.55], MAT.iron, false, 0.02, 1);
+  addBeveledBox(parent, 'deadfall-guide-right', [0.26, 5.9, 0.22], [3.95, 5.8, z - 0.55], MAT.iron, false, 0.02, 1);
+  for (let i = 0; i < 4; i += 1) {
+    const x = -2.4 + i * 1.6;
+    addCylinder(parent, 'deadfall-rivet-' + i, 0.12, 0.08, [x, 7.72, z - 0.31], MAT.iron, 6).rotation.x = Math.PI * 0.5;
+  }
+}
+
+function addGoldArchRibs(parent) {
+  for (let i = 0; i < 4; i += 1) {
+    const z = -15 + i * 10.0;
+    addBeveledBox(parent, 'gold-arch-rib-left-' + i, [0.72, 8.8, 0.72], [-7.2, 4.4, z], MAT.connectorWall, false, 0.045, 1).rotation.z = -0.13;
+    addBeveledBox(parent, 'gold-arch-rib-right-' + i, [0.72, 8.8, 0.72], [7.2, 4.4, z], MAT.connectorWall, false, 0.045, 1).rotation.z = 0.13;
+    addBeveledBox(parent, 'gold-arch-rib-cap-' + i, [14.4, 0.54, 0.78], [0, 8.55, z], MAT.trim, false, 0.04, 1);
+  }
+}
+
+function addGoldSkullPress(parent, z = 23.15) {
+  addExtrudedPolygon(parent, 'maw-brow-plain-bone', [
+    [-7.8, 0.85],
+    [7.8, 0.85],
+    [6.7, -0.36],
+    [2.4, -0.72],
+    [0, -1.12],
+    [-2.4, -0.72],
+    [-6.7, -0.36],
+  ], 1.15, [0, 8.7, z], MAT.bonePlain, false);
+  addBeveledBox(parent, 'maw-bronze-compression-rail', [12.6, 0.38, 0.82], [0, 7.85, z - 0.04], MAT.trim, false, 0.03, 1);
+  addBeveledBox(parent, 'maw-upper-tooth-socket', [7.8, 0.62, 0.98], [0, 6.82, z - 0.34], MAT.bonePlain, false, 0.035, 1);
+  addBeveledBox(parent, 'maw-upper-mouth-shadow', [6.7, 0.22, 0.28], [0, 6.44, z - 0.57], MAT.void, false, 0.01, 1);
+
+  addExtrudedPolygon(parent, 'maw-left-upright-plain', [
+    [-1.18, 3.45],
+    [1.08, 3.72],
+    [0.82, -3.1],
+    [-1.35, -2.72],
+  ], 1.05, [-5.75, 5.55, z], MAT.bonePlain, false);
+  addExtrudedPolygon(parent, 'maw-right-upright-plain', [
+    [-1.08, 3.72],
+    [1.18, 3.45],
+    [1.35, -2.72],
+    [-0.82, -3.1],
+  ], 1.05, [5.75, 5.55, z], MAT.bonePlain, false);
+
+  addExtrudedPolygon(parent, 'maw-left-eye-recess', [
+    [-0.78, 0.38],
+    [0.78, 0.52],
+    [0.54, -0.45],
+    [-0.62, -0.56],
+  ], 0.36, [-2.65, 7.92, z - 0.34], MAT.void, false);
+  addExtrudedPolygon(parent, 'maw-right-eye-recess', [
+    [-0.78, 0.52],
+    [0.78, 0.38],
+    [0.62, -0.56],
+    [-0.54, -0.45],
+  ], 0.36, [2.65, 7.92, z - 0.34], MAT.void, false);
+  addExtrudedPolygon(parent, 'maw-nose-notch', [
+    [0, 0.62],
+    [0.46, -0.24],
+    [0, -0.76],
+    [-0.46, -0.24],
+  ], 0.32, [0, 7.02, z - 0.35], MAT.void, false);
+
+  for (let i = 0; i < 5; i += 1) {
+    const x = -3.2 + i * 1.6;
+    const tooth = addExtrudedPolygon(parent, 'maw-rooted-upper-tooth-' + i, [
+      [-0.42, 0.58],
+      [0.42, 0.58],
+      [0.18, -0.72],
+      [0, -1.02],
+      [-0.18, -0.72],
+    ], 0.58, [x, 6.24 + (i % 2) * 0.08, z - 0.58], MAT.bone, false);
+    tooth.rotation.z = (i - 2) * 0.025;
+  }
+
+  addBeveledBox(parent, 'maw-left-lower-jaw', [3.75, 0.54, 0.9], [-3.72, 3.32, z], MAT.bonePlain, false, 0.035, 1).rotation.z = -0.12;
+  addBeveledBox(parent, 'maw-right-lower-jaw', [3.75, 0.54, 0.9], [3.72, 3.32, z], MAT.bonePlain, false, 0.035, 1).rotation.z = 0.12;
+  addExtrudedPolygon(parent, 'maw-narrow-center-blade', [
+    [-0.72, 2.05],
+    [0.72, 2.05],
+    [0.52, -1.42],
+    [0, -2.52],
+    [-0.52, -1.42],
+  ], 0.46, [0, 6.1, z - 0.72], MAT.blood, false);
+}
+
+function addGoldBloodGutter(parent) {
+  addGroundedBeveledBox(parent, 'blood-gutter-dark-trench', [1.28, 0.12, 28.6], [0, 0.255, -0.3], MAT.bloodDark, false, 0.02, 1);
+  addGroundedBeveledBox(parent, 'blood-gutter-left-lip', [0.22, 0.18, 28.8], [-0.76, 0.31, -0.3], MAT.trim, false, 0.018, 1);
+  addGroundedBeveledBox(parent, 'blood-gutter-right-lip', [0.22, 0.18, 28.8], [0.76, 0.31, -0.3], MAT.trim, false, 0.018, 1);
+  const segments = [
+    [-12.2, 2.9, 0.56],
+    [-8.1, 1.8, 0.38],
+    [-4.9, 3.2, 0.64],
+    [0.2, 2.3, 0.48],
+    [4.2, 3.5, 0.7],
+    [9.2, 2.1, 0.42],
+  ];
+  for (let i = 0; i < segments.length; i += 1) {
+    const [z, length, width] = segments[i];
+    addGroundedBeveledBox(parent, 'blood-gutter-pool-' + i, [width, 0.08, length], [0, 0.37, z], i % 2 ? MAT.blood : MAT.bloodDark, false, 0.012, 1);
+  }
+  for (let i = 0; i < 5; i += 1) {
+    addGroundedBeveledBox(parent, 'blood-gutter-crossbar-' + i, [1.55, 0.08, 0.1], [0, 0.405, -10 + i * 5.2], MAT.iron, false, 0.01, 1);
+  }
+}
+
+function addGoldRoomLandmarks(parent) {
+  addGroundedBeveledBox(parent, 'execution-block', [4.2, 1.0, 2.4], [0, 0.3, -18.4], MAT.trim, true, 0.06, 1);
+  addGoldBloodGutter(parent);
+  addGoldArchRibs(parent);
+  addGoldHangingBlade(parent);
+  addGoldSkullPress(parent);
+  addHangingChain(parent, 'gold-chain-left', -4.0, -2.0, 8.9, 8, MAT.iron, rngFromSeed(0x51551), { length: 4.2, sway: 0.01, dropStone: false });
+  addHangingChain(parent, 'gold-chain-right', 4.0, -2.0, 8.9, 8, MAT.iron, rngFromSeed(0x51553), { length: 4.2, sway: 0.01, dropStone: false });
+  addBrazier(parent, 'gold-brazier-left', [-13.8, 0, -20.4], { kind: 'flame' });
+  addBrazier(parent, 'gold-brazier-right', [13.8, 0, -20.4], { kind: 'flame' });
+  addBrazier(parent, 'gold-brazier-exit-left', [-5.1, 2.4, 24.0], { kind: 'corpsefire' });
+  addBrazier(parent, 'gold-brazier-exit-right', [5.1, 2.4, 24.0], { kind: 'corpsefire' });
+}
+
+function addMeasuredQuakeRoomLandmarks(parent) {
+  addGroundedBeveledBox(parent, 'measured-execution-block', [3.5, 0.82, 2.0], [0, 0.02, -13.2], MAT.trim, true, 0.05, 1);
+  addGoldBloodGutter(parent);
+  addGoldArchRibs(parent);
+  addGoldHangingBlade(parent, -4.1);
+  addGoldSkullPress(parent, 15.6);
+  addHangingChain(parent, 'measured-chain-left', -3.4, 2.1, 5.7, 7, MAT.iron, rngFromSeed(0x71551), { length: 3.0, sway: 0.01, dropStone: false });
+  addHangingChain(parent, 'measured-chain-right', 3.4, 1.6, 5.7, 7, MAT.iron, rngFromSeed(0x71553), { length: 3.0, sway: 0.01, dropStone: false });
+  addBrazier(parent, 'measured-entry-brazier-left', [-8.8, 0, -13.8], { kind: 'flame' });
+  addBrazier(parent, 'measured-entry-brazier-right', [8.8, 0, -13.8], { kind: 'flame' });
+  addBrazier(parent, 'measured-recovery-corpsefire', [-8.4, 1.45, 5.0], { kind: 'corpsefire' });
+  addBrazier(parent, 'measured-exit-corpsefire-left', [-4.2, 1.76, 14.6], { kind: 'corpsefire' });
+  addBrazier(parent, 'measured-exit-corpsefire-right', [4.2, 1.76, 14.6], { kind: 'corpsefire' });
+  addMarker(parent, makeVec(0, 1.98, 14.6), MAT.exit, 1.15);
+  addMarker(parent, makeVec(-6.8, 1.64, 7.8), MAT.trim, 0.8);
+}
+
+function buildGoldExecutionBridgeGallery() {
+  const width = 24;
+  const depth = 36;
+  const height = 13.5;
+
+  // Compact Quake-style route sentence: entry read -> lip -> offset bridge -> side recovery -> upper crossing -> visible exit.
+  addWalkableBox(roomGroup, 'measured-entry-read', [9.8, 0.42, 5.8], [0, -0.21, -14.7], MAT.floor, false, 0.08);
+  addWalkableBox(roomGroup, 'measured-runway-lip', [5.6, 0.46, 5.4], [0, 0.02, -9.4], MAT.floor, true, 0.06);
+  addWalkableBox(roomGroup, 'measured-bridge-commit-a', [4.2, 0.46, 5.8], [0, 0.26, -4.4], MAT.bridge, true, 0.04);
+  addWalkableBox(roomGroup, 'measured-bridge-commit-b', [3.4, 0.42, 5.6], [1.35, 0.68, 1.0], MAT.bridge, true, 0.035);
+  addWalkableBox(roomGroup, 'measured-bridge-commit-c', [3.2, 0.42, 4.8], [-1.25, 1.08, 5.8], MAT.bridge, true, 0.035);
+  addWalkableBox(roomGroup, 'measured-exit-landing', [8.2, 0.46, 5.6], [0, 1.53, 14.0], MAT.platform, false, 0.08);
+
+  addWalkableBox(roomGroup, 'measured-west-low-recovery', [4.1, 0.42, 16.8], [-8.1, -0.21, -2.0], MAT.platform, false, 0.08);
+  addGoldStairRun(roomGroup, 'measured-west-stair', -8.0, -10.4, 5, 3.8, 1.62, 0.0, 0.25, MAT.platform);
+  addWalkableBox(roomGroup, 'measured-west-upper-gallery', [4.2, 0.42, 12.2], [-7.0, 1.24, 4.8], MAT.platform, false, 0.06);
+  addWalkableBox(roomGroup, 'measured-upper-crossing', [12.0, 0.42, 3.2], [-1.25, 1.38, 8.7], MAT.bridge, true, 0.04);
+  addWalkableBox(roomGroup, 'measured-east-drop-recovery', [3.8, 0.38, 9.4], [8.1, 0.18, 1.5], MAT.platform, false, 0.06);
+  addWalkableBox(roomGroup, 'measured-east-return-ledge', [3.5, 0.42, 8.0], [7.3, 1.36, 8.5], MAT.platform, false, 0.06);
+
+  addBox(roomGroup, 'measured-central-void', [12.4, 0.5, 22.8], [0, -2.28, 0.8], MAT.void, false);
+  addBox(roomGroup, 'measured-blood-lit-floor', [10.8, 0.08, 19.6], [0, -3.02, 0.8], MAT.hazard, false);
+
+  addWallBox(roomGroup, 'measured-west-inner-wall-low', [0.62, 2.2, 6.8], [-4.55, 0.9, -2.4], MAT.connectorWall, true);
+  addWallBox(roomGroup, 'measured-west-inner-wall-upper', [0.62, 3.2, 3.0], [-4.55, 2.0, 2.6], MAT.connectorWall, true);
+  addWallBox(roomGroup, 'measured-east-inner-wall-low', [0.62, 2.1, 5.0], [5.0, 1.05, -1.4], MAT.connectorWall, true);
+  addWallBox(roomGroup, 'measured-east-inner-wall-upper', [0.62, 2.8, 2.8], [5.0, 2.18, 5.4], MAT.connectorWall, true);
+
+  addBeveledBox(roomGroup, 'measured-bridge-support-a', [0.88, 3.1, 0.88], [-3.0, -0.52, -4.2], MAT.connectorWall, true);
+  addBeveledBox(roomGroup, 'measured-bridge-support-b', [0.88, 3.9, 0.88], [3.15, -0.1, 1.1], MAT.connectorWall, true);
+  addBeveledBox(roomGroup, 'measured-bridge-support-c', [0.88, 4.6, 0.88], [-2.95, 0.25, 5.9], MAT.connectorWall, true);
+  addBeveledBox(roomGroup, 'measured-upper-support-west', [0.9, 4.9, 0.9], [-7.0, 0.55, 8.6], MAT.connectorWall, true);
+  addBeveledBox(roomGroup, 'measured-upper-support-east', [0.9, 4.4, 0.9], [5.35, 0.75, 8.6], MAT.connectorWall, true);
+
+  addGoldPortalWall(roomGroup, 'measured-south-portal', -depth / 2, width, height, 6.2, 5.2);
+  addGoldPortalWall(roomGroup, 'measured-north-portal', depth / 2, width, height, 6.8, 5.6);
+  addGoldSideWall(roomGroup, 'measured-west-wall', -width / 2, depth, height);
+  addGoldSideWall(roomGroup, 'measured-east-wall', width / 2, depth, height);
+  addGoldCeiling(roomGroup, width, depth, height);
+
+  addBeveledBox(roomGroup, 'measured-exit-gate-left', [0.5, 3.6, 0.66], [-3.7, 3.6, 15.9], MAT.trim, false, 0.04, 1);
+  addBeveledBox(roomGroup, 'measured-exit-gate-right', [0.5, 3.6, 0.66], [3.7, 3.6, 15.9], MAT.trim, false, 0.04, 1);
+  addBeveledBox(roomGroup, 'measured-exit-gate-top', [7.8, 0.5, 0.74], [0, 5.6, 15.9], MAT.trim, false, 0.04, 1);
+  addExtrudedPolygon(roomGroup, 'measured-exit-sloped-cap', [[-4.4, 0.52], [4.4, 0.52], [3.25, -0.74], [-3.25, -0.74]], 0.78, [0, 6.28, 15.72], MAT.bone, false);
+  addMeasuredQuakeRoomLandmarks(roomGroup);
+
+  return {
+    spawn: makeVec(0, PLAYER_EYE_HEIGHT, -15.0),
+    exit: makeVec(0, 3.26, 14.2),
+    exitRadius: 2.2,
+    enemyPositions: [makeVec(0.2, 0, -5.2), makeVec(-7.0, 0, 4.8)],
+    bounds: { minX: -11.5, maxX: 11.5, minZ: -17.4, maxZ: 17.4 },
+  };
+}
+
+
+const CARDINAL_CONNECTORS = ['N', 'E', 'S', 'W'];
+
+function normalizeConnector(connector) {
+  if (!connector) return 'N';
+  const c = String(connector).toUpperCase();
+  if (CARDINAL_CONNECTORS.includes(c)) return c;
+  if (c.includes('N')) return c.includes('E') ? 'E' : 'W';
+  if (c.includes('S')) return c.includes('E') ? 'E' : 'W';
+  return 'N';
+}
+
+function oppositeConnector(connector) {
+  const c = normalizeConnector(connector);
+  if (c === 'N') return 'S';
+  if (c === 'S') return 'N';
+  if (c === 'E') return 'W';
+  return 'E';
+}
+
+function connectorPoint(connector, width, depth, topY = 0, inset = 4.2) {
+  const c = normalizeConnector(connector);
+  if (c === 'N') return makeVec(0, topY, depth * 0.5 - inset);
+  if (c === 'S') return makeVec(0, topY, -depth * 0.5 + inset);
+  if (c === 'E') return makeVec(width * 0.5 - inset, topY, 0);
+  return makeVec(-width * 0.5 + inset, topY, 0);
+}
+
+function addWalkableTopBox(parent, name, sizeXZ, center, topY, mat, height = 0.42, margin = 0.06) {
+  return addWalkableBox(parent, name, [sizeXZ[0], height, sizeXZ[1]], [center.x, topY - height * 0.5, center.z], mat, true, margin);
+}
+
+function addBatchRouteSegment(parent, name, a, b, topY, width = 3.4, mat = MAT.bridge, trim = 0.95) {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const length = Math.hypot(dx, dz);
+  if (length < 0.35) return null;
+  const inset = Math.min(trim, Math.max(0, length * 0.18 - 0.05));
+  const ux = dx / length;
+  const uz = dz / length;
+  const startX = a.x + ux * inset;
+  const startZ = a.z + uz * inset;
+  const endX = b.x - ux * inset;
+  const endZ = b.z - uz * inset;
+  const lenX = Math.abs(endX - startX);
+  const lenZ = Math.abs(endZ - startZ);
+  if (lenX < 0.28 && lenZ < 0.28) return null;
+  if (lenX >= lenZ) {
+    const center = makeVec((startX + endX) * 0.5, topY, (startZ + endZ) * 0.5);
+    return addWalkableTopBox(parent, name, [Math.max(0.4, lenX + 0.64), width], center, topY, mat, 0.42, 0.045);
+  }
+  const center = makeVec((startX + endX) * 0.5, topY, (startZ + endZ) * 0.5);
+  return addWalkableTopBox(parent, name, [width, Math.max(0.4, lenZ + 0.64)], center, topY, mat, 0.42, 0.045);
+}
+
+function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.platform) {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const horizontalLength = Math.max(0.1, Math.hypot(dx, dz));
+  const verticalDelta = Math.abs(endTop - startTop);
+  const steps = Math.max(5, Math.min(12, Math.ceil(horizontalLength / 4.2), Math.ceil(verticalDelta / 0.26)));
+  const alongX = Math.abs(dx) > Math.abs(dz);
+  const ux = dx / horizontalLength;
+  const uz = dz / horizontalLength;
+  const treadLength = Math.max(1.55, horizontalLength / steps * 0.98);
+  const stairWidth = 3.55;
+  for (let i = 0; i < steps; i += 1) {
+    const t = (i + 0.5) / steps;
+    const x = a.x + dx * t;
+    const z = a.z + dz * t;
+    const topY = startTop + (endTop - startTop) * ((i + 1) / steps) + i * 0.008;
+    const size = alongX ? [treadLength, stairWidth] : [stairWidth, treadLength];
+    addWalkableTopBox(parent, prefix + '-tread-' + i, size, makeVec(x, topY, z), topY, mat, 0.24, 0.045);
+    if (i > 0) {
+      const prevT = (i - 0.5) / steps;
+      const prevY = startTop + (endTop - startTop) * (i / steps) + (i - 1) * 0.008;
+      const riserY = (prevY + topY) * 0.5 - 0.08;
+      const riserH = Math.max(0.18, Math.abs(topY - prevY) + 0.14);
+      const riserX = a.x + dx * ((prevT + t) * 0.5);
+      const riserZ = a.z + dz * ((prevT + t) * 0.5);
+      const riserSize = alongX ? [0.24, riserH, stairWidth] : [stairWidth, riserH, 0.24];
+      addBeveledBox(parent, prefix + '-riser-' + i, riserSize, [riserX - ux * 0.08, riserY, riserZ - uz * 0.08], MAT.connectorWall, false, 0.015, 1);
+    }
+  }
+  addBatchRouteSegment(parent, prefix + '-base-join', a, b, Math.min(startTop, endTop) + 0.025, 2.15, MAT.connectorFloor, 1.65);
+}
+
+function addBatchShell(parent, spec, width, depth, height) {
+  const connectors = new Set((spec.horizontal_connectors || []).map(normalizeConnector));
+  if (connectors.has('N')) addGoldPortalWall(parent, 'batch-north-portal', depth / 2, width, height, 6.4, 5.2);
+  else addFullWall(parent, 'batch-north-wall', 'north', width, depth, height, MAT.wall);
+  if (connectors.has('S')) addGoldPortalWall(parent, 'batch-south-portal', -depth / 2, width, height, 6.4, 5.2);
+  else addFullWall(parent, 'batch-south-wall', 'south', width, depth, height, MAT.wall);
+  if (connectors.has('E')) addSidePortalWall(parent, 'batch-east-portal', width / 2, depth, height, MAT.wall, 6.4);
+  else addFullWall(parent, 'batch-east-wall', 'east', width, depth, height, MAT.wall);
+  if (connectors.has('W')) addSidePortalWall(parent, 'batch-west-portal', -width / 2, depth, height, MAT.wall, 6.4);
+  else addFullWall(parent, 'batch-west-wall', 'west', width, depth, height, MAT.wall);
+  addGoldCeiling(parent, width, depth, height);
+}
+
+function addBatchVoidBoundary(parent, spec, width, depth, height, shellConnectors) {
+  const connectors = new Set((shellConnectors || []).map(normalizeConnector));
+  const seed = hashRoomKey(spec.id || 'void-boundary');
+  const missing = ['N', 'S', 'E', 'W'].filter((c) => !connectors.has(c));
+
+  const addSocketFrame = (connector) => {
+    const c = normalizeConnector(connector);
+    const sideAxis = c === 'N' || c === 'S';
+    const point = connectorPoint(c, width, depth, 0, 2.15);
+    const inward = c === 'N' ? [0, 0, -1] : c === 'S' ? [0, 0, 1] : c === 'E' ? [-1, 0, 0] : [1, 0, 0];
+    const spread = sideAxis ? Math.max(3.6, width * 0.18) : Math.max(3.6, depth * 0.18);
+    const postSize = sideAxis ? [0.72, height * 0.46, 0.95] : [0.95, height * 0.46, 0.72];
+    const capSize = sideAxis ? [spread * 2 + 1.2, 0.48, 0.76] : [0.76, 0.48, spread * 2 + 1.2];
+    const postY = postSize[1] * 0.5;
+    const capY = Math.min(height - 1.8, postSize[1] + 0.3);
+    const a = sideAxis ? [point.x - spread, postY, point.z + inward[2] * 0.5] : [point.x + inward[0] * 0.5, postY, point.z - spread];
+    const b = sideAxis ? [point.x + spread, postY, point.z + inward[2] * 0.5] : [point.x + inward[0] * 0.5, postY, point.z + spread];
+    const cap = sideAxis ? [point.x, capY, point.z + inward[2] * 0.62] : [point.x + inward[0] * 0.62, capY, point.z];
+    addBeveledBox(parent, 'batch-void-' + c + '-post-a', postSize, a, MAT.connectorWall, false, 0.035, 1);
+    addBeveledBox(parent, 'batch-void-' + c + '-post-b', postSize, b, MAT.connectorWall, false, 0.035, 1);
+    addBeveledBox(parent, 'batch-void-' + c + '-high-cap', capSize, cap, MAT.trim, false, 0.025, 1);
+  };
+
+  for (const connector of connectors) addSocketFrame(connector);
+
+  const addBoundaryButtress = (name, side, offset = 0) => {
+    if (side === 'N') addWallBox(parent, 'batch-void-buttress-' + name, [width * 0.24, height * 0.62, 1.15], [offset * width * 0.18, height * 0.31, depth * 0.5 - 1.05], MAT.wall, false);
+    if (side === 'S') addWallBox(parent, 'batch-void-buttress-' + name, [width * 0.24, height * 0.62, 1.15], [offset * width * 0.18, height * 0.31, -depth * 0.5 + 1.05], MAT.wall, false);
+    if (side === 'E') addWallBox(parent, 'batch-void-buttress-' + name, [1.15, height * 0.62, depth * 0.24], [width * 0.5 - 1.05, height * 0.31, offset * depth * 0.18], MAT.wall, false);
+    if (side === 'W') addWallBox(parent, 'batch-void-buttress-' + name, [1.15, height * 0.62, depth * 0.24], [-width * 0.5 + 1.05, height * 0.31, offset * depth * 0.18], MAT.wall, false);
+  };
+
+  for (let i = 0; i < missing.length; i += 1) {
+    const offset = ((seed >> (i * 3)) & 1) ? 0.72 : -0.72;
+    addBoundaryButtress(missing[i].toLowerCase() + '-' + i, missing[i], offset);
+  }
+}
+
+function batchRoomDimensions(spec) {
+  const klass = spec.junction_class || '';
+  if (klass.startsWith('4c')) return { width: 30, depth: 36, height: 13.5 };
+  if (klass.startsWith('3c')) return { width: 28, depth: 34, height: 13.0 };
+  if (klass.startsWith('1c')) return { width: 22, depth: 28, height: 12.0 };
+  return { width: 25, depth: 32, height: 12.5 };
+}
+
+function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, center, start, exit, options = {}) {
+  const role = spec.semantic_role || '';
+  const routeText = (spec.route_sentence || []).join(' ');
+  const routeAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
+  const sideSign = (hashRoomKey(spec.id || String(options.index || 0)) % 2) ? 1 : -1;
+  const attachWall = (name, side, span = 0.34, height = 4.4) => {
+    if (side === 'north') addWallBox(parent, prefix + '-' + name, [width * span, height, 1.0], [0, height * 0.5, depth * 0.5 - 1.0], MAT.connectorWall, false);
+    if (side === 'south') addWallBox(parent, prefix + '-' + name, [width * span, height, 1.0], [0, height * 0.5, -depth * 0.5 + 1.0], MAT.connectorWall, false);
+    if (side === 'east') addWallBox(parent, prefix + '-' + name, [1.0, height, depth * span], [width * 0.5 - 1.0, height * 0.5, 0], MAT.connectorWall, false);
+    if (side === 'west') addWallBox(parent, prefix + '-' + name, [1.0, height, depth * span], [-width * 0.5 + 1.0, height * 0.5, 0], MAT.connectorWall, false);
+  };
+  const sideWall = routeAlongX ? (sideSign > 0 ? 'north' : 'south') : (sideSign > 0 ? 'east' : 'west');
+  const oppositeWall = routeAlongX ? (sideSign > 0 ? 'south' : 'north') : (sideSign > 0 ? 'west' : 'east');
+
+  if (options.wantsHub) {
+    addBeveledBox(parent, prefix + '-hub-anchor', [2.4, 5.1, 2.0], [center.x, 2.55, center.z], MAT.connectorWall, true, 0.04, 1);
+    attachWall('hub-backed-shrine', sideWall, 0.42, 5.0);
+    return;
+  }
+  if (options.hasUpper || role.includes('reward') || routeText.includes('upper')) {
+    attachWall('upper-retaining-wall', sideWall, 0.52, 4.8);
+    addBeveledBox(parent, prefix + '-upper-support-a', [1.0, 3.2, 1.0], routeAlongX ? [start.x * 0.45, 1.6, sideSign * depth * 0.28] : [sideSign * width * 0.28, 1.6, start.z * 0.45], MAT.connectorWall, true, 0.04, 1);
+    addBeveledBox(parent, prefix + '-upper-support-b', [1.0, 3.2, 1.0], routeAlongX ? [exit.x * 0.45, 1.6, sideSign * depth * 0.28] : [sideSign * width * 0.28, 1.6, exit.z * 0.45], MAT.connectorWall, true, 0.04, 1);
+    return;
+  }
+  if (options.hasLower || role.includes('recovery') || role.includes('secret') || role.includes('return')) {
+    attachWall('sump-retaining-wall', oppositeWall, 0.48, 3.8);
+    addBeveledBox(parent, prefix + '-sump-corner-pier', [1.4, 3.0, 1.4], routeAlongX ? [center.x, 1.5, -sideSign * depth * 0.27] : [-sideSign * width * 0.27, 1.5, center.z], MAT.connectorWall, true, 0.04, 1);
+    return;
+  }
+  if (options.wantsCorner) {
+    attachWall('corner-blind-mass-a', sideWall, 0.36, 4.2);
+    attachWall('corner-blind-mass-b', oppositeWall, 0.24, 3.4);
+    return;
+  }
+  if (options.wantsCombat || role.includes('ambush')) {
+    attachWall('combat-cover-wall', sideWall, 0.30, 3.2);
+    addBeveledBox(parent, prefix + '-combat-attached-pier', routeAlongX ? [1.15, 3.0, 2.0] : [2.0, 3.0, 1.15], routeAlongX ? [center.x, 1.5, sideSign * depth * 0.22] : [sideSign * width * 0.22, 1.5, center.z], MAT.connectorWall, true, 0.04, 1);
+    return;
+  }
+  attachWall('route-framing-wall', sideWall, 0.26, 3.4);
+}
+
+function addBatchVerticalPlayArea(parent, prefix, spec, width, depth, center, start, exit, options = {}) {
+  const routeAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
+  const sideSign = options.index % 2 ? 1 : -1;
+  const upperTop = options.hasUpper ? 4.35 : options.wantsHub ? 3.85 : 3.15;
+  const lowerTop = -1.15;
+  const hasDropRoute = options.hasLower || /recovery|drop|secret|return/.test(options.routeText || '');
+  const wantsUpperLayer = options.hasUpper || options.wantsHub || (options.wantsCorner && !hasDropRoute);
+  if (options.enabled && wantsUpperLayer) {
+    const gallery = routeAlongX
+      ? makeVec((start.x + exit.x) * 0.32, upperTop, sideSign * depth * 0.31)
+      : makeVec(sideSign * width * 0.31, upperTop, (start.z + exit.z) * 0.32);
+    const gallerySize = routeAlongX ? [Math.max(7, width * 0.34), 3.65] : [3.65, Math.max(7, depth * 0.34)];
+    addWalkableTopBox(parent, prefix + '-upper-gallery', gallerySize, gallery, upperTop, MAT.bridge, 0.34, 0.06);
+    const stairStart = makeVec(center.x, Math.max(0.32, center.y + 0.04), center.z);
+    addBatchStairRun(parent, prefix + '-upper-stair', stairStart, gallery, stairStart.y, upperTop, MAT.platform);
+    const cross = routeAlongX
+      ? makeVec(exit.x * 0.46, upperTop + 0.08, gallery.z)
+      : makeVec(gallery.x, upperTop + 0.08, exit.z * 0.46);
+    addWalkableTopBox(parent, prefix + '-upper-crossing', routeAlongX ? [4.1, 3.25] : [3.25, 4.1], cross, cross.y, MAT.connectorFloor, 0.28, 0.06);
+    addBatchRouteSegment(parent, prefix + '-upper-exit-read', cross, exit, Math.max(cross.y + 0.04, exit.y + 0.12), 2.3, MAT.connectorFloor, 2.35);
+  }
+  if (options.hasLower || /recovery|drop|secret|return/.test(options.routeText || '')) {
+    const shelf = routeAlongX
+      ? makeVec((start.x + exit.x) * 0.15, lowerTop, -sideSign * depth * 0.27)
+      : makeVec(-sideSign * width * 0.27, lowerTop, (start.z + exit.z) * 0.15);
+    addWalkableTopBox(parent, prefix + '-lower-recovery-shelf', routeAlongX ? [Math.max(7, width * 0.36), 4.0] : [4.0, Math.max(7, depth * 0.36)], shelf, lowerTop, MAT.connectorFloor, 0.32, 0.06);
+    addBatchStairRun(parent, prefix + '-recovery-stair', shelf, center, lowerTop + 0.04, Math.max(0.28, center.y + 0.04), MAT.platform);
+    addBrazier(parent, prefix + '-lower-corpsefire', [shelf.x, lowerTop, shelf.z], { kind: 'corpsefire' });
+  }
+}
+
+function addBatchCarvedChamberFloor(parent, spec, width, depth, height, shellConnectors, options = {}) {
+  const connectors = new Set((shellConnectors || []).map(normalizeConnector));
+  const seed = hashRoomKey(spec.id || String(options.index || 0));
+  const centralW = width * (options.wantsHub ? 0.56 : 0.48);
+  const centralD = depth * (options.wantsHub ? 0.54 : 0.44);
+  addWalkableTopBox(parent, 'batch-carved-core-floor', [centralW, centralD], makeVec(0, 0.02, 0), 0.02, MAT.floor, 0.42, 0.08);
+
+  if (connectors.has('N')) addWalkableTopBox(parent, 'batch-carved-north-arm', [Math.max(5.8, width * 0.26), depth * 0.36], makeVec(0, 0.06, depth * 0.27), 0.06, MAT.floor, 0.38, 0.07);
+  if (connectors.has('S')) addWalkableTopBox(parent, 'batch-carved-south-arm', [Math.max(5.8, width * 0.26), depth * 0.36], makeVec(0, 0.06, -depth * 0.27), 0.06, MAT.floor, 0.38, 0.07);
+  if (connectors.has('E')) addWalkableTopBox(parent, 'batch-carved-east-arm', [width * 0.36, Math.max(5.8, depth * 0.24)], makeVec(width * 0.27, 0.06, 0), 0.06, MAT.floor, 0.38, 0.07);
+  if (connectors.has('W')) addWalkableTopBox(parent, 'batch-carved-west-arm', [width * 0.36, Math.max(5.8, depth * 0.24)], makeVec(-width * 0.27, 0.06, 0), 0.06, MAT.floor, 0.38, 0.07);
+
+  if (options.wantsCorner) {
+    const sx = seed % 2 ? 1 : -1;
+    const sz = seed % 3 ? 1 : -1;
+    addWalkableTopBox(parent, 'batch-carved-corner-gallery', [width * 0.32, depth * 0.26], makeVec(sx * width * 0.23, 0.14, sz * depth * 0.23), 0.14, MAT.connectorFloor, 0.34, 0.07);
+  }
+  if (options.wantsHub) {
+    addWalkableTopBox(parent, 'batch-carved-west-balcony', [width * 0.22, depth * 0.34], makeVec(-width * 0.31, 0.12, 0), 0.12, MAT.connectorFloor, 0.32, 0.07);
+    addWalkableTopBox(parent, 'batch-carved-east-balcony', [width * 0.22, depth * 0.34], makeVec(width * 0.31, 0.12, 0), 0.12, MAT.connectorFloor, 0.32, 0.07);
+  }
+
+  const cornerW = Math.max(3.2, width * 0.17);
+  const cornerD = Math.max(3.2, depth * 0.17);
+  const cornerH = height * 0.72;
+  const corners = [
+    ['nw', -1, 1, !connectors.has('N') || !connectors.has('W')],
+    ['ne', 1, 1, !connectors.has('N') || !connectors.has('E')],
+    ['sw', -1, -1, !connectors.has('S') || !connectors.has('W')],
+    ['se', 1, -1, !connectors.has('S') || !connectors.has('E')],
+  ];
+  for (const [name, sx, sz, enabled] of corners) {
+    if (!enabled) continue;
+    addWallBox(parent, 'batch-carved-corner-mass-' + name, [cornerW, cornerH, cornerD], [sx * (width * 0.5 - cornerW * 0.5), cornerH * 0.5, sz * (depth * 0.5 - cornerD * 0.5)], MAT.wall, false);
+  }
+}
+
+function addBatchConnectorLandmark(parent, name, point, connector, role, topY = 0) {
+  addMarker(parent, makeVec(point.x, topY + 0.18, point.z), role === 'exit' || role === 'locked' ? MAT.exit : MAT.trim, 0.8);
+  const c = normalizeConnector(connector);
+  const sideAxis = c === 'N' || c === 'S';
+  const offset = c === 'N' ? [0, 0, -0.86] : c === 'S' ? [0, 0, 0.86] : c === 'E' ? [-0.86, 0, 0] : [0.86, 0, 0];
+  const spread = 2.55;
+  const postA = sideAxis ? [point.x - spread, topY + 1.55, point.z + offset[2]] : [point.x + offset[0], topY + 1.55, point.z - spread];
+  const postB = sideAxis ? [point.x + spread, topY + 1.55, point.z + offset[2]] : [point.x + offset[0], topY + 1.55, point.z + spread];
+  addBeveledBox(parent, name + '-post-a', sideAxis ? [0.34, 3.1, 0.54] : [0.54, 3.1, 0.34], postA, MAT.trim, false, 0.03, 1);
+  addBeveledBox(parent, name + '-post-b', sideAxis ? [0.34, 3.1, 0.54] : [0.54, 3.1, 0.34], postB, MAT.trim, false, 0.03, 1);
+}
+
+function addBatchRoleLandmarks(parent, spec, start, exit, center, width, depth, exitTop) {
+  const role = spec.semantic_role || '';
+  const seed = hashRoomKey(spec.id || role);
+  const rng = rngFromSeed(seed);
+  addBrazier(parent, 'batch-start-flame-left', [start.x - 2.8, 0, start.z], { kind: 'flame' });
+  addBrazier(parent, 'batch-start-flame-right', [start.x + 2.8, 0, start.z], { kind: 'flame' });
+  addBrazier(parent, 'batch-exit-corpsefire-a', [exit.x - 2.4, exitTop, exit.z], { kind: 'corpsefire' });
+  addBrazier(parent, 'batch-exit-corpsefire-b', [exit.x + 2.4, exitTop, exit.z], { kind: 'corpsefire' });
+  if (role.includes('exit') || role.includes('locked') || role.includes('key')) {
+    addGoldSkullPress(parent, Math.max(-depth * 0.5 + 5, Math.min(depth * 0.5 - 2.4, exit.z + (exit.z >= 0 ? 1.6 : -1.6))));
+  }
+  if (role.includes('switch')) {
+    addGroundedBeveledBox(parent, 'batch-switch-plinth', [2.2, 0.9, 1.6], [center.x, exitTop, center.z], MAT.trim, true, 0.04, 1);
+    addMarker(parent, makeVec(center.x, exitTop + 1.05, center.z), MAT.exit, 0.75);
+  }
+  if (role.includes('ambush') || role.includes('combat')) {
+    addBeveledBox(parent, 'batch-combat-cover', [2.0, 2.4, 1.5], [center.x, 1.2, center.z], MAT.connectorWall, true, 0.04, 1);
+  }
+  if (role.includes('hazard') || role.includes('deadfall') || role.includes('timing')) {
+    addGoldHangingBlade(parent, center.z);
+  }
+  if (role.includes('vista')) {
+    addBeveledBox(parent, 'batch-vista-high-rib', [6.8, 0.28, 0.4], [exit.x, exitTop + 4.3, exit.z], MAT.iron, false, 0.02, 1);
+  }
+  if (role.includes('reward') || role.includes('secret')) {
+    addMarker(parent, makeVec(exit.x, exitTop + 0.32, exit.z), MAT.bone, 0.9);
+    addHangingChain(parent, 'batch-reward-chain', center.x, center.z, 6.8, 6, MAT.iron, rng, { length: 2.5, sway: 0.015, dropStone: false });
+  }
+}
+
+function buildGeneratedBatchRoom(spec, index, path = {}) {
+  const { width, depth, height } = batchRoomDimensions(spec);
+  const connectors = (spec.horizontal_connectors || ['S', 'N']).map(normalizeConnector);
+  const uniqueConnectors = [...new Set(connectors)];
+  const specEntryConnector = uniqueConnectors[0] || 'S';
+  const specExitConnector = uniqueConnectors.length === 1 ? specEntryConnector : (uniqueConnectors[1] || oppositeConnector(specEntryConnector));
+  const pathEntryConnector = path.entryConnector ? normalizeConnector(path.entryConnector) : null;
+  const pathExitConnector = path.exitConnector ? normalizeConnector(path.exitConnector) : null;
+  const pathBranchConnectors = (path.branchConnectors || []).map(normalizeConnector);
+  const spawnConnector = pathEntryConnector || oppositeConnector(pathExitConnector || specEntryConnector);
+  const terminalExitConnector = pathExitConnector || specExitConnector;
+  const shellConnectors = [...new Set([spawnConnector, terminalExitConnector, ...pathBranchConnectors])];
+  const role = spec.semantic_role || '';
+  const routeText = (spec.route_sentence || []).join(' ');
+  const klass = spec.junction_class || '';
+  const hasUpper = (spec.vertical_overlays || []).includes('U') || klass.includes('vertical') || klass.includes('layered') || routeText.includes('upper') || routeText.includes('stair');
+  const hasLower = (spec.vertical_overlays || []).includes('D') || routeText.includes('drop') || routeText.includes('recovery');
+  const wantsRiskLine = /bridge|gap|hazard|gutter|broken|trial|crossing|lip/.test(routeText) || /hazard|trial|crossing/.test(role);
+  const wantsCorner = klass.includes('corner') || routeText.includes('turn') || routeText.includes('switchback');
+  const wantsCombat = /combat|ambush|enemy/.test(role);
+  const wantsHub = klass.startsWith('3c') || klass.startsWith('4c');
+  const wantsVerticalPlay = hasUpper || hasLower || wantsHub || wantsCorner || index % 3 === 2;
+  const startTop = hasLower && role.includes('descent') ? 1.0 : 0;
+  const exitTop = hasUpper ? 1.2 : role.includes('descent') ? 0 : 0.28;
+  const startSurfaceTop = Math.max(0.22, startTop + 0.2);
+  const exitSurfaceTop = Math.max(0.28, exitTop + 0.2);
+  const start = connectorPoint(spawnConnector, width, depth, startSurfaceTop, 4.5);
+  const exit = connectorPoint(terminalExitConnector, width, depth, exitSurfaceTop, 4.5);
+  const center = makeVec(0, Math.max(0.3, Math.min(1.05, (start.y + exit.y) * 0.5)), 0);
+
+  addBatchVoidBoundary(roomGroup, spec, width, depth, height, shellConnectors);
+
+  // Build a carved chamber footprint first; pads and route pieces sit on top of this outline.
+  addBatchCarvedChamberFloor(roomGroup, spec, width, depth, height, shellConnectors, { index, wantsCorner, wantsHub });
+  addWalkableTopBox(roomGroup, 'batch-entry-pad', [7.2, 5.4], start, start.y, MAT.platform, 0.32, 0.08);
+  addWalkableTopBox(roomGroup, 'batch-exit-pad', [7.4, 5.4], exit, exit.y, MAT.platform, 0.34, 0.08);
+
+  // A narrow visual gutter gives movement focus without creating the giant side void from build 0.8.1.
+  if (wantsRiskLine) {
+    const gutterAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
+    const gutterSize = gutterAlongX ? [Math.max(8, width * 0.46), 1.25] : [1.25, Math.max(8, depth * 0.46)];
+    addBeveledBox(roomGroup, 'batch-narrow-hazard-gutter', [gutterSize[0], 0.05, gutterSize[1]], [0, 0.035, 0], role.includes('hazard') ? MAT.hazard : MAT.bloodDark, false, 0.01, 1);
+  }
+
+  const midA = makeVec((start.x * 0.58 + exit.x * 0.42), Math.max(start.y + 0.08, 0.32), (start.z * 0.58 + exit.z * 0.42));
+  const midB = makeVec((start.x * 0.30 + exit.x * 0.70), Math.max(exit.y + 0.06, 0.36), (start.z * 0.30 + exit.z * 0.70));
+
+  if (wantsCorner) {
+    const bendSide = terminalExitConnector === 'E' || spawnConnector === 'E' ? 1 : -1;
+    const bend = makeVec(bendSide * width * 0.26, Math.max(0.36, (start.y + exit.y) * 0.5 + 0.08), (start.z + exit.z) * 0.18);
+    addWalkableTopBox(roomGroup, 'batch-corner-route-a', [5.2, 4.0], bend, bend.y, MAT.bridge, 0.28, 0.05);
+    addBatchRouteSegment(roomGroup, 'batch-corner-entry-link', start, bend, bend.y + 0.035, 2.7, MAT.platform, 2.65);
+    addBatchRouteSegment(roomGroup, 'batch-corner-exit-link', bend, exit, Math.max(bend.y + 0.09, exit.y + 0.08), 2.7, MAT.bridge, 2.65);
+  } else if (hasUpper) {
+    addWalkableTopBox(roomGroup, 'batch-lip-landing', [4.8, 3.8], midA, midA.y, MAT.platform, 0.28, 0.05);
+    addBatchStairRun(roomGroup, 'batch-measured-rise', midA, midB, midA.y, Math.max(midA.y + 0.38, exit.y + 0.04), MAT.platform);
+    addBatchRouteSegment(roomGroup, 'batch-upper-exit-link', midB, exit, Math.max(0.46, exit.y + 0.08), 2.8, MAT.bridge, 2.65);
+  } else {
+    addWalkableTopBox(roomGroup, 'batch-route-lip-marker', [4.6, 3.4], midA, midA.y, wantsRiskLine ? MAT.bridge : MAT.platform, 0.24, 0.05);
+    addWalkableTopBox(roomGroup, 'batch-route-landing-marker', [4.2, 3.6], midB, midB.y, MAT.platform, 0.24, 0.05);
+    addBatchRouteSegment(roomGroup, 'batch-low-route-link-a', start, midA, midA.y + 0.035, 2.6, MAT.platform, 2.65);
+    addBatchRouteSegment(roomGroup, 'batch-low-route-link-b', midB, exit, Math.max(midB.y + 0.06, exit.y + 0.08), 2.6, MAT.platform, 2.65);
+  }
+
+  if (hasLower || role.includes('recovery') || role.includes('secret')) {
+    const side = Math.abs(start.x) < 1 ? (index % 2 ? 1 : -1) : -Math.sign(start.x);
+    const low = makeVec(side * width * 0.30, 0.24, 0);
+    addWalkableTopBox(roomGroup, 'batch-side-recovery-floor', [4.6, Math.max(7.0, depth * 0.34)], low, low.y, MAT.connectorFloor, 0.28, 0.07);
+    addBatchStairRun(roomGroup, 'batch-side-recovery-rise', low, exit, low.y + 0.03, Math.max(0.5, exit.y + 0.04), MAT.platform);
+    addBrazier(roomGroup, 'batch-recovery-corpsefire', [low.x, 0, low.z], { kind: 'corpsefire' });
+  }
+
+  addBatchArchitecturalTemplate(roomGroup, 'batch-architecture', spec, width, depth, center, start, exit, {
+    index,
+    wantsHub,
+    wantsCombat,
+    wantsCorner,
+    hasUpper,
+    hasLower,
+  });
+
+  addBatchVerticalPlayArea(roomGroup, 'batch-vertical-play', spec, width, depth, center, start, exit, {
+    index,
+    enabled: wantsVerticalPlay,
+    hasUpper,
+    hasLower,
+    wantsHub,
+    routeText,
+  });
+
+  const branchConnectors = [...new Set(pathBranchConnectors)].filter((c) => c !== spawnConnector && c !== terminalExitConnector);
+  const socketPoints = new Map([[spawnConnector, start], [terminalExitConnector, exit]]);
+  if (wantsHub || branchConnectors.length) {
+    for (let i = 0; i < branchConnectors.length; i += 1) {
+      const c = branchConnectors[i];
+      const branchTop = hasUpper && i % 2 ? 0.95 : 0.26;
+      const point = connectorPoint(c, width, depth, branchTop, 4.6);
+      socketPoints.set(c, point);
+      addWalkableTopBox(roomGroup, 'batch-side-branch-' + i, [5.2, 4.2], point, point.y, i % 2 ? MAT.bridge : MAT.connectorFloor, 0.30, 0.06);
+      addBatchRouteSegment(roomGroup, 'batch-side-branch-link-' + i, center, point, Math.max(0.34, branchTop + 0.09), 2.4, MAT.connectorFloor, 2.65);
+      addBatchConnectorLandmark(roomGroup, 'batch-side-connector-' + i, point, c, 'side', branchTop);
+    }
+  }
+
+  if (klass.startsWith('4c')) {
+    addBeveledBox(roomGroup, 'batch-hub-central-landmark', [2.1, 2.6, 1.8], [0, 1.3, 0], MAT.connectorWall, true, 0.04, 1);
+    addWalkableTopBox(roomGroup, 'batch-hub-west-footwork', [3.6, 7.8], makeVec(-4.9, 0.3, 0), 0.3, MAT.platform, 0.24, 0.06);
+    addWalkableTopBox(roomGroup, 'batch-hub-east-footwork', [3.6, 7.8], makeVec(4.9, 0.3, 0), 0.3, MAT.platform, 0.24, 0.06);
+  }
+
+  if (wantsCombat) {
+    addBeveledBox(roomGroup, 'batch-combat-route-mass', [1.8, 2.1, 1.3], [center.x, 1.05, center.z], MAT.connectorWall, true, 0.04, 1);
+  } else {
+    addBeveledBox(roomGroup, 'batch-route-buttress-left', [0.8, 2.4, 1.0], [-width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
+    addBeveledBox(roomGroup, 'batch-route-buttress-right', [0.8, 2.4, 1.0], [width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
+  }
+
+  addBatchConnectorLandmark(roomGroup, 'batch-exit-landmark', exit, terminalExitConnector, role, exit.y);
+  for (let i = 0; i < pathBranchConnectors.length; i += 1) {
+    const connector = pathBranchConnectors[i];
+    const branchPoint = socketPoints.get(connector);
+    if (branchPoint) addBatchConnectorLandmark(roomGroup, 'batch-physical-branch-' + i, branchPoint, connector, 'side', branchPoint.y);
+  }
+  addBatchRoleLandmarks(roomGroup, spec, start, exit, center, width, depth, exit.y);
+
+  const sockets = {};
+  for (const connector of shellConnectors) {
+    const point = socketPoints.get(connector) || connectorPoint(connector, width, depth, 0.34, 4.6);
+    sockets[connector] = makeVec(point.x, point.y + PLAYER_EYE_HEIGHT, point.z);
+  }
+  return {
+    spawn: makeVec(start.x, start.y + PLAYER_EYE_HEIGHT, start.z),
+    exit: makeVec(exit.x, exit.y + PLAYER_EYE_HEIGHT, exit.z),
+    sockets,
+    exitRadius: 2.15,
+    enemyPositions: [makeVec(center.x, 0, center.z), makeVec(exit.x, exit.y, exit.z)],
+    bounds: { minX: -width * 0.5 + 0.7, maxX: width * 0.5 - 0.7, minZ: -depth * 0.5 + 0.7, maxZ: depth * 0.5 - 0.7 },
+  };
+}
+
+function currentBatchSpec() {
+  const count = Math.max(1, GENERATED_ROOM_BATCH.length);
+  const index = ((roomState.nodeIndex % count) + count) % count;
+  roomState.nodeIndex = index;
+  return GENERATED_ROOM_BATCH[index];
+}
+
+const BATCH_CHAPTER_SIZE = 12;
+const BATCH_CHAPTER_SPACING_Z = 330;
+const BATCH_CHAPTER_LAYOUT = [
+  [0, 0, 0], [0, 42, 0], [0, 84, 2.4],
+  [42, 84, 2.4], [84, 84, 4.8], [84, 126, 4.8],
+  [84, 168, 2.0], [42, 168, 2.0], [0, 168, 0.35],
+  [0, 210, 0.35], [42, 210, 3.1], [84, 210, 3.1],
+];
+const BATCH_CHAPTER_BRANCH_PAIRS = [[2, 8], [5, 11]];
+
+function batchRoomLocalIndex(index) {
+  return ((index % BATCH_CHAPTER_SIZE) + BATCH_CHAPTER_SIZE) % BATCH_CHAPTER_SIZE;
+}
+
+function batchRoomWorldOffset(index) {
+  const chapter = Math.floor(index / BATCH_CHAPTER_SIZE);
+  const local = batchRoomLocalIndex(index);
+  const point = BATCH_CHAPTER_LAYOUT[local] || BATCH_CHAPTER_LAYOUT[BATCH_CHAPTER_LAYOUT.length - 1];
+  return makeVec(point[0], point[2] || 0, point[1] + chapter * BATCH_CHAPTER_SPACING_Z);
+}
+
+function connectorTowardOffset(fromOffset, toOffset) {
+  const dx = toOffset.x - fromOffset.x;
+  const dz = toOffset.z - fromOffset.z;
+  if (Math.abs(dx) >= Math.abs(dz)) return dx >= 0 ? 'E' : 'W';
+  return dz >= 0 ? 'N' : 'S';
+}
+
+function roomWantsBranch(index) {
+  const spec = GENERATED_ROOM_BATCH[index] || {};
+  const text = [spec.id, spec.junction_class, spec.semantic_role, ...(spec.route_sentence || [])].join(' ');
+  return /3c|4c|hub|junction|secret|shortcut|return|loop|reward|key|switch/.test(text);
+}
+
+function buildGauntletBranchLinks() {
+  const links = [];
+  for (let chapterStart = 0; chapterStart < GENERATED_ROOM_BATCH.length; chapterStart += BATCH_CHAPTER_SIZE) {
+    for (const [fromLocal, toLocal] of BATCH_CHAPTER_BRANCH_PAIRS) {
+      const a = chapterStart + fromLocal;
+      const b = chapterStart + toLocal;
+      if (a >= GENERATED_ROOM_BATCH.length || b >= GENERATED_ROOM_BATCH.length) continue;
+      const offsetA = batchRoomWorldOffset(a);
+      const offsetB = batchRoomWorldOffset(b);
+      links.push({
+        a,
+        b,
+        sideA: connectorTowardOffset(offsetA, offsetB),
+        sideB: connectorTowardOffset(offsetB, offsetA),
+      });
+    }
+  }
+  return links;
+}
+
+function addWorldConnector(index, from, to, options = {}) {
+  const fromTop = from.y - PLAYER_EYE_HEIGHT;
+  const toTop = to.y - PLAYER_EYE_HEIGHT;
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const len = Math.max(0.001, Math.hypot(dx, dz));
+  const ux = dx / len;
+  const uz = dz / len;
+  const padClearance = options.branch ? 3.9 : 3.25;
+  const fromRun = makeVec(from.x + ux * padClearance, from.y, from.z + uz * padClearance);
+  const toRun = makeVec(to.x - ux * padClearance, to.y, to.z - uz * padClearance);
+  const corner = Math.abs(dx) > Math.abs(dz)
+    ? makeVec(toRun.x, fromRun.y, fromRun.z)
+    : makeVec(fromRun.x, fromRun.y, toRun.z);
+  const heightDelta = Math.abs(toTop - fromTop);
+  const routeTopA = Math.max(0.34, fromTop + 0.14);
+  const routeTopB = Math.max(0.34, toTop + 0.14);
+
+  if (heightDelta > 0.28) {
+    const firstDx = corner.x - fromRun.x;
+    const firstDz = corner.z - fromRun.z;
+    const firstLen = Math.hypot(firstDx, firstDz);
+    const secondDx = toRun.x - corner.x;
+    const secondDz = toRun.z - corner.z;
+    const secondLen = Math.hypot(secondDx, secondDz);
+    const minUsefulRun = Math.max(7.5, heightDelta * 5.2);
+    if (secondLen >= minUsefulRun || secondLen >= firstLen) {
+      addBatchRouteSegment(roomGroup, 'gauntlet-connector-' + index + '-a', fromRun, corner, routeTopA, 3.2, MAT.connectorFloor, 1.25);
+      addBatchStairRun(roomGroup, 'gauntlet-connector-' + index + '-rise', corner, toRun, fromTop + 0.18, toTop + 0.18, MAT.connectorFloor);
+    } else if (firstLen > 0.5) {
+      const stairLen = Math.min(firstLen, Math.max(minUsefulRun, Math.min(firstLen, heightDelta * 8.5)));
+      const sx = corner.x - (firstDx / firstLen) * stairLen;
+      const sz = corner.z - (firstDz / firstLen) * stairLen;
+      const stairStart = makeVec(sx, fromRun.y, sz);
+      addBatchRouteSegment(roomGroup, 'gauntlet-connector-' + index + '-a', fromRun, stairStart, routeTopA, 3.2, MAT.connectorFloor, 1.25);
+      addBatchStairRun(roomGroup, 'gauntlet-connector-' + index + '-rise', stairStart, corner, fromTop + 0.18, toTop + 0.18, MAT.connectorFloor);
+      addBatchRouteSegment(roomGroup, 'gauntlet-connector-' + index + '-b', makeVec(corner.x, to.y, corner.z), toRun, routeTopB, 3.2, MAT.connectorFloor, 1.25);
+    } else {
+      addBatchStairRun(roomGroup, 'gauntlet-connector-' + index + '-rise', fromRun, toRun, fromTop + 0.18, toTop + 0.18, MAT.connectorFloor);
+    }
+  } else {
+    addBatchRouteSegment(roomGroup, 'gauntlet-connector-' + index + '-a', fromRun, corner, routeTopA, 3.2, MAT.connectorFloor, 1.25);
+    addBatchRouteSegment(roomGroup, 'gauntlet-connector-' + index + '-b', corner, toRun, routeTopB, 3.2, MAT.connectorFloor, 1.25);
+  }
+
+  const addSignal = options.signal || Number(index) % 3 === 0;
+  if (addSignal) {
+    const safeName = String(index).replace(/[^a-z0-9_-]/gi, '-');
+    const signalPos = heightDelta > 0.28 ? makeVec((fromRun.x + toRun.x) * 0.5, 0, (fromRun.z + toRun.z) * 0.5) : corner;
+    addBrazier(roomGroup, 'gauntlet-connector-' + safeName + '-corpsefire', [signalPos.x, Math.max(0, Math.min(fromTop, toTop)), signalPos.z], { kind: options.branch ? 'corpsefire' : 'flame' });
+  }
+}
+
+function buildGeneratedGauntlet(startIndex = 0) {
+  const rooms = [];
+  const linkKeys = new Set();
+  const branchLinks = buildGauntletBranchLinks();
+  const branchSides = Array.from({ length: GENERATED_ROOM_BATCH.length }, () => new Set());
+  for (const link of branchLinks) {
+    branchSides[link.a].add(link.sideA);
+    branchSides[link.b].add(link.sideB);
+  }
+  for (let i = 0; i < GENERATED_ROOM_BATCH.length; i += 1) {
+    const offset = batchRoomWorldOffset(i);
+    const prevOffset = i > 0 ? batchRoomWorldOffset(i - 1) : null;
+    const nextOffset = i < GENERATED_ROOM_BATCH.length - 1 ? batchRoomWorldOffset(i + 1) : null;
+    const path = {
+      entryConnector: prevOffset ? connectorTowardOffset(offset, prevOffset) : null,
+      exitConnector: nextOffset ? connectorTowardOffset(offset, nextOffset) : null,
+      branchConnectors: [...branchSides[i]],
+    };
+    const built = withBatchBuildOffset(offset, () => buildGeneratedBatchRoom(GENERATED_ROOM_BATCH[i], i, path));
+    rooms.push({
+      spec: GENERATED_ROOM_BATCH[i],
+      spawn: built.spawn.clone().add(offset),
+      exit: built.exit.clone().add(offset),
+      enemyPositions: built.enemyPositions.map((pos) => pos.clone().add(offset)),
+      sockets: Object.fromEntries(Object.entries(built.sockets).map(([key, pos]) => [key, pos.clone().add(offset)])),
+      bounds: {
+        minX: built.bounds.minX + offset.x,
+        maxX: built.bounds.maxX + offset.x,
+        minZ: built.bounds.minZ + offset.z,
+        maxZ: built.bounds.maxZ + offset.z,
+      },
+    });
+  }
+  const addUniqueConnector = (name, from, to, options = {}) => {
+    if (!from || !to) return;
+    const ax = Math.round(from.x * 10);
+    const ay = Math.round(from.y * 10);
+    const az = Math.round(from.z * 10);
+    const bx = Math.round(to.x * 10);
+    const by = Math.round(to.y * 10);
+    const bz = Math.round(to.z * 10);
+    const aKey = ax + ',' + ay + ',' + az;
+    const bKey = bx + ',' + by + ',' + bz;
+    const key = aKey < bKey ? aKey + '|' + bKey : bKey + '|' + aKey;
+    if (linkKeys.has(key)) return;
+    linkKeys.add(key);
+    addWorldConnector(name, from, to, options);
+  };
+  for (let i = 0; i < rooms.length - 1; i += 1) addUniqueConnector(i, rooms[i].exit, rooms[i + 1].spawn);
+  for (let i = 0; i < branchLinks.length; i += 1) {
+    const link = branchLinks[i];
+    const from = rooms[link.a]?.sockets?.[link.sideA];
+    const to = rooms[link.b]?.sockets?.[link.sideB];
+    addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
+  }
+  const first = rooms[Math.max(0, Math.min(startIndex, rooms.length - 1))] || rooms[0];
+  const last = rooms[rooms.length - 1] || first;
+  const minX = Math.min(...rooms.map((room) => room.bounds.minX), -14);
+  const maxX = Math.max(...rooms.map((room) => room.bounds.maxX), 14);
+  const minZ = Math.min(...rooms.map((room) => room.bounds.minZ), -18);
+  const maxZ = Math.max(...rooms.map((room) => room.bounds.maxZ), 18);
+  return { rooms, spawn: first.spawn, exit: last.exit, exitRadius: 2.35, enemyPositions: first.enemyPositions, bounds: { minX, maxX, minZ, maxZ } };
+}
+
+function updateCurrentGauntletRoom() {
+  if (!roomState.gauntletRooms?.length) return;
+  let bestIndex = roomState.nodeIndex;
+  let bestDist = Infinity;
+  for (let i = 0; i < roomState.gauntletRooms.length; i += 1) {
+    const center = batchRoomWorldOffset(i);
+    const dx = player.position.x - center.x;
+    const dz = player.position.z - center.z;
+    const distSq = dx * dx + dz * dz;
+    if (distSq < bestDist) {
+      bestDist = distSq;
+      bestIndex = i;
+    }
+  }
+  if (bestIndex !== roomState.nodeIndex) {
+    roomState.nodeIndex = bestIndex;
+    setNodeIndex(bestIndex);
+    const spec = GENERATED_ROOM_BATCH[bestIndex];
+    roomState.spec = { index: bestIndex, connector: spec.id, type: spec.junction_class, roomRole: spec.semantic_role, landmark: spec.batch_prompt, routeSentence: spec.route_sentence };
+    setStatus('gauntlet room ' + (bestIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + spec.id);
+  }
+}
+
+function completeGeneratedGauntlet() {
+  roomState.levelIndex += 1;
+  roomState.nodeIndex = 0;
+  setLevelIndex(roomState.levelIndex);
+  setNodeIndex(0);
+  buildRoom(true);
+}
+
+function buildRoom(movePlayer = true) {
+  const rootGroup = roomGroup;
+  clearGroup(rootGroup);
+  resetWalkableBounds();
+  roomState.transitionLock = 0.7;
+  const startIndex = Math.max(0, Math.min(roomState.nodeIndex, GENERATED_ROOM_BATCH.length - 1));
+  const built = buildGeneratedGauntlet(startIndex);
+  const spec = GENERATED_ROOM_BATCH[startIndex] || GENERATED_ROOM_BATCH[0];
+  roomState.plan = {
+    levelIndex: roomState.levelIndex,
+    nodes: GENERATED_ROOM_BATCH.map((room, index) => ({ index, connector: room.id, type: room.junction_class })),
+  };
+  roomState.gauntletRooms = built.rooms;
+  roomState.nodeIndex = startIndex;
+  roomState.spec = { index: startIndex, connector: spec.id, type: spec.junction_class, roomRole: spec.semantic_role, landmark: spec.batch_prompt, routeSentence: spec.route_sentence };
+  roomState.seed = hashRoomKey(spec.id || String(startIndex));
+  roomState.spawn.copy(built.spawn);
+  roomState.exit.copy(built.exit);
+  roomState.exitRadius = built.exitRadius;
+  roomState.enemyPositions = built.enemyPositions.map((pos) => pos.clone());
+  roomState.levelBounds = built.bounds;
+  positionEnemy(built.enemyPositions[0]);
+
+  if (movePlayer) {
+    player.position.copy(roomState.spawn);
+    player.visualPosition.copy(player.position);
+    player.velocity.set(0, 0, 0);
+    input.smoothMoveX = 0;
+    input.smoothMoveY = 0;
+    player.grounded = true;
+    player.runCharge = 0;
+    player.lastRunIntent = false;
+    player.attack = null;
+    player.attackTimer = 0;
+  }
+  setStatus('legible chapter ' + (startIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | 2 branches | ' + spec.id);
+}
+
+function buildEnemy() {
+  if (enemy && enemy.parent) enemy.parent.remove(enemy);
+  enemy = new THREE.Group();
+  enemy.position.set(0, 0, 4.8);
+  enemy.userData.health = 3;
+  enemy.userData.hitTimer = 0;
+  addBox(enemy, 'broken-knight-torso', [0.9, 1.25, 0.42], [0, 1.18, 0], MAT.iron);
+  addBox(enemy, 'broken-knight-head', [0.58, 0.5, 0.5], [0, 2.15, 0], MAT.stone2);
+  addBox(enemy, 'broken-knight-left-arm', [0.32, 1.05, 0.32], [-0.74, 1.2, 0], MAT.iron).rotation.z = -0.28;
+  addBox(enemy, 'broken-knight-right-arm', [0.32, 1.05, 0.32], [0.74, 1.2, 0], MAT.iron).rotation.z = 0.28;
+  addBox(enemy, 'broken-knight-legs', [0.34, 1.0, 0.32], [-0.26, 0.48, 0], MAT.iron);
+  addBox(enemy, 'broken-knight-legs', [0.34, 1.0, 0.32], [0.26, 0.48, 0], MAT.iron);
+  const sword = addBox(enemy, 'execution-sword', [0.16, 1.9, 0.16], [1.25, 1.25, 0.08], MAT.bone);
+  sword.rotation.z = -0.42;
+  enemy.traverse((node) => { if (node.isMesh) node.castShadow = USE_DYNAMIC_SHADOWS; });
+  scene.add(enemy);
+}
+
+function buildLights() {
+  scene.add(new THREE.HemisphereLight(0xf2e8d6, 0x3a4654, 1.18));
+  const key = new THREE.DirectionalLight(0xfff1dc, 1.16);
+  key.position.set(-4, 8, -5);
+  key.castShadow = false;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x9bd4ff, 0.62);
+  rim.position.set(5, 3, 7);
+  rim.castShadow = false;
+  scene.add(rim);
+}
+
+function buildFallbackArms() {
+  const group = new THREE.Group();
+  group.name = 'fallback-camera-space-arms';
+  const left = addBox(group, 'left-primitive-arm', [0.32, 0.32, 2.6], [-0.62, -0.45, 1.7], MAT.flesh);
+  const right = addBox(group, 'right-primitive-arm', [0.32, 0.32, 2.6], [0.62, -0.45, 1.7], MAT.flesh);
+  const fistL = addBox(group, 'left-fist', [0.48, 0.42, 0.54], [-0.62, -0.45, 3.02], MAT.flesh);
+  const fistR = addBox(group, 'right-fist', [0.48, 0.42, 0.54], [0.62, -0.45, 3.02], MAT.flesh);
+  left.rotation.y = -0.17;
+  right.rotation.y = 0.17;
+  fistL.rotation.y = -0.17;
+  fistR.rotation.y = 0.17;
+  armsScene.add(group);
+  return group;
+}
+const fallbackArms = buildFallbackArms();
+
+function findBone(root, name) {
+  let found = null;
+  root.traverse((node) => { if (!found && node.isBone && node.name === name) found = node; });
+  return found;
+}
+
+function clipMap(clips) {
+  return new Map(clips.map((clip) => [clip.name, clip]));
+}
+
+function chooseClip(clips, names) {
+  for (const name of names) {
+    const exact = clips.find((clip) => clip.name === name);
+    if (exact) return exact;
+  }
+  for (const name of names) {
+    const partial = clips.find((clip) => clip.name.toLowerCase().includes(name.toLowerCase()));
+    if (partial) return partial;
+  }
+  return clips[0] || null;
+}
+
+function resolvePlayerSolids(position, velocity) {
+  const radius = 0.38;
+  const minY = position.y - PLAYER_EYE_HEIGHT + 0.15;
+  const maxY = position.y + 0.35;
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const solid of solidColliders) {
+      if (maxY < solid.minY || minY > solid.maxY) continue;
+      if (position.x < solid.minX - radius || position.x > solid.maxX + radius) continue;
+      if (position.z < solid.minZ - radius || position.z > solid.maxZ + radius) continue;
+      const centerX = (solid.minX + solid.maxX) * 0.5;
+      const centerZ = (solid.minZ + solid.maxZ) * 0.5;
+      const pushLeft = Math.abs(position.x - (solid.minX - radius));
+      const pushRight = Math.abs((solid.maxX + radius) - position.x);
+      const pushBack = Math.abs(position.z - (solid.minZ - radius));
+      const pushForward = Math.abs((solid.maxZ + radius) - position.z);
+      const pushX = Math.min(pushLeft, pushRight);
+      const pushZ = Math.min(pushBack, pushForward);
+      if (pushX < pushZ) {
+        position.x = position.x < centerX ? solid.minX - radius : solid.maxX + radius;
+        velocity.x = 0;
+      } else {
+        position.z = position.z < centerZ ? solid.minZ - radius : solid.maxZ + radius;
+        velocity.z = 0;
+      }
+    }
+  }
+}
+
+function resolveSupportHeight(x, z, feetY, velocityY) {
+  let best = null;
+  for (const surface of walkableSurfaces) {
+    if (x < surface.minX - SUPPORT_RADIUS || x > surface.maxX + SUPPORT_RADIUS) continue;
+    if (z < surface.minZ - SUPPORT_RADIUS || z > surface.maxZ + SUPPORT_RADIUS) continue;
+    if (velocityY > 0.5 && feetY < surface.topY - 0.14) continue;
+    if (feetY > surface.topY + SUPPORT_SNAP_UP) continue;
+    if (feetY < surface.topY - SUPPORT_SNAP_DOWN) continue;
+    if (!best || surface.topY > best.topY) best = surface;
+  }
+  return best;
+}
+
+function playArmAction(action, fade = 0.12, restart = false) {
+  if (!action) return;
+  if (action === activeArmAction && !restart) return;
+  action.reset().enabled = true;
+  action.fadeIn(fade).play();
+  if (activeArmAction && activeArmAction !== action) activeArmAction.fadeOut(fade);
+  activeArmAction = action;
+}
+
+function makeArmAction(clip, options = {}) {
+  if (!armsMixer || !clip) return null;
+  const action = armsMixer.clipAction(clip);
+  action.enabled = true;
+  if (options.once) {
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = Boolean(options.clamp);
+  }
+  return action;
+}
+
+function makeAttackDef(name, action, index = 0, options = {}) {
+  const duration = Math.max(0.24, Number(action?.getClip?.().duration || options.duration || 0.55));
+  return {
+    name,
+    action,
+    index,
+    duration,
+    comboOpen: Math.max(0.16, duration * 0.46),
+    hitAt: Math.max(0.08, duration * 0.34),
+    dashStart: Math.max(0.05, duration * 0.22),
+    dashDuration: Math.max(0.07, duration * 0.18),
+    dashDistance: Number(options.dashDistance ?? (index >= 4 ? 0.58 : 0.36)),
+    range: Number(options.range ?? 3.0),
+    damage: Number(options.damage ?? 1),
+    airBoost: Number(options.airBoost ?? 0),
+  };
+}
+
+function startJumpCharge(pointerId = null) {
+  input.jumpPointerId = pointerId;
+  input.jumpCharging = true;
+  input.jumpHoldStart = performance.now();
+}
+
+function loadArms() {
+  loader.load('assets/models/FPSPlayer.glb', (gltf) => {
+    armsModel = gltf.scene;
+    armsModel.traverse((node) => {
+      if (node.isMesh) {
+        node.frustumCulled = false;
+        node.castShadow = false;
+        node.renderOrder = 10;
+        if (node.name === 'Plane' || node.name === 'placeholderWeapon') node.visible = false;
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        for (const mat of mats) {
+          if (!mat) continue;
+          mat.flatShading = true;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+    armsScene.add(armsModel);
+    armsCameraBone = findBone(armsModel, 'Camera');
+    armsMixer = new THREE.AnimationMixer(armsModel);
+    const clipsByName = clipMap(gltf.animations);
+    idleAction = makeArmAction(chooseClip(gltf.animations, ['FistReady', 'FistIdle', '0T-Pose']));
+    walkAction = makeArmAction(chooseClip(gltf.animations, ['FistWalking', 'Walking']));
+    runAction = walkAction;
+    jumpAction = makeArmAction(chooseClip(gltf.animations, ['FistJump', 'JumpAddative', 'Jump']), { once: true, clamp: true });
+    normalAttackDefs = [1, 2, 3, 4, 5].map((index) => {
+      const clip = clipsByName.get('FistAttack' + index) || chooseClip(gltf.animations, ['FistAttack' + index]);
+      const action = makeArmAction(clip, { once: true });
+      return makeAttackDef('FistAttack' + index, action, index - 1, { dashDistance: 0.32 + index * 0.055, damage: 1 + index * 0.08 });
+    }).filter((def) => def.action);
+    attackAction = normalAttackDefs[0]?.action || null;
+    sprintAttackAction = makeArmAction(clipsByName.get('FistAttackSprint') || chooseClip(gltf.animations, ['FistAttackSprint', 'SprintAttack']), { once: true });
+    airAttackAction = makeArmAction(clipsByName.get('FistAttackAir') || chooseClip(gltf.animations, ['FistAttackAir', 'AirAttack']), { once: true });
+    airForwardAttackAction = makeArmAction(clipsByName.get('FistAttackAirForward') || chooseClip(gltf.animations, ['FistAttackAirForward', 'AirForward']), { once: true });
+    crouchAttackAction = makeArmAction(clipsByName.get('FistAttackCrouch') || chooseClip(gltf.animations, ['FistAttackCrouch', 'CrouchAttack']), { once: true });
+    sprintAttackDef = makeAttackDef('FistAttackSprint', sprintAttackAction, 0, { dashDistance: 0.96, range: 3.35, damage: 1.45 });
+    airAttackDef = makeAttackDef('FistAttackAir', airAttackAction, 0, { dashDistance: 0.26, range: 2.85, damage: 1.15 });
+    airForwardAttackDef = makeAttackDef('FistAttackAirForward', airForwardAttackAction, 0, { dashDistance: 1.05, range: 3.4, damage: 1.35, airBoost: 3.2 });
+    crouchAttackDef = makeAttackDef('FistAttackCrouch', crouchAttackAction, 0, { duration: 0.66, dashDistance: 0.4, range: 2.9, damage: 1.35 });
+    if (crouchAttackDef) {
+      crouchAttackDef.dashStart = 0.33;
+      crouchAttackDef.dashDuration = 0.075;
+      crouchAttackDef.hitAt = 0.36;
+      crouchAttackDef.comboOpen = 0.42;
+    }
+    playArmAction(idleAction, 0.01);
+    fallbackArms.visible = false;
+    setStatus('FPS arms ready: ' + gltf.animations.length + ' clips');
+  }, undefined, (err) => {
+    console.error(err);
+    fallbackArms.visible = true;
+    setStatus('using primitive arms fallback');
+  });
+}
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function noiseBuffer(duration = 0.08) {
+  const sampleRate = audioCtx.sampleRate;
+  const buffer = audioCtx.createBuffer(1, Math.max(1, Math.floor(sampleRate * duration)), sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  return buffer;
+}
+
+function playStep(intensity = 1) {
+  if (!audioCtx) return;
+  const src = audioCtx.createBufferSource();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+  src.buffer = noiseBuffer(0.055 + Math.random() * 0.035);
+  src.playbackRate.value = 0.82 + Math.random() * 0.28 + intensity * 0.1;
+  filter.type = 'lowpass';
+  filter.frequency.value = 360 + intensity * 240 + Math.random() * 90;
+  gain.gain.value = 0.03 + intensity * 0.05;
+  src.connect(filter).connect(gain).connect(audioCtx.destination);
+  src.start();
+}
+
+function playThud(power = 1) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(92 + power * 22, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(38, audioCtx.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.08 * power, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.16);
+}
+
+function setActionPadVisible(visible) {
+  actionPad.classList.toggle('visible', visible);
+}
+
+function placeActionPad() {
+  actionPad.style.left = 'auto';
+  actionPad.style.top = 'auto';
+  actionPad.style.right = 'max(22px, env(safe-area-inset-right))';
+  actionPad.style.bottom = 'max(20px, env(safe-area-inset-bottom))';
+  setActionPadVisible(true);
+}
+
+function selectAttackDef() {
+  if (!player.grounded) return player.lastRunIntent ? airForwardAttackDef : airAttackDef;
+  if (player.isRunning) return sprintAttackDef;
+  if (player.comboTimer <= 0) player.comboIndex = 0;
+  const def = normalAttackDefs[player.comboIndex % Math.max(1, normalAttackDefs.length)] || normalAttackDefs[0] || sprintAttackDef || airAttackDef;
+  player.comboIndex = (player.comboIndex + 1) % Math.max(1, normalAttackDefs.length || 1);
+  player.comboTimer = 0.9;
+  return def;
+}
+
+function beginAttack() {
+  beginAttackDef(selectAttackDef());
+}
+
+function beginHoldAttack() {
+  beginAttackDef(crouchAttackDef || selectAttackDef());
+}
+
+function commitJump(force = 0, charge = 0, keepCharge = false) {
+  ensureAudio();
+  if (!player.grounded) return;
+  const forward = cameraForwardYaw(player.yaw).normalize();
+  const lateral = cameraRightYaw(player.yaw).normalize();
+  const moveBlend = new THREE.Vector3().addScaledVector(forward, input.moveY).addScaledVector(lateral, input.moveX);
+  if (moveBlend.lengthSq() > 1) moveBlend.normalize();
+  const horizontalVelocity = new THREE.Vector3(player.velocity.x, 0, player.velocity.z);
+  const horizontalSpeed = horizontalVelocity.length();
+  const moveDir = horizontalSpeed > 0.05
+    ? horizontalVelocity.multiplyScalar(1 / horizontalSpeed)
+    : (moveBlend.lengthSq() > 0.0001 ? moveBlend.normalize() : forward.clone());
+  const chargeRatio = clamp(charge / JUMP_CHARGE_MAX, 0, 1);
+  const easedCharge = 1 - Math.pow(1 - chargeRatio, 4);
+  const chargeBoost = easedCharge * WALK_JUMP_CHARGE_HEIGHT;
+  const verticalBoost = player.isRunning
+    ? WALK_JUMP_BASE_HEIGHT + RUN_JUMP_VERTICAL_BOOST + force + Math.min(0.4, horizontalSpeed * 0.07)
+    : WALK_JUMP_BASE_HEIGHT + chargeBoost + force;
+  const directionalBoost = player.isRunning
+    ? RUN_JUMP_HORIZONTAL_BOOST + Math.min(1.6, horizontalSpeed * 0.28) + force
+    : 0;
+  player.velocity.x += moveDir.x * directionalBoost;
+  player.velocity.z += moveDir.z * directionalBoost;
+  player.velocity.y = Math.max(player.velocity.y, verticalBoost);
+  player.grounded = false;
+  if (!keepCharge) {
+    input.jumpCharging = false;
+    input.jumpHoldStart = 0;
+    input.jumpPointerId = null;
+  }
+  if (jumpAction) playArmAction(jumpAction, 0.045, true);
+  playThud(player.isRunning ? 0.55 : 0.42 + chargeRatio * 0.1);
+  setActionPadVisible(true);
+}
+
+function beginAttackDef(def) {
+  ensureAudio();
+  const current = player.attack;
+  if (current && current.elapsed < current.def.comboOpen) return;
+  if (!def) return;
+  const direction = cameraForwardYaw(player.yaw).normalize();
+  player.attack = { def, elapsed: 0, hitDone: false, dashDone: 0, direction };
+  player.attackTimer = def.duration;
+  if (def.airBoost && !player.grounded) {
+    player.velocity.x += direction.x * def.airBoost;
+    player.velocity.z += direction.z * def.airBoost;
+    player.velocity.y = Math.max(player.velocity.y, 1.2);
+  }
+  playArmAction(def.action, 0.035, true);
+  playThud(def.name.includes('Sprint') || def.name.includes('Forward') || def.name.includes('Crouch') ? 0.92 : 0.62);
+  setActionPadVisible(true);
+}
+
+function jump(pointerId = null) {
+  if (!player.grounded) return;
+  if (player.isRunning) {
+    commitJump(0.75, 0, false);
+    return;
+  }
+  startJumpCharge(pointerId);
+  commitJump(0, 0, true);
+}
+
+async function toggleGyro() {
+  ensureAudio();
+  if (!input.gyro && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const result = await DeviceOrientationEvent.requestPermission();
+      if (result !== 'granted') return;
+    } catch (err) {
+      console.warn(err);
+      return;
+    }
+  }
+  input.gyro = !input.gyro;
+  input.gyroYaw = 0;
+  input.gyroPitch = 0;
+  input.gyroBaseGamma = null;
+  input.gyroBaseBeta = null;
+  gyroButton.classList.toggle('active', input.gyro);
+  setStatus(input.gyro ? 'gyro assist on' : 'gyro assist off');
+  setActionPadVisible(true);
+}
+
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+}
+
+function setupTouch() {
+  window.addEventListener('pointerdown', ensureAudio, { passive: true });
+
+  const handlePointerMove = (event) => {
+    if (event.pointerId === input.stickPointer) {
+      updateStick(event);
+      event.preventDefault();
+      return;
+    }
+    if (event.pointerId !== input.lookPointer) return;
+    const dx = event.clientX - input.lastLookX;
+    const dy = event.clientY - input.lastLookY;
+    input.lastLookX = event.clientX;
+    input.lastLookY = event.clientY;
+    player.yaw -= dx * 0.0065;
+    player.pitch = clamp(player.pitch - dy * 0.0053, -1.15, 1.1);
+    event.preventDefault();
+  };
+  const endLook = (event) => {
+    if (event.pointerId === input.stickPointer) {
+      endStick(event);
+      return;
+    }
+    if (event.pointerId !== input.lookPointer) return;
+    input.lookPointer = null;
+    placeActionPad(event.clientX, event.clientY);
+    event.preventDefault();
+  };
+  window.addEventListener('pointermove', handlePointerMove, { passive: false });
+  window.addEventListener('pointerup', endLook);
+  window.addEventListener('pointercancel', endLook);
+
+  fsButton.addEventListener('pointerdown', (event) => {
+    ensureAudio();
+    toggleFullscreen();
+    event.preventDefault();
+  });
+
+  for (const button of [attackButton, jumpButton, gyroButton]) {
+    button.addEventListener('contextmenu', (event) => event.preventDefault());
+    button.addEventListener('selectstart', (event) => event.preventDefault());
+    button.addEventListener('pointerdown', (event) => {
+      ensureAudio();
+      setActionPadVisible(true);
+      input.lookPointer = event.pointerId;
+      input.lastLookX = event.clientX;
+      input.lastLookY = event.clientY;
+      if (button === attackButton) {
+        const pointerId = event.pointerId;
+        let holdTriggered = false;
+        const holdTimer = window.setTimeout(() => {
+          if (input.attackPointerId !== pointerId) return;
+          holdTriggered = true;
+          beginHoldAttack();
+        }, 260);
+        input.attackPointerId = pointerId;
+        const finishAttackPress = (upEvent) => {
+          if (upEvent.pointerId !== pointerId) return;
+          window.clearTimeout(holdTimer);
+          try { attackButton.releasePointerCapture(pointerId); } catch (err) { console.warn(err); }
+          window.removeEventListener('pointerup', finishAttackPress, true);
+          window.removeEventListener('pointercancel', finishAttackPress, true);
+          input.attackPointerId = null;
+          if (!holdTriggered) beginAttack();
+          upEvent.preventDefault();
+        };
+        try { attackButton.setPointerCapture(pointerId); } catch (err) { console.warn(err); }
+        window.addEventListener('pointerup', finishAttackPress, true);
+        window.addEventListener('pointercancel', finishAttackPress, true);
+      } else if (button === jumpButton) {
+        const pointerId = event.pointerId;
+        if (player.grounded) {
+          jump(pointerId);
+          if (input.jumpCharging) {
+            try { jumpButton.setPointerCapture(pointerId); } catch (err) { console.warn(err); }
+            const finishJumpPress = (upEvent) => {
+              if (upEvent.pointerId !== pointerId) return;
+              window.removeEventListener('pointerup', finishJumpPress, true);
+              window.removeEventListener('pointercancel', finishJumpPress, true);
+              try { jumpButton.releasePointerCapture(pointerId); } catch (err) { console.warn(err); }
+              input.jumpCharging = false;
+              input.jumpHoldStart = 0;
+              input.jumpPointerId = null;
+              upEvent.preventDefault();
+            };
+            window.addEventListener('pointerup', finishJumpPress, true);
+            window.addEventListener('pointercancel', finishJumpPress, true);
+          }
+        }
+      } else if (button === gyroButton) {
+        toggleGyro();
+      }
+      event.preventDefault();
+    });
+  }
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('button')) return;
+    ensureAudio();
+    hintEl.style.opacity = '0';
+    if (event.clientX < window.innerWidth * 0.44) beginStick(event);
+    else beginLook(event);
+    event.preventDefault();
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') {
+      jump();
+      event.preventDefault();
+    }
+    if (event.code === 'KeyF' || event.code === 'Enter') beginAttack();
+    if (event.code === 'KeyW') input.moveY = 1;
+    if (event.code === 'KeyS') input.moveY = -1;
+    if (event.code === 'KeyA') input.moveX = -1;
+    if (event.code === 'KeyD') input.moveX = 1;
+  });
+  window.addEventListener('keyup', (event) => {
+    if (event.code === 'Space' && input.jumpCharging && input.jumpPointerId === null) {
+      input.jumpCharging = false;
+      input.jumpHoldStart = 0;
+      event.preventDefault();
+    }
+    if ((event.code === 'KeyW' && input.moveY > 0) || (event.code === 'KeyS' && input.moveY < 0)) input.moveY = 0;
+    if ((event.code === 'KeyA' && input.moveX < 0) || (event.code === 'KeyD' && input.moveX > 0)) input.moveX = 0;
+  });
+
+  window.addEventListener('deviceorientation', (event) => {
+    if (!input.gyro) return;
+    const gamma = Number(event.gamma || 0);
+    const beta = Number(event.beta || 0);
+    if (input.gyroBaseGamma === null || input.gyroBaseBeta === null) {
+      input.gyroBaseGamma = gamma;
+      input.gyroBaseBeta = beta;
+    }
+    input.gyroYaw = clamp(THREE.MathUtils.degToRad(gamma - input.gyroBaseGamma) * 0.72, -0.42, 0.42);
+    input.gyroPitch = clamp(THREE.MathUtils.degToRad(beta - input.gyroBaseBeta) * 0.44, -0.28, 0.28);
+  });
+}
+
+function beginStick(event) {
+  input.stickPointer = event.pointerId;
+  const size = leftStick.getBoundingClientRect().width || 132;
+  leftStick.style.left = clamp(event.clientX - size / 2, 8, window.innerWidth * 0.48 - size) + 'px';
+  leftStick.style.top = clamp(event.clientY - size / 2, 44, window.innerHeight - size - 8) + 'px';
+  leftStick.style.bottom = 'auto';
+  leftStick.classList.add('active');
+  updateStick(event);
+}
+
+function beginLook(event) {
+  input.lookPointer = event.pointerId;
+  input.lastLookX = event.clientX;
+  input.lastLookY = event.clientY;
+}
+
+function updateStick(event) {
+  const rect = leftStick.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = event.clientX - cx;
+  const dy = event.clientY - cy;
+  const max = rect.width * 0.36;
+  const mag = Math.min(max, Math.hypot(dx, dy));
+  const angle = Math.atan2(dy, dx);
+  const kx = Math.cos(angle) * mag;
+  const ky = Math.sin(angle) * mag;
+  stickKnob.style.transform = `translate(${kx}px, ${ky}px)`;
+  const nx = clamp(kx / max, -1, 1);
+  const ny = clamp(-ky / max, -1, 1);
+  input.moveX = Math.sign(nx) * Math.pow(Math.abs(nx), STICK_RESPONSE);
+  input.moveY = Math.sign(ny) * Math.pow(Math.abs(ny), STICK_RESPONSE);
+}
+
+function endStick(event) {
+  if (event.pointerId !== input.stickPointer) return;
+  input.stickPointer = null;
+  input.moveX = 0;
+  input.moveY = 0;
+  stickKnob.style.transform = 'translate(0, 0)';
+  leftStick.classList.remove('active');
+  event.preventDefault();
+}
+
+function updatePlayer(dt) {
+  const now = performance.now();
+  const smoothRate = player.grounded ? MOVE_INPUT_SMOOTH_GROUND : MOVE_INPUT_SMOOTH_AIR;
+  const smoothBlend = 1 - Math.exp(-smoothRate * dt);
+  input.smoothMoveX += (input.moveX - input.smoothMoveX) * smoothBlend;
+  input.smoothMoveY += (input.moveY - input.smoothMoveY) * smoothBlend;
+  if (Math.abs(input.moveX) < 0.001 && Math.abs(input.smoothMoveX) < 0.015) input.smoothMoveX = 0;
+  if (Math.abs(input.moveY) < 0.001 && Math.abs(input.smoothMoveY) < 0.015) input.smoothMoveY = 0;
+  const moveX = input.smoothMoveX;
+  const moveY = input.smoothMoveY;
+  const forward = cameraForwardYaw(player.yaw);
+  const right = cameraRightYaw(player.yaw);
+  const desired = new THREE.Vector3();
+  desired.addScaledVector(forward, moveY);
+  desired.addScaledVector(right, moveX);
+  if (desired.lengthSq() > 1) desired.normalize();
+  const stickMagnitude = Math.hypot(moveX, moveY);
+  const forwardArc = moveY > 0.56 && Math.abs(moveX) <= Math.max(0.001, moveY);
+  const buildingRun = player.grounded && forwardArc && stickMagnitude > 0.55;
+  if (buildingRun) player.runCharge = Math.min(RUN_BUILD_TIME, player.runCharge + dt);
+  else if (player.grounded) player.runCharge = Math.max(0, player.runCharge - dt * 2.2);
+  else if (player.runCharge > 0) player.runCharge = Math.max(0, player.runCharge - dt * 0.15);
+  player.isRunning = player.grounded && player.runCharge >= RUN_BUILD_TIME;
+  if (player.isRunning) player.lastRunIntent = true;
+  else if (player.grounded && stickMagnitude < 0.18) player.lastRunIntent = false;
+  const runProgress = clamp(player.runCharge / RUN_BUILD_TIME, 0, 1);
+  const wishSpeed = player.grounded ? (GROUND_WISH_SPEED + (RUN_WISH_SPEED - GROUND_WISH_SPEED) * runProgress) : AIR_CRUISE_SPEED;
+  const accel = player.grounded ? GROUND_ACCEL : AIR_TURN_ACCEL;
+  if (player.grounded) {
+    const horizontalSpeed = Math.hypot(player.velocity.x, player.velocity.z);
+    if (horizontalSpeed > 0.001) {
+      const drop = horizontalSpeed * GROUND_FRICTION * dt;
+      const newSpeed = Math.max(0, horizontalSpeed - drop);
+      if (newSpeed !== horizontalSpeed) {
+        const scale = newSpeed / horizontalSpeed;
+        player.velocity.x *= scale;
+        player.velocity.z *= scale;
+      }
+    }
+  }
+  const wishDir = desired.lengthSq() > 0.0001 ? desired.normalize() : desired;
+  if (!player.grounded) {
+    const horizontal = new THREE.Vector3(player.velocity.x, 0, player.velocity.z);
+    const horizontalSpeed = horizontal.length();
+    if (wishDir.lengthSq() > 0.0001) {
+      const currentSpeed = horizontal.dot(wishDir);
+      const addSpeed = wishSpeed - currentSpeed;
+      if (addSpeed > 0) {
+        const accelSpeed = AIR_TURN_ACCEL * Math.max(0.35, stickMagnitude) * dt;
+        const applied = Math.min(accelSpeed, addSpeed);
+        horizontal.addScaledVector(wishDir, applied);
+      } else if (addSpeed < 0) {
+        const brakeSpeed = Math.min(-addSpeed, AIR_BRAKE_ACCEL * dt);
+        horizontal.addScaledVector(wishDir, brakeSpeed);
+      }
+    }
+    if (horizontalSpeed > AIR_MAX_SPEED) {
+      const overspeed = horizontalSpeed - AIR_MAX_SPEED;
+      const drag = Math.min(overspeed, AIR_DRAG * dt + overspeed * 0.12 * dt);
+      if (horizontalSpeed > 0.001) horizontal.multiplyScalar((horizontalSpeed - drag) / horizontalSpeed);
+    }
+    player.velocity.x = horizontal.x;
+    player.velocity.z = horizontal.z;
+  } else if (wishDir.lengthSq() > 0.0001) {
+    const currentSpeed = player.velocity.dot(wishDir);
+    const addSpeed = wishSpeed - currentSpeed;
+    if (addSpeed > 0) {
+      const accelSpeed = accel * wishSpeed * dt;
+      const applied = Math.min(accelSpeed, addSpeed);
+      player.velocity.addScaledVector(wishDir, applied);
+    }
+  }
+  if (!player.grounded && input.jumpCharging && input.jumpHoldStart !== 0 && player.velocity.y > 0) {
+    const held = clamp((now - input.jumpHoldStart) / 1000, 0, JUMP_CHARGE_MAX);
+    const taper = 1 - held / JUMP_CHARGE_MAX;
+    player.velocity.y += JUMP_HOLD_ACCEL * taper * dt;
+  }
+  if (player.attack) {
+    const def = player.attack.def;
+    const dashEnd = def.dashStart + def.dashDuration;
+    if (player.attack.elapsed >= def.dashStart && player.attack.elapsed <= dashEnd) {
+      const step = (def.dashDistance / def.dashDuration) * dt;
+      player.position.addScaledVector(player.attack.direction, step);
+      player.attack.dashDone += step;
+    }
+  }
+  player.velocity.y -= 14.4 * dt;
+  player.position.addScaledVector(player.velocity, dt);
+  resolvePlayerSolids(player.position, player.velocity);
+  const feetY = player.position.y - PLAYER_EYE_HEIGHT;
+  const support = player.velocity.y <= 0 ? resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y) : null;
+  if (support) {
+    if (!player.grounded && player.velocity.y < -1.2) playThud(0.7);
+    player.position.y = support.topY + PLAYER_EYE_HEIGHT;
+    player.velocity.y = 0;
+    player.grounded = true;
+    if (player.isRunning && input.jumpCharging && input.jumpHoldStart !== 0 && player.lastRunIntent && now - input.jumpHoldStart > 35) {
+      commitJump(0.15, 0, false);
+    }
+  } else {
+    player.grounded = false;
+  }
+  player.position.x = clamp(player.position.x, roomState.levelBounds?.minX ?? -14, roomState.levelBounds?.maxX ?? 14);
+  player.position.z = clamp(player.position.z, roomState.levelBounds?.minZ ?? -18, roomState.levelBounds?.maxZ ?? 18);
+  if (player.grounded && player.runCharge < RUN_BUILD_TIME && stickMagnitude < 0.18) player.runCharge = Math.max(0, player.runCharge - dt * 0.4);
+  if (roomState.transitionLock > 0) roomState.transitionLock = Math.max(0, roomState.transitionLock - dt);
+  if (player.grounded && roomState.transitionLock <= 0) {
+    const dx = player.position.x - roomState.exit.x;
+    const dz = player.position.z - roomState.exit.z;
+    const dy = player.position.y - roomState.exit.y;
+    if (Math.hypot(dx, dz) < roomState.exitRadius && Math.abs(dy) < 1.8) {
+      completeGeneratedGauntlet();
+    }
+  }
+  updateCurrentGauntletRoom();
+  if (player.position.y < KILL_Y) {
+    player.position.copy(roomState.spawn);
+    player.visualPosition.copy(player.position);
+    player.velocity.set(0, 0, 0);
+    input.smoothMoveX = 0;
+    input.smoothMoveY = 0;
+    player.grounded = true;
+    player.attack = null;
+    player.attackTimer = 0;
+    setStatus('returned to start');
+  }
+
+  const horizontalSpeed = Math.hypot(player.velocity.x, player.velocity.z);
+  const bobRate = player.grounded ? (player.isRunning ? 2.05 : 1.35) * Math.min(1.2, horizontalSpeed / 5.2) : 0.35;
+  player.bob += dt * bobRate;
+  const bobAmount = player.grounded ? Math.min(1, horizontalSpeed / 5.2) : 0.08;
+  const bobY = Math.sin(player.bob * Math.PI * 2) * 0.012 * bobAmount;
+  const bobX = Math.cos(player.bob * Math.PI * 2) * 0.008 * bobAmount;
+  const followBlend = 1 - Math.exp(-(player.grounded ? CAMERA_GROUND_SMOOTH : CAMERA_AIR_SMOOTH) * dt);
+  if (!Number.isFinite(player.visualPosition.x) || player.visualPosition.distanceTo(player.position) > 4.0 || (!player.grounded && player.velocity.y > 0.35)) {
+    player.visualPosition.copy(player.position);
+  } else {
+    player.visualPosition.lerp(player.position, followBlend);
+  }
+  camera.position.copy(player.visualPosition).add(new THREE.Vector3(bobX, bobY, 0));
+  skyDome.position.copy(camera.position);
+  camera.rotation.y = player.yaw + input.gyroYaw;
+  camera.rotation.x = player.pitch + input.gyroPitch;
+
+  if (player.grounded && horizontalSpeed > 0.65) {
+    player.stepClock += dt * horizontalSpeed;
+    if (player.stepClock > 1.42) {
+      player.stepClock = 0;
+      playStep(Math.min(1.4, horizontalSpeed / 4.2));
+    }
+  } else {
+    player.stepClock = Math.min(player.stepClock, 0.8);
+  }
+
+  updateAttack(dt);
+  enemy.userData.hitTimer = Math.max(0, enemy.userData.hitTimer - dt);
+  enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
+  enemy.position.y = Math.sin(performance.now() * 0.002) * 0.025;
+  enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
+}
+
+
+function updateAttack(dt) {
+  player.attackTimer = Math.max(0, player.attackTimer - dt);
+  player.comboTimer = Math.max(0, player.comboTimer - dt);
+  const attack = player.attack;
+  if (!attack) return;
+  attack.elapsed += dt;
+  const def = attack.def;
+  if (!attack.hitDone && attack.elapsed >= def.hitAt) {
+    attack.hitDone = true;
+    const toEnemy = enemy.position.clone().sub(player.position);
+    toEnemy.y = 0;
+    const dist = toEnemy.length();
+    const alignment = dist > 0.001 ? attack.direction.dot(toEnemy.normalize()) : 0;
+    if (enemy.visible && dist < def.range && alignment > 0.5) {
+      enemy.userData.health -= def.damage;
+      enemy.userData.hitTimer = 0.28;
+      enemy.position.addScaledVector(attack.direction, 0.28 + def.damage * 0.12);
+      playThud(1.05 + def.damage * 0.16);
+      if (enemy.userData.health <= 0) {
+        enemy.visible = false;
+        setStatus('broken knight down. survive another room.');
+      }
+    }
+  }
+  if (attack.elapsed >= def.duration) {
+    player.attack = null;
+    player.attackTimer = 0;
+  }
+}
+
+function updateArms(dt) {
+  if (armsMixer) armsMixer.update(dt);
+  const moving = Math.hypot(input.smoothMoveX, input.smoothMoveY) > 0.18;
+  if (!player.attack && player.grounded && moving && walkAction) walkAction.timeScale = player.isRunning ? 1.55 : 1;
+  if (!player.attack && player.grounded) playArmAction(moving ? walkAction : idleAction, 0.12);
+  else if (!player.attack && !player.grounded && jumpAction) playArmAction(jumpAction, 0.12);
+  if (armsModel && armsCameraBone) {
+    armsModel.updateMatrixWorld(true);
+    const pos = new THREE.Vector3();
+    armsCameraBone.getWorldPosition(pos);
+    armsCamera.position.copy(pos);
+    armsCamera.position.y += 0.015;
+    armsCamera.lookAt(pos.x, pos.y + 0.01, pos.z + 1.35);
+  } else {
+    const punch = Math.max(0, player.attackTimer / 0.42);
+    fallbackArms.children.forEach((child, index) => {
+      child.position.z += Math.sin(performance.now() * 0.008 + index) * 0.0007;
+    });
+    fallbackArms.rotation.z = Math.sin(player.bob * Math.PI * 2) * 0.018 + punch * -0.05;
+  }
+}
+
+function updatePad() {
+}
+
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  armsCamera.aspect = w / h;
+  armsCamera.updateProjectionMatrix();
+}
+
+function render() {
+  requestAnimationFrame(render);
+  try {
+    const dt = Math.min(0.045, clock.getDelta());
+    updatePlayer(dt);
+    updateArms(dt);
+    updateDiegeticLights(performance.now() / 1000);
+    updatePad();
+    renderer.clear();
+    renderer.render(scene, camera);
+    renderer.clearDepth();
+    renderer.render(armsScene, armsCamera);
+    const mode = player.attack?.def?.name || (input.jumpCharging ? 'jump-charge' : (player.isRunning ? 'run' : (!player.grounded ? 'air' : (player.runCharge > 0 ? 'build' : 'walk'))));
+    const node = roomState.spec;
+    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'} | ${input.gyro ? 'gyro' : 'touch'}`;
+  } catch (err) {
+    console.error(err);
+    setStatus('runtime error: ' + (err?.message || err));
+    hintEl.textContent = 'Runtime error: ' + (err?.message || err);
+    hintEl.style.opacity = '1';
+  }
+}
+
+function init() {
+  try {
+    buildLights();
+    buildEnemy();
+    buildRoom();
+    setupTouch();
+    resize();
+    window.addEventListener('resize', resize);
+    placeActionPad();
+    loadArms();
+    setStatus('Limbo room ready');
+    render();
+  } catch (err) {
+    console.error(err);
+    setStatus('boot error: ' + (err?.message || err));
+    hintEl.textContent = 'Boot error: ' + (err?.message || err);
+    hintEl.style.opacity = '1';
+  }
+}
+
+init();

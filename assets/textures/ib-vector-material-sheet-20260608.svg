@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="360" viewBox="0 0 1080 360">
+<rect width="1080" height="360" fill="#111"/>
+<image href="ib-vector-stone-20260608.svg" x="20" y="20" width="240" height="240"/>
+<image href="ib-vector-bronze-20260608.svg" x="290" y="20" width="240" height="240"/>
+<image href="ib-vector-bone-20260608.svg" x="560" y="20" width="240" height="240"/>
+<image href="ib-vector-limbo-sky-20260608.svg" x="830" y="20" width="220" height="110"/>
+<text x="20" y="306" fill="#e8e1d0" font-family="monospace" font-size="24">stone</text>
+<text x="290" y="306" fill="#e8e1d0" font-family="monospace" font-size="24">bronze</text>
+<text x="560" y="306" fill="#e8e1d0" font-family="monospace" font-size="24">bone</text>
+<text x="830" y="166" fill="#e8e1d0" font-family="monospace" font-size="24">limbo sky</text>
+</svg>

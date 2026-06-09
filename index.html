@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Infinite Brutality</title>
+  <link rel="stylesheet" href="./src/styles.css?v=0.2.5">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../pose-lab/vendor/three/build/three.module.js",
+      "three/addons/": "../pose-lab/vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+    <div id="topHud">
+      <strong>Infinite Brutality</strong>
+      <div id="topControls">
+        <button id="fsButton" class="top-button" type="button" title="Fullscreen">⛶</button>
+        <button id="gyroButton" class="top-button" type="button" title="Gyro">Gyro</button>
+        <div id="status">booting...</div>
+      </div>
+    </div>
+    <div id="hint">Touch left side for movement. Touch right side to look. Strike and Jump are on the right. Gyro is optional.</div>
+    <div id="readout"></div>
+    <div id="leftStick" class="stick"><div></div></div>
+    <div id="actionPad">
+      <button id="jumpButton" type="button">Jump</button>
+      <button id="attackButton" type="button">Strike</button>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js?v=0.8.18"></script>
+</body>
+</html>
