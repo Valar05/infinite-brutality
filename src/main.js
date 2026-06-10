@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.58';
+const BUILD = '0.8.59';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -1574,8 +1574,6 @@ const ENEMY_AI_SLEEP_DISTANCE = 44;
 const ENEMY_AI_WAKE_DISTANCE = 30;
 const ENEMY_AI_SLEEP_ROOM_DELTA = 2;
 const ENEMY_AI_WAKE_ROOM_DELTA = 1;
-const LOW_SOLID_MAX_HEIGHT = 0.48;
-const LOW_SOLID_STEP_HEIGHT = 0.42;
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -2362,10 +2360,6 @@ function addBatchRoleLandmarks(parent, spec, start, exit, center, width, depth, 
   if (role.includes('switch')) {
     addGroundedBeveledBox(parent, 'batch-switch-plinth', [2.2, 0.9, 1.6], [center.x, exitTop, center.z], MAT.trim, true, 0.04, 1);
     addMarker(parent, makeVec(center.x, exitTop + 1.05, center.z), MAT.exit, 0.75);
-  }
-  if ((role.includes('ambush') || role.includes('combat')) && !role.includes('corner')) {
-    addBeveledBox(parent, 'batch-combat-cover', [2.0, 2.4, 1.5], [center.x, 1.2, center.z], MAT.connectorWall, true, 0.04, 1);
-    addWalkableTopBox(parent, 'batch-combat-cover-top', [1.72, 1.22], center, 2.4, MAT.connectorFloor, 0.18, 0.04);
   }
   if (role.includes('hazard') || role.includes('deadfall') || role.includes('timing')) {
     addGoldHangingBlade(parent, center.z);
@@ -3690,8 +3684,10 @@ function resolvePlayerSolids(position, velocity) {
       if (position.z < solid.minZ - radius || position.z > solid.maxZ + radius) continue;
       const feetY = position.y - PLAYER_EYE_HEIGHT;
       const topDelta = solid.maxY - feetY;
-      const stepHeight = solid.stepHeight > 0 ? solid.stepHeight : (solid.sizeY <= LOW_SOLID_MAX_HEIGHT ? LOW_SOLID_STEP_HEIGHT : 0);
-      if (stepHeight > 0 && topDelta >= -0.04 && topDelta <= stepHeight) {
+      const canStepUp = topDelta >= -0.04 && topDelta <= SUPPORT_SNAP_UP
+        && solid.maxX - solid.minX >= PLAYER_SOLID_RADIUS * 2
+        && solid.maxZ - solid.minZ >= PLAYER_SOLID_RADIUS * 2;
+      if (canStepUp) {
         position.y = Math.max(position.y, solid.maxY + PLAYER_EYE_HEIGHT);
         velocity.y = Math.max(0, velocity.y);
         continue;
