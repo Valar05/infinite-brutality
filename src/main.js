@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.59';
+const BUILD = '0.8.60';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -1620,15 +1620,17 @@ function addConnectorSegment(parent, name, start, end, floorY) {
   const length = Math.max(2.0, Math.abs(horizontal ? dx : dz) + 1.6);
   const cx = (start.x + end.x) * 0.5;
   const cz = (start.z + end.z) * 0.5;
+  const topY = floorY - CONNECTOR_FLOOR_DROP;
   if (horizontal) {
     addWalkableBox(parent, name + '-floor', [length, 0.34, 7.6], [cx, floorY - 0.17 - CONNECTOR_FLOOR_DROP, start.z], MAT.connectorFloor, true, 0.03);
-    addWallBox(parent, name + '-wall-a', [length, 1.56, 0.56], [cx, floorY + 0.78 - CONNECTOR_FLOOR_DROP, start.z - 4.05], MAT.connectorWall, true);
-    addWallBox(parent, name + '-wall-b', [length, 1.56, 0.56], [cx, floorY + 0.78 - CONNECTOR_FLOOR_DROP, start.z + 4.05], MAT.connectorWall, true);
+    addBeveledBox(parent, name + '-curb-a', [length, 0.18, 0.28], [cx, topY + 0.09, start.z - 3.94], MAT.trim, false, 0.02, 1);
+    addBeveledBox(parent, name + '-curb-b', [length, 0.18, 0.28], [cx, topY + 0.09, start.z + 3.94], MAT.trim, false, 0.02, 1);
   } else {
     addWalkableBox(parent, name + '-floor', [7.6, 0.34, length], [start.x, floorY - 0.17 - CONNECTOR_FLOOR_DROP, cz], MAT.connectorFloor, true, 0.03);
-    addWallBox(parent, name + '-wall-a', [0.56, 1.56, length], [start.x - 4.05, floorY + 0.78 - CONNECTOR_FLOOR_DROP, cz], MAT.connectorWall, true);
-    addWallBox(parent, name + '-wall-b', [0.56, 1.56, length], [start.x + 4.05, floorY + 0.78 - CONNECTOR_FLOOR_DROP, cz], MAT.connectorWall, true);
+    addBeveledBox(parent, name + '-curb-a', [0.28, 0.18, length], [start.x - 3.94, topY + 0.09, cz], MAT.trim, false, 0.02, 1);
+    addBeveledBox(parent, name + '-curb-b', [0.28, 0.18, length], [start.x + 3.94, topY + 0.09, cz], MAT.trim, false, 0.02, 1);
   }
+  addBrokenRouteRails(parent, name + '-rails', start, end, topY, 7.2);
   addConnectorRibs(parent, name, start, end, floorY, horizontal, length);
 }
 
@@ -3150,6 +3152,24 @@ function canEnemyTraverseBetween(room, fromAnchor, toAnchor) {
   return cursor.distanceToSquared(to) < 0.04 || canEnemyTraverseSegment(cursor, to);
 }
 
+function addHangingMarketStall(parent, prefix, x, y, z, width, depth, yaw = 0) {
+  const postHeight = 1.9;
+  const roofY = y + postHeight + 0.16;
+  const stall = new THREE.Group();
+  stall.position.set(x, 0, z);
+  stall.rotation.y = yaw;
+  addGroundedBeveledBox(stall, prefix + '-counter', [width * 0.82, 0.42, depth * 0.78], [0, y, 0], MAT.bridge, true, 0.03, 1);
+  addGroundedBeveledBox(stall, prefix + '-crate-a', [0.52, 0.34, 0.48], [-width * 0.22, y + 0.42, -depth * 0.12], MAT.trim, false, 0.02, 1);
+  addGroundedBeveledBox(stall, prefix + '-crate-b', [0.48, 0.28, 0.42], [width * 0.18, y + 0.42, depth * 0.08], MAT.iron, false, 0.02, 1);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    addBeveledBox(stall, prefix + '-post-' + sx + '-' + sz, [0.16, postHeight, 0.16], [sx * (width * 0.42), y + postHeight * 0.5, sz * (depth * 0.42)], MAT.iron, false, 0.02, 1);
+  }
+  addBeveledBox(stall, prefix + '-roof', [width, 0.14, depth], [0, roofY, 0], MAT.trim, false, 0.02, 1);
+  addBeveledBox(stall, prefix + '-awning', [width * 0.78, 0.08, depth * 0.34], [0, roofY - 0.12, depth * 0.34], MAT.bronze, false, 0.01, 1).rotation.x = -0.18;
+  parent.add(stall);
+  return stall;
+}
+
 function addHangingMarketDistrictSkeleton(district) {
   const masses = district.massAnchors || [];
   for (const mass of masses) {
@@ -3168,7 +3188,21 @@ function addHangingMarketDistrictSkeleton(district) {
     const x = district.origin.x - 20 + (i % 3) * 18;
     addGroundedCylinder(roomGroup, 'district-' + district.id + '-support-' + i, 1.2 + (i % 2) * 0.2, Math.max(8, highBand - district.baseElevation + 10), [x, district.baseElevation - 10, z], MAT.iron, 6);
     addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-brace-' + i, [1.2, 10 + (i % 3) * 2, 1.2], [x + 5, district.baseElevation - 8, z + 5], MAT.trim, false, 0.03, 1).rotation.z = 0.42;
+    if (i < 7) addHangingChain(roomGroup, 'district-' + district.id + '-chain-' + i, x, z, highBand + 2.6, 6, MAT.iron, rngFromSeed(hashRoomKey(district.id + '-chain-' + i)), { length: 2.8 + (i % 3) * 0.45, sway: 0.02, dropStone: false });
   }
+
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-entry-a', district.origin.x - 34, lowBand + 0.1, district.origin.z + 62, 4.2, 2.6, 0.18);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-entry-b', district.origin.x - 12, lowBand + 0.1, district.origin.z + 94, 4.8, 2.8, -0.12);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-core-a', district.origin.x + 12, midBand + 0.1, district.origin.z + 148, 5.2, 3.0, 0.1);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-core-b', district.origin.x + 36, midBand + 0.1, district.origin.z + 176, 4.4, 2.8, -0.08);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-bridge-a', district.origin.x + 58, highBand + 0.1, district.origin.z + 230, 4.6, 2.6, 0.22);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-bridge-b', district.origin.x + 78, highBand + 0.1, district.origin.z + 264, 4.0, 2.4, -0.2);
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-crate-stack-a', [1.8, 1.1, 1.4], [district.origin.x - 18, lowBand + 0.05, district.origin.z + 118], MAT.iron, false, 0.03, 1);
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-crate-stack-b', [1.6, 0.9, 1.2], [district.origin.x + 18, midBand + 0.05, district.origin.z + 198], MAT.trim, false, 0.03, 1);
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-crate-stack-c', [1.4, 0.8, 1.0], [district.origin.x + 68, highBand + 0.05, district.origin.z + 252], MAT.iron, false, 0.03, 1);
+  addBrazier(roomGroup, 'district-' + district.id + '-market-brazier-a', [district.origin.x - 8, lowBand + 0.18, district.origin.z + 88], { kind: 'flame' });
+  addBrazier(roomGroup, 'district-' + district.id + '-market-brazier-b', [district.origin.x + 28, midBand + 0.18, district.origin.z + 168], { kind: 'corpsefire' });
+  addBrazier(roomGroup, 'district-' + district.id + '-market-brazier-c', [district.origin.x + 74, highBand + 0.18, district.origin.z + 258], { kind: 'flame' });
 
   addBatchRouteSegment(roomGroup, 'district-' + district.id + '-roof-cross', makeVec(district.origin.x + 24, highBand, district.origin.z + 174), makeVec(district.origin.x + 86, highBand + 0.8, district.origin.z + 272), highBand + 0.18, 4.2, MAT.bridge, 1.0);
   addBatchRouteSegment(roomGroup, 'district-' + district.id + '-underdeck-cross', makeVec(district.origin.x - 20, lowBand, district.origin.z + 146), makeVec(district.origin.x + 38, lowBand - 0.4, district.origin.z + 242), lowBand + 0.18, 3.4, MAT.connectorFloor, 1.0);
