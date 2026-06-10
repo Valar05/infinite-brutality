@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.35';
+const BUILD = '0.8.47';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -141,7 +141,18 @@ const roomState = {
   districtPlan: null,
   gauntletRooms: [],
   navGraph: null,
+  connectivityRepair: null,
 };
+
+const SHOW_NAV_LINKS = bootParams.get('links') === '1';
+const navDebug = {
+  graphGroup: new THREE.Group(),
+  routeGroup: new THREE.Group(),
+};
+navDebug.graphGroup.name = 'nav-graph-debug';
+navDebug.routeGroup.name = 'nav-route-debug';
+scene.add(navDebug.graphGroup);
+scene.add(navDebug.routeGroup);
 
 const input = {
   moveX: 0,
@@ -1512,15 +1523,22 @@ const ENEMY_RETREAT_SPEED = 2.25;
 const ENEMY_LUNGE_SPEED = 2.9;
 const ENEMY_FLOOR_RADIUS = 0.36;
 const ENEMY_SOLID_RADIUS = 0.44;
+const ENEMY_CAPSULE_RADIUS = 0.44;
+const ENEMY_CAPSULE_FOOT_OFFSET = 0.3;
+const ENEMY_CAPSULE_SUPPORT_TOLERANCE = 0.26;
 // Match the player's snap range so the enemy can clear the same tiny seams and ledges.
 const ENEMY_STEP_UP = SUPPORT_SNAP_UP;
 const ENEMY_STEP_DOWN = SUPPORT_SNAP_DOWN;
 const ENEMY_FLOOR_SAMPLE_STEP = 0.68;
 const ENEMY_NAV_REPATH_INTERVAL = 0.18;
 const ENEMY_NAV_STALL_LIMIT = 12;
+const BUILD_REPAIR_TOTAL_BUDGET = 12;
+const BUILD_REPAIR_PER_ROOM_BUDGET = 3;
 const ENEMY_JUMP_MIN_DISTANCE = 0.42;
 const ENEMY_JUMP_MAX_DISTANCE = 8.8;
 const ENEMY_JUMP_MAX_HEIGHT = 2.2;
+const ENEMY_JUMP_PREP_DURATION = 0.16;
+const ENEMY_JUMP_LAND_FRACTION = 0.78;
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -2198,7 +2216,10 @@ function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, cente
   }
   if (options.wantsCombat || role.includes('ambush')) {
     attachWall('combat-cover-wall', sideWall, 0.30, 3.2);
-    addBeveledBox(parent, prefix + '-combat-attached-pier', routeAlongX ? [1.15, 3.0, 2.0] : [2.0, 3.0, 1.15], routeAlongX ? [center.x, 1.5, sideSign * depth * 0.22] : [sideSign * width * 0.22, 1.5, center.z], MAT.connectorWall, true, 0.04, 1);
+    const pierSize = routeAlongX ? [1.15, 3.0, 2.0] : [2.0, 3.0, 1.15];
+    const pierCenter = routeAlongX ? makeVec(center.x, 0, sideSign * depth * 0.22) : makeVec(sideSign * width * 0.22, 0, center.z);
+    addBeveledBox(parent, prefix + '-combat-attached-pier', pierSize, [pierCenter.x, 1.5, pierCenter.z], MAT.connectorWall, true, 0.04, 1);
+    addWalkableTopBox(parent, prefix + '-combat-attached-pier-top', [Math.max(0.74, pierSize[0] - 0.22), Math.max(0.74, pierSize[2] - 0.22)], pierCenter, 3.0, MAT.connectorFloor, 0.18, 0.04);
     return;
   }
   attachWall('route-framing-wall', sideWall, 0.26, 3.4);
@@ -2303,6 +2324,7 @@ function addBatchRoleLandmarks(parent, spec, start, exit, center, width, depth, 
   }
   if ((role.includes('ambush') || role.includes('combat')) && !role.includes('corner')) {
     addBeveledBox(parent, 'batch-combat-cover', [2.0, 2.4, 1.5], [center.x, 1.2, center.z], MAT.connectorWall, true, 0.04, 1);
+    addWalkableTopBox(parent, 'batch-combat-cover-top', [1.72, 1.22], center, 2.4, MAT.connectorFloor, 0.18, 0.04);
   }
   if (role.includes('hazard') || role.includes('deadfall') || role.includes('timing')) {
     addGoldHangingBlade(parent, center.z);
@@ -2472,6 +2494,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
 
   if (wantsCombat && !wantsCorner) {
     addBeveledBox(roomGroup, 'batch-combat-route-mass', [1.8, 2.1, 1.3], [center.x, 1.05, center.z], MAT.connectorWall, true, 0.04, 1);
+    addWalkableTopBox(roomGroup, 'batch-combat-route-mass-top', [1.5, 1.02], center, 2.1, MAT.connectorFloor, 0.18, 0.04);
   } else {
     addBeveledBox(roomGroup, 'batch-route-buttress-left', [0.8, 2.4, 1.0], [-width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
     addBeveledBox(roomGroup, 'batch-route-buttress-right', [0.8, 2.4, 1.0], [width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
@@ -2960,6 +2983,121 @@ function addWorldConnector(index, from, to, options = {}) {
   }
 }
 
+function snapAnchorToSupport(point) {
+  if (!point) return null;
+  const floorY = point.y - PLAYER_EYE_HEIGHT;
+  const support = findEnemySupport(point.x, point.z, floorY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  return support ? makeVec(point.x, support.topY + PLAYER_EYE_HEIGHT, point.z) : point.clone();
+}
+
+function snapEnemyPointToSupport(point) {
+  if (!point) return null;
+  const support = findEnemySupport(point.x, point.z, point.y, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  return support ? makeVec(point.x, support.topY, point.z) : point.clone();
+}
+
+function anchorFloorPoint(point) {
+  return makeVec(point.x, point.y - PLAYER_EYE_HEIGHT, point.z);
+}
+
+function canEnemyTraverseSegment(from, to) {
+  return !!sampleEnemyMoveSupport(from, to) || (!!enemy && enemyCanJumpBetween(from, to));
+}
+
+function canEnemyTraverseBetween(room, fromAnchor, toAnchor) {
+  if (!fromAnchor || !toAnchor) return false;
+  const from = anchorFloorPoint(fromAnchor);
+  const to = anchorFloorPoint(toAnchor);
+  if (canEnemyTraverseSegment(from, to)) return true;
+  if (!room) return false;
+  const route = buildEnemyLocalRoute(room, from, to);
+  if (!route?.length) return false;
+  let cursor = from;
+  for (const point of route) {
+    if (!canEnemyTraverseSegment(cursor, point)) return false;
+    cursor = point;
+  }
+  return cursor.distanceToSquared(to) < 0.04 || canEnemyTraverseSegment(cursor, to);
+}
+
+function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
+  const repairs = [];
+  const roomRepairCounts = new Map();
+  const repairKeys = new Set();
+  const pairKey = (from, to) => {
+    const a = [Math.round(from.x * 10), Math.round(from.y * 10), Math.round(from.z * 10)].join(',');
+    const b = [Math.round(to.x * 10), Math.round(to.y * 10), Math.round(to.z * 10)].join(',');
+    return a < b ? a + '|' + b : b + '|' + a;
+  };
+  const canRepairRoom = (roomIndex) => roomIndex == null || (roomRepairCounts.get(roomIndex) || 0) < BUILD_REPAIR_PER_ROOM_BUDGET;
+  const noteRepair = (roomIndex) => {
+    if (roomIndex == null) return;
+    roomRepairCounts.set(roomIndex, (roomRepairCounts.get(roomIndex) || 0) + 1);
+  };
+  const tryRepair = (name, from, to, room, roomIndexes = [], options = {}) => {
+    if (!from || !to || repairs.length >= BUILD_REPAIR_TOTAL_BUDGET) return false;
+    const key = pairKey(from, to);
+    if (repairKeys.has(key)) return false;
+    for (const roomIndex of roomIndexes) {
+      if (!canRepairRoom(roomIndex)) return false;
+    }
+    addWorldConnector('repair-' + name, from, to, options);
+    repairKeys.add(key);
+    repairs.push({ name, from: from.clone(), to: to.clone(), roomIndexes: [...roomIndexes] });
+    for (const roomIndex of roomIndexes) noteRepair(roomIndex);
+    return canEnemyTraverseBetween(room, from, to);
+  };
+
+  for (let i = 0; i < rooms.length; i += 1) {
+    const room = rooms[i];
+    const pairs = [{ name: 'room-' + i + '-main', from: room.spawn, to: room.exit }];
+    for (const [socketKey, socketPoint] of Object.entries(room.sockets || {})) {
+      pairs.push({ name: 'room-' + i + '-socket-' + socketKey.toLowerCase(), from: room.spawn, to: socketPoint });
+    }
+    for (const pair of pairs) {
+      if (canEnemyTraverseBetween(room, pair.from, pair.to)) continue;
+      tryRepair(pair.name, pair.from, pair.to, room, [i]);
+    }
+  }
+
+  for (let i = 0; i < rooms.length - 1; i += 1) {
+    const from = rooms[i]?.exit;
+    const to = rooms[i + 1]?.spawn;
+    if (!from || !to || canEnemyTraverseBetween(null, from, to)) continue;
+    tryRepair('spine-' + i, from, to, null, [i, i + 1]);
+  }
+
+  for (let i = 0; i < branchLinks.length; i += 1) {
+    const link = branchLinks[i];
+    const from = rooms[link.a]?.sockets?.[link.sideA];
+    const to = rooms[link.b]?.sockets?.[link.sideB];
+    if (!from || !to || canEnemyTraverseBetween(null, from, to)) continue;
+    tryRepair('branch-' + i, from, to, null, [link.a, link.b], { branch: true });
+  }
+
+  const unresolved = [];
+  for (let i = 0; i < rooms.length; i += 1) {
+    const room = rooms[i];
+    if (!canEnemyTraverseBetween(room, room.spawn, room.exit)) unresolved.push('room-' + i + '-main');
+    for (const [socketKey, socketPoint] of Object.entries(room.sockets || {})) {
+      if (!canEnemyTraverseBetween(room, room.spawn, socketPoint)) unresolved.push('room-' + i + '-socket-' + socketKey.toLowerCase());
+    }
+  }
+  for (let i = 0; i < rooms.length - 1; i += 1) {
+    const from = rooms[i]?.exit;
+    const to = rooms[i + 1]?.spawn;
+    if (from && to && !canEnemyTraverseBetween(null, from, to)) unresolved.push('spine-' + i);
+  }
+  for (let i = 0; i < branchLinks.length; i += 1) {
+    const link = branchLinks[i];
+    const from = rooms[link.a]?.sockets?.[link.sideA];
+    const to = rooms[link.b]?.sockets?.[link.sideB];
+    if (from && to && !canEnemyTraverseBetween(null, from, to)) unresolved.push('branch-' + i);
+  }
+
+  return { repairs, unresolved };
+}
+
 function buildGeneratedGauntlet(startIndex = 0) {
   const districtPlan = ensureDistrictPlan();
   const rooms = [];
@@ -2981,14 +3119,18 @@ function buildGeneratedGauntlet(startIndex = 0) {
       branchConnectors: [...branchSides[i]],
     };
     const built = withBatchBuildOffset(offset, () => buildGeneratedBatchRoom(GENERATED_ROOM_BATCH[i], i, path));
+    const spawn = snapAnchorToSupport(built.spawn.clone().add(offset));
+    const exit = snapAnchorToSupport(built.exit.clone().add(offset));
+    const enemyPositions = built.enemyPositions.map((pos) => snapEnemyPointToSupport(pos.clone().add(offset)));
+    const sockets = Object.fromEntries(Object.entries(built.sockets).map(([key, pos]) => [key, snapAnchorToSupport(pos.clone().add(offset))]));
     rooms.push({
       spec: GENERATED_ROOM_BATCH[i],
       district: districtInfo.district,
       districtIndex: districtInfo.districtIndex,
-      spawn: built.spawn.clone().add(offset),
-      exit: built.exit.clone().add(offset),
-      enemyPositions: built.enemyPositions.map((pos) => pos.clone().add(offset)),
-      sockets: Object.fromEntries(Object.entries(built.sockets).map(([key, pos]) => [key, pos.clone().add(offset)])),
+      spawn,
+      exit,
+      enemyPositions,
+      sockets,
       bounds: {
         minX: built.bounds.minX + offset.x,
         maxX: built.bounds.maxX + offset.x,
@@ -3019,6 +3161,7 @@ function buildGeneratedGauntlet(startIndex = 0) {
     const to = rooms[link.b]?.sockets?.[link.sideB];
     addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
   }
+  const connectivity = validateAndRepairGauntletConnectivity(rooms, branchLinks);
   const first = rooms[Math.max(0, Math.min(startIndex, rooms.length - 1))] || rooms[0];
   const last = rooms[rooms.length - 1] || first;
   const minX = Math.min(...rooms.map((room) => room.bounds.minX), -14);
@@ -3033,6 +3176,7 @@ function buildGeneratedGauntlet(startIndex = 0) {
     exitRadius: 2.35,
     enemyPositions: first.enemyPositions,
     bounds: { minX, maxX, minZ, maxZ },
+    connectivity,
   };
 }
 
@@ -3140,6 +3284,11 @@ function buildRoom(movePlayer = true) {
   };
   roomState.gauntletRooms = built.rooms;
   roomState.navGraph = buildRoomTraversalGraph(built.rooms, GENERATED_ROOM_BATCH, buildDistrictBranchLinks(districtPlan));
+  roomState.connectivityRepair = built.connectivity;
+  refreshNavGraphDebug(roomState.navGraph);
+  if (built.connectivity?.repairs?.length || built.connectivity?.unresolved?.length) {
+    console.warn('gauntlet connectivity repair', built.connectivity);
+  }
   roomState.nodeIndex = startIndex;
   roomState.spec = {
     index: startIndex,
@@ -3178,7 +3327,9 @@ function buildRoom(movePlayer = true) {
     player.attack = null;
     player.attackTimer = 0;
   }
-  setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + districtPlan.districts.length + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (startIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + districtInfo.district.purpose);
+  const repairNote = built.connectivity?.repairs?.length ? ' | repairs ' + built.connectivity.repairs.length : '';
+  const unresolvedNote = built.connectivity?.unresolved?.length ? ' | unresolved ' + built.connectivity.unresolved.length : '';
+  setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + districtPlan.districts.length + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (startIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + districtInfo.district.purpose + repairNote + unresolvedNote);
 }
 
 
@@ -3387,6 +3538,63 @@ function findEnemySupport(x, z, referenceY, stepUp = ENEMY_STEP_UP, stepDown = E
   return best;
 }
 
+function enemyCapsuleOffsets(direction = null) {
+  const radius = ENEMY_CAPSULE_RADIUS * 0.72;
+  if (!direction || direction.lengthSq() <= 0.0001) {
+    return [
+      [0, 0],
+      [radius, 0],
+      [-radius, 0],
+      [0, radius],
+      [0, -radius],
+    ];
+  }
+  const dir = direction.clone().normalize();
+  const perp = new THREE.Vector3(-dir.z, 0, dir.x);
+  return [
+    [0, 0],
+    [dir.x * ENEMY_CAPSULE_FOOT_OFFSET, dir.z * ENEMY_CAPSULE_FOOT_OFFSET],
+    [-dir.x * ENEMY_CAPSULE_FOOT_OFFSET * 0.4, -dir.z * ENEMY_CAPSULE_FOOT_OFFSET * 0.4],
+    [perp.x * radius, perp.z * radius],
+    [-perp.x * radius, -perp.z * radius],
+  ];
+}
+
+function findEnemyCapsuleSupport(x, z, referenceY, direction = null, stepUp = ENEMY_STEP_UP, stepDown = ENEMY_STEP_DOWN) {
+  const offsets = enemyCapsuleOffsets(direction);
+  const supports = [];
+  let minTopY = Infinity;
+  let maxTopY = -Infinity;
+  for (const [ox, oz] of offsets) {
+    const support = findEnemySupport(x + ox, z + oz, referenceY, stepUp, stepDown);
+    if (!support) return null;
+    if (enemyBodyBlockedAt(x + ox, z + oz, support.topY)) return null;
+    supports.push(support);
+    minTopY = Math.min(minTopY, support.topY);
+    maxTopY = Math.max(maxTopY, support.topY);
+  }
+  if (maxTopY - minTopY > ENEMY_CAPSULE_SUPPORT_TOLERANCE) return null;
+  return supports.reduce((best, support) => (!best || support.topY > best.topY ? support : best), null);
+}
+
+function resolveEnemyLandingSupport(target, referenceY, fromPoint = null) {
+  if (!target) return null;
+  const refY = Number.isFinite(referenceY) ? referenceY : (enemy?.userData?.baseY ?? target.y);
+  const direction = fromPoint ? target.clone().sub(fromPoint) : null;
+  if (direction) {
+    direction.y = 0;
+    if (direction.lengthSq() > 0.001) direction.normalize();
+  }
+  const offsets = direction && direction.lengthSq() > 0.001 ? [0, -0.14, -0.28, -0.42] : [0];
+  for (const offset of offsets) {
+    const probe = direction ? target.clone().addScaledVector(direction, offset) : target.clone();
+    const support = findEnemyCapsuleSupport(probe.x, probe.z, refY, direction, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    if (!support) continue;
+    return { point: makeVec(probe.x, support.topY, probe.z), support };
+  }
+  return null;
+}
+
 function enemyBodyBlockedAt(x, z, floorY) {
   const minY = floorY + 0.08;
   const maxY = floorY + ORC_BERSERKER_TARGET_HEIGHT * 0.86;
@@ -3404,15 +3612,16 @@ function sampleEnemyMoveSupport(from, to) {
   const dz = to.z - from.z;
   const distance = Math.hypot(dx, dz);
   const steps = Math.max(1, Math.ceil(distance / ENEMY_FLOOR_SAMPLE_STEP));
+  const moveDir = distance > 0.0001 ? makeVec(dx / distance, 0, dz / distance) : null;
   let referenceY = Number.isFinite(enemy?.userData?.baseY) ? enemy.userData.baseY : from.y;
-  let support = findEnemySupport(from.x, from.z, referenceY, ENEMY_STEP_UP, ENEMY_STEP_DOWN) || { topY: referenceY };
+  let support = findEnemyCapsuleSupport(from.x, from.z, referenceY, moveDir, ENEMY_STEP_UP, ENEMY_STEP_DOWN) || { topY: referenceY };
   referenceY = support.topY;
   for (let i = 1; i <= steps; i += 1) {
     const t = i / steps;
     const x = from.x + dx * t;
     const z = from.z + dz * t;
-    support = findEnemySupport(x, z, referenceY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
-    if (!support || enemyBodyBlockedAt(x, z, support.topY)) return null;
+    support = findEnemyCapsuleSupport(x, z, referenceY, moveDir, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    if (!support) return null;
     referenceY = support.topY;
   }
   return support;
@@ -3424,8 +3633,8 @@ function applyEnemyMove(direction, speed, dt) {
   const next = enemy.position.clone().add(step);
   const bounds = roomState.levelBounds;
   if (bounds) {
-    next.x = clamp(next.x, bounds.minX + 0.65, bounds.maxX - 0.65);
-    next.z = clamp(next.z, bounds.minZ + 0.65, bounds.maxZ - 0.65);
+    next.x = clamp(next.x, bounds.minX + ENEMY_CAPSULE_RADIUS, bounds.maxX - ENEMY_CAPSULE_RADIUS);
+    next.z = clamp(next.z, bounds.minZ + ENEMY_CAPSULE_RADIUS, bounds.maxZ - ENEMY_CAPSULE_RADIUS);
   }
   const support = sampleEnemyMoveSupport(enemy.position, next);
   if (!support) {
@@ -3478,6 +3687,111 @@ function roomWorldCenter(room) {
   if (bounds) return makeVec((bounds.minX + bounds.maxX) * 0.5, 0, (bounds.minZ + bounds.maxZ) * 0.5);
   const fallback = room?.spawn || room?.exit || makeVec(0, 0, 0);
   return makeVec(fallback.x, 0, fallback.z);
+}
+
+function clearDebugGroup(group) {
+  if (!group) return;
+  while (group.children.length) {
+    const child = group.children[0];
+    group.remove(child);
+    child.traverse?.((node) => {
+      node.geometry?.dispose?.();
+      if (Array.isArray(node.material)) {
+        for (const mat of node.material) mat?.dispose?.();
+      } else {
+        node.material?.dispose?.();
+      }
+    });
+  }
+}
+
+function navKindColor(kind) {
+  switch (kind) {
+    case 'jump': return 0xff6b8c;
+    case 'bridge': return 0x58d1c9;
+    case 'stair': return 0xf3c56b;
+    case 'drop': return 0xff9b70;
+    case 'branch': return 0xba8cff;
+    default: return 0x7fb6ff;
+  }
+}
+
+function raisedNavPoint(point, lift = 0.2) {
+  return makeVec(point.x, point.y + lift, point.z);
+}
+
+function addDebugLine(group, points, color, opacity = 0.85) {
+  if (!group || !points || points.length < 2) return null;
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({
+    color,
+    transparent: opacity < 1,
+    opacity,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const line = new THREE.Line(geometry, material);
+  line.renderOrder = 40;
+  group.add(line);
+  return line;
+}
+
+function addDebugPost(group, point, color, height = 0.9, opacity = 0.65) {
+  if (!group || !point) return;
+  addDebugLine(group, [point, makeVec(point.x, point.y + height, point.z)], color, opacity);
+}
+
+function resolveTraversalAnchor(room, key, fallback = null) {
+  if (!room) return null;
+  if (key === 'spawn' || key === 'exit') return roomFloorPoint(room, key);
+  const socketPoint = roomSocketPoint(room, key);
+  if (socketPoint) return socketPoint;
+  if (fallback && fallback !== key) return resolveTraversalAnchor(room, fallback, null);
+  return roomFloorPoint(room, 'spawn') || roomFloorPoint(room, 'exit') || roomWorldCenter(room);
+}
+
+function refreshNavGraphDebug(graph) {
+  clearDebugGroup(navDebug.graphGroup);
+  if (!SHOW_NAV_LINKS || !graph?.adjacency?.length) return;
+  const seen = new Set();
+  for (const node of graph.nodes || []) {
+    const center = roomWorldCenter(node.room);
+    addDebugPost(navDebug.graphGroup, raisedNavPoint(center, 0.08), navKindColor(node.kind), 1.3, 0.4);
+  }
+  for (const edges of graph.adjacency) {
+    for (const edge of edges) {
+      const pairKey = edge.from < edge.to ? `${edge.from}:${edge.to}:${edge.kind}` : `${edge.to}:${edge.from}:${edge.kind}`;
+      if (seen.has(pairKey)) continue;
+      seen.add(pairKey);
+      const fromRoom = graph.nodes[edge.from]?.room;
+      const toRoom = graph.nodes[edge.to]?.room;
+      const from = resolveTraversalAnchor(fromRoom, edge.fromKey, edge.linear ? 'exit' : 'spawn');
+      const to = resolveTraversalAnchor(toRoom, edge.toKey, edge.linear ? 'spawn' : 'exit');
+      if (!from || !to) continue;
+      addDebugLine(navDebug.graphGroup, [raisedNavPoint(from), raisedNavPoint(to)], navKindColor(edge.kind), edge.branch ? 0.95 : 0.75);
+      addDebugPost(navDebug.graphGroup, raisedNavPoint(from, 0.04), navKindColor(edge.kind), 0.38, 0.45);
+      addDebugPost(navDebug.graphGroup, raisedNavPoint(to, 0.04), navKindColor(edge.kind), 0.38, 0.45);
+    }
+  }
+  for (const repair of roomState.connectivityRepair?.repairs || []) {
+    const from = raisedNavPoint(repair.from, 0.32);
+    const to = raisedNavPoint(repair.to, 0.32);
+    addDebugLine(navDebug.graphGroup, [from, to], 0xfff2a8, 0.95);
+  }
+}
+
+function refreshEnemyRouteDebug(nav) {
+  clearDebugGroup(navDebug.routeGroup);
+  if (!SHOW_NAV_LINKS || !enemy || !nav?.waypoints?.length) return;
+  const points = [raisedNavPoint(makeVec(enemy.position.x, enemy.userData.baseY ?? enemy.position.y, enemy.position.z), 0.55)];
+  for (const waypoint of nav.waypoints) points.push(raisedNavPoint(waypoint, 0.55));
+  addDebugLine(navDebug.routeGroup, points, 0xffffff, 0.95);
+  for (let i = 0; i < nav.waypoints.length; i += 1) {
+    const waypoint = nav.waypoints[i];
+    const kind = nav.waypointKinds[i] || 'flat';
+    addDebugPost(navDebug.routeGroup, raisedNavPoint(waypoint, 0.18), navKindColor(kind), i === 0 ? 1.2 : 0.7, i === 0 ? 0.95 : 0.55);
+  }
+  if (nav.jump?.target) addDebugPost(navDebug.routeGroup, raisedNavPoint(nav.jump.target, 0.12), navKindColor('jump'), 1.5, 0.95);
 }
 
 function roomTraversalKindForSpec(spec) {
@@ -3633,6 +3947,7 @@ function clearEnemyRoute(nav) {
   nav.waypoints.length = 0;
   nav.waypointKinds.length = 0;
   nav.routePath.length = 0;
+  refreshEnemyRouteDebug(nav);
 }
 
 function pushEnemyRouteWaypoint(nav, point, kind = 'flat') {
@@ -3641,12 +3956,22 @@ function pushEnemyRouteWaypoint(nav, point, kind = 'flat') {
   if (last && last.distanceToSquared(point) < 0.16) return;
   nav.waypoints.push(point.clone ? point.clone() : makeVec(point.x, point.y, point.z));
   nav.waypointKinds.push(kind || 'flat');
+  refreshEnemyRouteDebug(nav);
+}
+
+function classifyTraversalSegment(from, to, preferredKind = 'flat') {
+  if (!from || !to) return preferredKind || 'flat';
+  if (!sampleEnemyMoveSupport(from, to) && enemyCanJumpBetween(from, to)) return 'jump';
+  if (preferredKind === 'jump') return 'flat';
+  return preferredKind || 'flat';
 }
 
 function shiftEnemyRouteWaypoint(nav) {
   if (!nav?.waypoints?.length) return null;
   if (nav.waypointKinds.length) nav.waypointKinds.shift();
-  return nav.waypoints.shift();
+  const shifted = nav.waypoints.shift();
+  refreshEnemyRouteDebug(nav);
+  return shifted;
 }
 
 function pushEnemyWaypoint(list, point) {
@@ -3679,11 +4004,8 @@ function tryEnemyJumpTargets(targets) {
   const currentTopY = currentSupport?.topY ?? (enemy.userData.baseY ?? enemy.position.y);
   for (const target of targets) {
     if (!target) continue;
-    const landing = findEnemySupport(target.x, target.z, currentTopY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
-    if (!landing) continue;
     const advance = target.distanceTo(enemy.position);
     if (advance < ENEMY_JUMP_MIN_DISTANCE || advance > ENEMY_JUMP_MAX_DISTANCE) continue;
-    if (Math.abs(landing.topY - currentTopY) > ENEMY_JUMP_MAX_HEIGHT) continue;
     const towardPlayer = player.position.clone().sub(enemy.position);
     towardPlayer.y = 0;
     const moveToTarget = target.clone().sub(enemy.position);
@@ -3691,14 +4013,81 @@ function tryEnemyJumpTargets(targets) {
     if (towardPlayer.lengthSq() > 0.001 && moveToTarget.lengthSq() > 0.001) {
       if (moveToTarget.dot(towardPlayer) < 0.35 * moveToTarget.length() * towardPlayer.length()) continue;
     }
-    if (!sampleEnemyMoveSupport(enemy.position, makeVec(target.x, landing.topY, target.z)) && startEnemyJump(target)) return true;
+    const landing = resolveEnemyLandingSupport(target, currentTopY, enemy.position);
+    if (!landing) continue;
+    if (Math.abs(landing.support.topY - currentTopY) > ENEMY_JUMP_MAX_HEIGHT) continue;
+    if (!sampleEnemyMoveSupport(enemy.position, landing.point) && startEnemyJump(landing.point)) return true;
   }
   return false;
+}
+
+function enemyCombatGoalPoint(fromPoint = null) {
+  const origin = fromPoint ? fromPoint.clone() : makeVec(enemy?.position?.x || player.position.x, enemy?.userData?.baseY ?? enemy?.position?.y ?? (player.position.y - PLAYER_EYE_HEIGHT), fromPoint?.z ?? enemy?.position?.z ?? player.position.z);
+  const toPlayer = player.position.clone().sub(origin);
+  toPlayer.y = 0;
+  const dist = toPlayer.length();
+  const dir = dist > 0.001 ? toPlayer.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1);
+  const standOff = clamp(ENEMY_ATTACK_RANGE * 0.82, 0.9, Math.max(0.9, ENEMY_RING_RADIUS - 0.35));
+  const goal = makeVec(player.position.x - dir.x * standOff, player.position.y - PLAYER_EYE_HEIGHT, player.position.z - dir.z * standOff);
+  const support = findEnemySupport(goal.x, goal.z, goal.y, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  if (support) goal.y = support.topY;
+  return goal;
+}
+
+function enemyHasDirectCombatPath(fromPoint = null) {
+  if (!enemy) return false;
+  const origin = fromPoint ? fromPoint.clone() : makeVec(enemy.position.x, enemy.userData.baseY ?? enemy.position.y, enemy.position.z);
+  const combatGoal = enemyCombatGoalPoint(origin);
+  return !!sampleEnemyMoveSupport(origin, combatGoal);
+}
+
+function findEnemyJumpSegmentTarget(from, to, referenceY = null) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance < ENEMY_JUMP_MIN_DISTANCE) return null;
+  const refY = Number.isFinite(referenceY) ? referenceY : (enemy?.userData?.baseY ?? from.y);
+  const steps = Math.max(8, Math.ceil(distance / 0.34));
+  let blockedIndex = -1;
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const probe = makeVec(from.x + dx * t, refY, from.z + dz * t);
+    if (!sampleEnemyMoveSupport(from, probe)) {
+      blockedIndex = i;
+      break;
+    }
+  }
+  if (blockedIndex < 0) return null;
+  let best = null;
+  let bestDist = Infinity;
+  let fallback = null;
+  let fallbackDist = Infinity;
+  for (let i = blockedIndex + 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const probe = makeVec(from.x + dx * t, refY, from.z + dz * t);
+    const landing = resolveEnemyLandingSupport(probe, refY, from);
+    if (!landing) continue;
+    if (!enemyCanJumpBetween(from, landing.point)) continue;
+    const remaining = landing.point.distanceTo(to);
+    if (remaining < fallbackDist) {
+      fallback = landing.point.clone();
+      fallbackDist = remaining;
+    }
+    if (!sampleEnemyMoveSupport(landing.point, to)) continue;
+    if (remaining < bestDist) {
+      best = landing.point.clone();
+      bestDist = remaining;
+    }
+  }
+  return best || fallback;
 }
 
 function buildEnemyLocalRoute(room, from, to) {
   if (!room) return [to.clone()];
   if (sampleEnemyMoveSupport(from, to)) return [to.clone()];
+  const routeRefY = Number.isFinite(enemy?.userData?.baseY) ? enemy.userData.baseY : from.y;
+  const directJump = findEnemyJumpSegmentTarget(from, to, routeRefY);
+  if (directJump) return [directJump, to.clone()];
   const center = roomWorldCenter(room);
   const bounds = room.bounds || null;
   const dx = to.x - from.x;
@@ -3729,28 +4118,28 @@ function buildEnemyLocalRoute(room, from, to) {
   anchors.push(to.clone().addScaledVector(perp, detour));
   anchors.push(to.clone().addScaledVector(perp, -detour));
 
-  let best = null;
+  let bestRoute = null;
   let bestScore = Infinity;
-  const refY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : from.y;
   for (const candidate of anchors) {
     if (!candidate) continue;
-    const support = findEnemySupport(candidate.x, candidate.z, refY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    const support = findEnemySupport(candidate.x, candidate.z, routeRefY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
     if (!support) continue;
     const point = makeVec(candidate.x, support.topY, candidate.z);
     const fromClear = !!sampleEnemyMoveSupport(from, point);
     const toClear = !!sampleEnemyMoveSupport(point, to);
     const fromJump = !fromClear && enemyCanJumpBetween(from, point);
     const toJump = !toClear && enemyCanJumpBetween(point, to);
+    const bridgeJump = !toClear && !toJump ? findEnemyJumpSegmentTarget(point, to, support.topY) : null;
     if (!fromClear && !fromJump) continue;
-    if (!toClear && !toJump) continue;
-    const score = from.distanceTo(point) + point.distanceTo(to) + Math.abs(support.topY - refY) * 0.45;
+    if (!toClear && !toJump && !bridgeJump) continue;
+    const route = bridgeJump ? [point, bridgeJump, to.clone()] : [point, to.clone()];
+    const score = from.distanceTo(point) + point.distanceTo(to) + Math.abs(support.topY - routeRefY) * 0.45 - (bridgeJump ? 0.35 : 0);
     if (score < bestScore) {
       bestScore = score;
-      best = point;
+      bestRoute = route;
     }
   }
-  if (!best) return [to.clone()];
-  return [best, to.clone()];
+  return bestRoute || [to.clone()];
 }
 
 function rebuildEnemyRoute(force = false) {
@@ -3776,9 +4165,18 @@ function rebuildEnemyRoute(force = false) {
   nav.routePath = graph ? findRoomTraversalPath(graph, enemyRoomIndex, playerRoomIndex) || [] : [];
 
   if (!rooms.length || enemyRoomIndex < 0 || playerRoomIndex < 0) {
-    pushEnemyRouteWaypoint(nav, goal, 'flat');
+    appendRoutePoint(goal, 'flat');
+    refreshEnemyRouteDebug(nav);
     return;
   }
+
+  const appendRoutePoint = (point, preferredKind = 'flat') => {
+    if (!point) return;
+    const fromPoint = nav.waypoints.length
+      ? nav.waypoints[nav.waypoints.length - 1]
+      : makeVec(enemy.position.x, enemy.userData.baseY ?? enemy.position.y, enemy.position.z);
+    pushEnemyRouteWaypoint(nav, point, classifyTraversalSegment(fromPoint, point, preferredKind));
+  };
 
   const pathEdges = nav.routePath;
   if (pathEdges.length) {
@@ -3786,26 +4184,28 @@ function rebuildEnemyRoute(force = false) {
     const firstEdge = pathEdges[0];
     const firstTargetRoom = rooms[firstEdge.to];
     const firstSource = pickRoomSocketToward(startRoom, roomWorldCenter(firstTargetRoom), firstEdge.fromKey, firstEdge.kind) || startRoom.spawn;
-    for (const point of buildEnemyLocalRoute(startRoom, enemy.position, firstSource)) pushEnemyRouteWaypoint(nav, point, firstEdge.kind);
+    for (const point of buildEnemyLocalRoute(startRoom, enemy.position, firstSource)) appendRoutePoint(point, firstEdge.kind);
     for (const edge of pathEdges) {
       const fromRoom = rooms[edge.from];
       const toRoom = rooms[edge.to];
       const source = pickRoomSocketToward(fromRoom, roomWorldCenter(toRoom), edge.fromKey, edge.kind) || fromRoom.exit;
       const target = pickRoomSocketToward(toRoom, roomWorldCenter(fromRoom), edge.toKey, edge.kind) || toRoom.spawn;
-      pushEnemyRouteWaypoint(nav, source, edge.kind);
-      pushEnemyRouteWaypoint(nav, target, edge.kind);
+      appendRoutePoint(source, edge.kind);
+      appendRoutePoint(target, edge.kind);
     }
     const finalRoom = rooms[playerRoomIndex];
     const tailStart = nav.waypoints.length ? nav.waypoints[nav.waypoints.length - 1] : enemy.position;
     const tailRoute = buildEnemyLocalRoute(finalRoom, tailStart, goal);
-    for (const point of tailRoute) pushEnemyRouteWaypoint(nav, point, roomTraversalKindForSpec(specs[playerRoomIndex]));
-    if (!nav.waypoints.length) pushEnemyRouteWaypoint(nav, goal, 'flat');
+    for (const point of tailRoute) appendRoutePoint(point, roomTraversalKindForSpec(specs[playerRoomIndex]));
+    if (!nav.waypoints.length) appendRoutePoint(goal, 'flat');
+    refreshEnemyRouteDebug(nav);
     return;
   }
 
   if (enemyRoomIndex === playerRoomIndex) {
-    for (const point of buildEnemyLocalRoute(rooms[enemyRoomIndex], enemy.position, goal)) pushEnemyRouteWaypoint(nav, point, roomTraversalKindForSpec(specs[enemyRoomIndex]));
-    if (!nav.waypoints.length) pushEnemyRouteWaypoint(nav, goal, 'flat');
+    for (const point of buildEnemyLocalRoute(rooms[enemyRoomIndex], enemy.position, goal)) appendRoutePoint(point, roomTraversalKindForSpec(specs[enemyRoomIndex]));
+    if (!nav.waypoints.length) appendRoutePoint(goal, 'flat');
+    refreshEnemyRouteDebug(nav);
     return;
   }
 
@@ -3816,14 +4216,15 @@ function rebuildEnemyRoute(force = false) {
     const roomCenter = roomWorldCenter(room);
     const nextCenter = roomWorldCenter(nextRoom);
     const edgeKind = roomTraversalEdgeKind(specs[i], specs[i + step]);
-    pushEnemyRouteWaypoint(nav, pickRoomSocketToward(room, nextCenter, step > 0 ? 'exit' : 'spawn', edgeKind), edgeKind);
-    pushEnemyRouteWaypoint(nav, pickRoomSocketToward(nextRoom, roomCenter, step > 0 ? 'spawn' : 'exit', edgeKind), edgeKind);
+    appendRoutePoint(pickRoomSocketToward(room, nextCenter, step > 0 ? 'exit' : 'spawn', edgeKind), edgeKind);
+    appendRoutePoint(pickRoomSocketToward(nextRoom, roomCenter, step > 0 ? 'spawn' : 'exit', edgeKind), edgeKind);
   }
 
   const finalRoom = rooms[playerRoomIndex];
   const tailRoute = buildEnemyLocalRoute(finalRoom, nav.waypoints.length ? nav.waypoints[nav.waypoints.length - 1] : enemy.position, goal);
-  for (const point of tailRoute) pushEnemyRouteWaypoint(nav, point, roomTraversalKindForSpec(specs[playerRoomIndex]));
-  if (!nav.waypoints.length) pushEnemyRouteWaypoint(nav, goal, 'flat');
+  for (const point of tailRoute) appendRoutePoint(point, roomTraversalKindForSpec(specs[playerRoomIndex]));
+  if (!nav.waypoints.length) appendRoutePoint(goal, 'flat');
+  refreshEnemyRouteDebug(nav);
 }
 
 function startEnemyJump(target) {
@@ -3831,16 +4232,28 @@ function startEnemyJump(target) {
   const nav = getEnemyNavState();
   if (!nav) return false;
   const refY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : enemy.position.y;
-  const landing = findEnemySupport(target.x, target.z, refY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+  const landing = resolveEnemyLandingSupport(target, refY, enemy.position);
   if (!landing) return false;
+  const totalDuration = Math.max(0.48, enemyJumpDuration());
+  const prepDuration = Math.min(ENEMY_JUMP_PREP_DURATION, totalDuration * 0.34);
+  const landTime = Math.max(prepDuration + 0.24, totalDuration * ENEMY_JUMP_LAND_FRACTION);
+  const travelDuration = Math.max(0.24, landTime - prepDuration);
+  const settleDuration = Math.max(0, totalDuration - landTime);
+  const horizontalDistance = Math.hypot(landing.point.x - enemy.position.x, landing.point.z - enemy.position.z);
   nav.jump = {
     start: enemy.position.clone(),
-    target: makeVec(target.x, landing.topY, target.z),
+    target: landing.point.clone(),
+    landing: landing.support,
     startY: refY,
-    targetY: landing.topY,
+    targetY: landing.support.topY,
     elapsed: 0,
-    duration: enemyJumpDuration(),
-    arc: Math.max(0.58, Math.min(1.55, 0.45 + Math.abs(landing.topY - refY) * 0.52 + Math.hypot(target.x - enemy.position.x, target.z - enemy.position.z) * 0.08)),
+    duration: totalDuration,
+    prepDuration,
+    landTime,
+    travelDuration,
+    settleDuration,
+    landed: false,
+    arc: Math.max(0.24, Math.min(0.74, 0.16 + Math.abs(landing.support.topY - refY) * 0.28 + horizontalDistance * 0.08)),
   };
   enemy.userData.mode = 'jump';
   enemy.userData.modeTimer = nav.jump.duration;
@@ -3856,20 +4269,38 @@ function advanceEnemyJump(dt) {
   const jump = nav?.jump;
   if (!jump) return false;
   jump.elapsed += dt;
-  const t = clamp(jump.elapsed / jump.duration, 0, 1);
-  const eased = t * t * (3 - 2 * t);
-  const lift = Math.sin(Math.PI * t) * jump.arc;
-  enemy.position.x = jump.start.x + (jump.target.x - jump.start.x) * eased;
-  enemy.position.z = jump.start.z + (jump.target.z - jump.start.z) * eased;
-  enemy.position.y = jump.startY + (jump.targetY - jump.startY) * eased + lift;
-  enemy.userData.baseY = jump.startY + (jump.targetY - jump.startY) * eased;
-  if (t < 1) return true;
-  enemy.position.copy(jump.target);
-  enemy.userData.baseY = jump.targetY;
-  nav.lastValidSupport = jump.target.clone();
+  if (jump.elapsed <= jump.prepDuration) {
+    enemy.position.x = jump.start.x;
+    enemy.position.z = jump.start.z;
+    enemy.position.y = jump.startY;
+    enemy.userData.baseY = jump.startY;
+    return true;
+  }
+
+  if (jump.elapsed < jump.landTime) {
+    const travelElapsed = jump.elapsed - jump.prepDuration;
+    const t = clamp(travelElapsed / jump.travelDuration, 0, 1);
+    const eased = t * t * (3 - 2 * t);
+    const lift = Math.sin(Math.PI * t) * jump.arc;
+    enemy.position.x = jump.start.x + (jump.target.x - jump.start.x) * eased;
+    enemy.position.z = jump.start.z + (jump.target.z - jump.start.z) * eased;
+    enemy.position.y = jump.startY + (jump.targetY - jump.startY) * eased + lift;
+    enemy.userData.baseY = jump.startY + (jump.targetY - jump.startY) * eased;
+    return true;
+  }
+
+  const landing = findEnemySupport(jump.target.x, jump.target.z, jump.targetY, ENEMY_STEP_UP, ENEMY_STEP_DOWN) || jump.landing || { topY: jump.targetY };
+  enemy.position.set(jump.target.x, landing.topY, jump.target.z);
+  enemy.userData.baseY = landing.topY;
+  nav.lastValidSupport = makeVec(jump.target.x, landing.topY, jump.target.z);
+
+  if (!jump.landed) jump.landed = true;
+
+  if (jump.elapsed < jump.duration) return true;
+
+  if (nav.waypoints.length) shiftEnemyRouteWaypoint(nav);
   nav.jump = null;
   nav.repathTimer = 0.08;
-  if (nav.waypoints.length) nav.waypoints.shift();
   enemy.userData.mode = 'approach';
   enemy.userData.modeTimer = 0;
   playEnemyAction('idle', 0.08);
@@ -4704,19 +5135,23 @@ function updateEnemyEngagement(dt) {
   }
   const previousGoal = nav?.goal ? nav.goal.clone() : null;
   const playerGoalY = player.grounded ? (player.position.y - PLAYER_EYE_HEIGHT) : (previousGoal?.y ?? (player.position.y - PLAYER_EYE_HEIGHT));
+  const routeGoal = makeVec(player.position.x, playerGoalY, player.position.z);
   const playerFloorY = playerGoalY;
   const verticalGap = playerFloorY - enemy.userData.baseY;
+  const directCombatGoal = enemyCombatGoalPoint();
 
+  let playerRoomIndex = -1;
+  let enemyRoomIndex = -1;
   if (nav) {
-    nav.goal = makeVec(player.position.x, playerGoalY, player.position.z);
+    nav.goal = routeGoal.clone();
     nav.lastSeenPlayer = player.position.clone();
     nav.repathTimer = Math.max(0, nav.repathTimer - dt);
     if (nav.jump) {
       advanceEnemyJump(dt);
       return;
     }
-    const playerRoomIndex = findNearestGauntletRoomIndex(player.position);
-    const enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
+    playerRoomIndex = findNearestGauntletRoomIndex(player.position);
+    enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
     const goalChanged = !previousGoal || (player.grounded ? previousGoal.distanceToSquared(nav.goal) > 0.36 : ((previousGoal.x - nav.goal.x) ** 2 + (previousGoal.z - nav.goal.z) ** 2 > 0.36));
     const roomChanged = nav.lastEnemyRoomIndex !== enemyRoomIndex || nav.lastPlayerRoomIndex !== playerRoomIndex;
     const staleRoute = nav.waypoints.length === 0 || nav.repathTimer <= 0 || roomChanged || goalChanged;
@@ -4760,13 +5195,22 @@ function updateEnemyEngagement(dt) {
   }
 
   const mode = enemy.userData.mode || 'approach';
+  const directCombatPath = enemyHasDirectCombatPath();
+  if (nav && directCombatPath && nav.waypoints.length && !nav.jump) {
+    clearEnemyRoute(nav);
+    nav.routePath.length = 0;
+    nav.repathTimer = ENEMY_NAV_REPATH_INTERVAL * 0.5;
+  }
   const tangent = new THREE.Vector3(-toPlayerDir.z, 0, toPlayerDir.x).multiplyScalar(enemy.userData.orbitSign || 1);
   const navTarget = nav?.waypoints?.length ? nav.waypoints[0].clone() : null;
+  const navKind = nav?.waypointKinds?.[0] || 'flat';
   const toNavTarget = navTarget ? navTarget.clone().sub(enemy.position) : null;
   if (toNavTarget) toNavTarget.y = 0;
   const navDist = toNavTarget ? toNavTarget.length() : dist;
   const navDir = toNavTarget && navDist > 0.001 ? toNavTarget.clone().multiplyScalar(1 / navDist) : toPlayerDir;
   const needsClimb = player.grounded && verticalGap > 0.22;
+  const separatedByGraph = enemyRoomIndex >= 0 && playerRoomIndex >= 0 && enemyRoomIndex !== playerRoomIndex;
+  const traversalActive = Boolean(navTarget) && (separatedByGraph || (nav?.routePath?.length || 0) > 0 || navKind !== 'flat' || navDist > ENEMY_ATTACK_RANGE + 0.45);
 
   if (navTarget && navDist < 0.36) {
     shiftEnemyRouteWaypoint(nav);
@@ -4774,6 +5218,31 @@ function updateEnemyEngagement(dt) {
   }
   if (nav?.jump) {
     advanceEnemyJump(dt);
+    return;
+  }
+
+  if (traversalActive) {
+    setEnemyMode('approach');
+    const segmentNeedsJump = !sampleEnemyMoveSupport(enemy.position, navTarget) && enemyCanJumpBetween(enemy.position, navTarget);
+    if (segmentNeedsJump) {
+      startEnemyJump(navTarget);
+      return;
+    }
+    const navSpeed = (navKind === 'stair' || navKind === 'drop')
+      ? ENEMY_WALK_SPEED
+      : (navDist > ENEMY_RING_RADIUS + 1.75 || navKind === 'bridge' || navKind === 'branch' || navKind === 'jump' ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED);
+    const moved = applyEnemyMove(navDir, navSpeed, dt);
+    playEnemyAction(navSpeed > ENEMY_WALK_SPEED + 0.1 ? 'run' : 'walk', 0.16);
+    if (!moved) {
+      if (nav) {
+        nav.stallCount += 1;
+        nav.repathTimer = 0;
+        rebuildEnemyRoute(true);
+      }
+    } else if (nav) {
+      nav.stallCount = 0;
+      nav.lastValidSupport = makeVec(enemy.position.x, baseY, enemy.position.z);
+    }
     return;
   }
 
@@ -4790,7 +5259,7 @@ function updateEnemyEngagement(dt) {
     return;
   }
 
-  if (dist <= ENEMY_ATTACK_RANGE && enemy.userData.attackCooldown <= 0 && mode !== 'retreat' && !needsClimb) {
+  if (dist <= ENEMY_ATTACK_RANGE && enemy.userData.attackCooldown <= 0 && mode !== 'retreat' && !needsClimb && !traversalActive) {
     startEnemyAttack();
     return;
   }
@@ -4962,7 +5431,10 @@ function render() {
     const mode = player.attack?.def?.name || (input.jumpCharging ? 'jump-charge' : (player.isRunning ? 'run' : (!player.grounded ? 'air' : (player.runCharge > 0 ? 'build' : 'walk'))));
     const node = roomState.spec;
     const districtText = node?.districtName ? ` | D${(node.districtIndex ?? 0) + 1} ${node.districtName}${node.districtElevationBand ? `(${node.districtElevationBand})` : ''}` : '';
-    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'} | ${input.gyro ? 'gyro' : 'touch'}`;
+    const enemyNav = getEnemyNavState();
+    const navText = enemyNav ? ` | nav ${(enemyNav.waypointKinds[0] || enemy.userData.mode || 'idle')} w${enemyNav.waypoints.length} e${enemyNav.routePath.length}` : '';
+    refreshEnemyRouteDebug(enemyNav);
+    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${navText} | ${input.gyro ? 'gyro' : 'touch'}`;
   } catch (err) {
     console.error(err);
     setStatus('runtime error: ' + (err?.message || err));
