@@ -249,6 +249,84 @@ Success condition:
 
 - replayability comes from topology plus state, not only shuffled order
 
+## Architectural Skeleton Follow-Through
+
+The vertical reset is necessary, but it is still not enough if districts keep being built as route scaffolds with decorative walls.
+
+The next correction is:
+
+- macro topology must be three-dimensional
+- district skeletons must be inspired by real building families
+- patchwork should be layered over those skeletons rather than replacing them
+
+### District skeleton requirements
+
+Every district should answer these questions before room fitting:
+
+- what real building type is this chunk descended from?
+- what is its dominant massing logic?
+- where does circulation naturally want to run through it?
+- what support language keeps it believable over the abyss?
+- what salvage or adaptation layer explains its present broken state?
+
+### Recommended source families
+
+Use real-world source families as structural seeds:
+
+- cliff monastery
+- medina / kasbah
+- furnace works / foundry
+- hill fort / citadel
+- stilt wharf settlement
+- necropolis / tomb quarter
+- collapsed aqueduct / bath complex
+
+The district generator should reduce these to massing and circulation rules, not decorative imitation.
+
+### Hanging Market as the proof district
+
+The first conversion should be `Hanging Market` using a `medina + wharf` hybrid.
+
+Implementation checklist:
+
+1. generate `4` major masses before any room fitting
+2. generate `3` stacked circulation bands
+3. force a visible underdeck support forest
+4. place one landmark crosswalk cluster visible from approach
+5. fit existing room bundles only into structural roles, not free offsets
+6. add patchwork bridges, braces, and scaffold infill only after the massing works
+7. validate one upper route, one lower route, one exposed crossing, and one over-under read
+
+Success condition:
+
+- the district screenshot reads as a salvaged vertical market settlement made from old architecture, not a flat combat layout with extra platforms
+
+
+### Acceptance checklist for the first screenshot pass
+
+The `Hanging Market` conversion should not be considered successful until a screenshot proves all of these at once:
+
+- one dominant upper crosswalk or roof route
+- one visible lower underdeck or return route
+- one strong support forest or hanging support language
+- one landmark bridge cluster that is visible before arrival
+- one readable over-under condition inside the district
+- no primary play space that reads as a free-standing generic slab
+
+If these are not simultaneously visible, the problem is still skeleton generation, not prop density.
+
+### Build order for the proof district
+
+1. generate the large masses
+2. carve the voids between them
+3. place support systems underneath
+4. place the three circulation bands
+5. fit room bundles onto those bands
+6. add patchwork adaptation pieces
+7. only then add local dressing
+
+This order should be treated as a hard rule for the proof district.
+
 ## Immediate Implementation Slice
 
 Do next, not a geometry polish pass.

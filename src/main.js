@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.47';
+const BUILD = '0.8.58';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -94,6 +94,18 @@ const AIR_MAX_SPEED = 8.8;
 const AIR_TURN_ACCEL = 14.0;
 const AIR_BRAKE_ACCEL = 19.5;
 const AIR_DRAG = 3.4;
+const PLAYER_SOLID_RADIUS = 0.38;
+const CLIMB_ATTACH_DISTANCE = 0.58;
+const CLIMB_FACE_OFFSET = 0.52;
+const CLIMB_SPEED_VERTICAL = 2.45;
+const CLIMB_SPEED_HORIZONTAL = 2.1;
+const CLIMB_MIN_HEIGHT = 1.25;
+const CLIMB_MIN_TOP_SIZE = 0.9;
+const CLIMB_TOP_OUT_THRESHOLD = 0.22;
+const CLIMB_MANTLE_DURATION = 0.34;
+const CLIMB_MANTLE_FORWARD = 0.48;
+const CLIMB_DETACH_UP = 4.6;
+const CLIMB_DETACH_BACK = 2.8;
 
 const player = {
   position: new THREE.Vector3(0, PLAYER_EYE_HEIGHT, -8.4),
@@ -102,6 +114,9 @@ const player = {
   yaw: Math.PI,
   pitch: 0,
   grounded: true,
+  mode: 'ground',
+  climb: null,
+  mantle: null,
   bob: 0,
   stepClock: 0,
   attackTimer: 0,
@@ -183,6 +198,11 @@ let idleAction = null;
 let walkAction = null;
 let jumpAction = null;
 let runAction = null;
+let climbIdleAction = null;
+let climbUpAction = null;
+let climbLeftAction = null;
+let climbRightAction = null;
+let mantleAction = null;
 let attackAction = null;
 let sprintAttackAction = null;
 let airAttackAction = null;
@@ -651,15 +671,25 @@ function registerWalkable(size, pos, margin = 0.12) {
   });
 }
 
-function registerSolid(size, pos, margin = 0.0) {
+function registerSolid(size, pos, margin = 0.0, options = {}) {
   const offset = worldOffset();
+  const centerX = pos[0] + offset.x;
+  const centerY = pos[1] + offset.y;
+  const centerZ = pos[2] + offset.z;
   solidColliders.push({
-    minX: pos[0] + offset.x - size[0] / 2 - margin,
-    maxX: pos[0] + offset.x + size[0] / 2 + margin,
-    minY: pos[1] + offset.y - size[1] / 2,
-    maxY: pos[1] + offset.y + size[1] / 2,
-    minZ: pos[2] + offset.z - size[2] / 2 - margin,
-    maxZ: pos[2] + offset.z + size[2] / 2 + margin,
+    centerX,
+    centerY,
+    centerZ,
+    sizeX: size[0],
+    sizeY: size[1],
+    sizeZ: size[2],
+    minX: centerX - size[0] / 2 - margin,
+    maxX: centerX + size[0] / 2 + margin,
+    minY: centerY - size[1] / 2,
+    maxY: centerY + size[1] / 2,
+    minZ: centerZ - size[2] / 2 - margin,
+    maxZ: centerZ + size[2] / 2 + margin,
+    stepHeight: Number.isFinite(options.stepHeight) ? options.stepHeight : 0,
   });
 }
 
@@ -1177,6 +1207,7 @@ function positionEnemy(position) {
     nav.jump = null;
     nav.lastEnemyRoomIndex = -1;
     nav.lastPlayerRoomIndex = -1;
+    nav.asleep = false;
   }
   enemy.position.copy(position);
   enemy.scale.setScalar(1);
@@ -1539,6 +1570,12 @@ const ENEMY_JUMP_MAX_DISTANCE = 8.8;
 const ENEMY_JUMP_MAX_HEIGHT = 2.2;
 const ENEMY_JUMP_PREP_DURATION = 0.16;
 const ENEMY_JUMP_LAND_FRACTION = 0.78;
+const ENEMY_AI_SLEEP_DISTANCE = 44;
+const ENEMY_AI_WAKE_DISTANCE = 30;
+const ENEMY_AI_SLEEP_ROOM_DELTA = 2;
+const ENEMY_AI_WAKE_ROOM_DELTA = 1;
+const LOW_SOLID_MAX_HEIGHT = 0.48;
+const LOW_SOLID_STEP_HEIGHT = 0.42;
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -2020,8 +2057,8 @@ function addBrokenRouteRails(parent, name, a, b, topY, walkWidth = 4.2) {
   const rng = rngFromSeed(seed);
   const sideBias = rng() < 0.68 ? [1] : [1, -1];
   const railOffset = Math.max(1.55, walkWidth * 0.5 + 0.14);
-  const railTop = topY + 0.54;
-  const railHeight = 0.34;
+  const railTop = topY + 0.74;
+  const railHeight = 0.28;
   const railThickness = 0.16;
   const segments = length > 8.2 ? [[0.06, 0.28], [0.40, 0.61], [0.73, 0.94]] : [[0.08, 0.34], [0.60, 0.92]];
   for (const side of sideBias) {
@@ -2042,6 +2079,10 @@ function addBrokenRouteRails(parent, name, a, b, topY, walkWidth = 4.2) {
       const size = alongX ? [segLen, railHeight, railThickness] : [railThickness, railHeight, segLen];
       addBeveledBox(parent, name + '-rail-' + (side > 0 ? 'outer' : 'inner') + '-' + i, size, pos, MAT.trim, false, 0.02, 1);
       registerSolid(size, pos, 0.01);
+      const mountSurfaceSize = alongX
+        ? [Math.max(0.72, segLen - 0.12), 0.12, 0.92]
+        : [0.92, 0.12, Math.max(0.72, segLen - 0.12)];
+      registerWalkable(mountSurfaceSize, [pos[0], railTop - 0.06, pos[2]], 0.02);
     }
   }
 }
@@ -2651,6 +2692,11 @@ const DISTRICT_MACRO_TEMPLATES = {
     routeType: 'climb',
     requiresVisibleBelow: true,
     requiresVisibleAbove: true,
+    realSourceA: 'medina_kasbah',
+    realSourceB: 'stilt_wharf_settlement',
+    skeletonType: 'hanging_market_hybrid',
+    patchStyle: 'scaffold_chain_infill',
+    silhouetteRule: 'lateral stacked market over a visible support forest',
   },
   liftworks: {
     id: 'liftworks_spire',
@@ -2726,6 +2772,89 @@ const DISTRICT_ARCHETYPE_TEMPLATES = {
   refuse: DISTRICT_MACRO_TEMPLATES.refuse,
   shrine: DISTRICT_MACRO_TEMPLATES.shrine,
 };
+
+function lerpNumber(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function buildHangingMarketDistrictMeta(district) {
+  const base = district.baseElevation;
+  const origin = district.origin;
+  const roomCount = Math.max(1, district.roomCount);
+  const roomOffsets = [];
+  const segmentRoles = [];
+  for (let i = 0; i < roomCount; i += 1) {
+    const t = roomCount <= 1 ? 0 : i / (roomCount - 1);
+    let x = 0;
+    let z = 0;
+    let y = 0;
+    let role = 'market_court';
+    if (t < 0.22) {
+      const s = t / 0.22;
+      x = lerpNumber(-28, -6, s);
+      z = lerpNumber(18, 74, s);
+      y = lerpNumber(1.2, 4.1, s);
+      role = s < 0.45 ? 'support_stair' : 'market_court';
+    } else if (t < 0.5) {
+      const s = (t - 0.22) / 0.28;
+      x = lerpNumber(0, 28, s);
+      z = lerpNumber(86, 156, s);
+      y = lerpNumber(5.0, 8.6, s);
+      role = 'market_court';
+    } else if (t < 0.8) {
+      const s = (t - 0.5) / 0.3;
+      x = lerpNumber(34, 76, s);
+      z = lerpNumber(170, 256, s);
+      y = lerpNumber(10.0, 13.8, s);
+      role = s < 0.68 ? 'roof_lane' : 'bridge_landing';
+    } else {
+      const s = (t - 0.8) / 0.2;
+      x = lerpNumber(84, 42, s);
+      z = lerpNumber(270, 338, s);
+      y = lerpNumber(11.0, 6.1, s);
+      role = s < 0.45 ? 'bridge_landing' : 'underdeck_pass';
+    }
+    roomOffsets.push([x, z, y]);
+    segmentRoles.push(role);
+  }
+  return {
+    realSourceA: district.realSourceA,
+    realSourceB: district.realSourceB,
+    skeletonType: district.skeletonType,
+    patchStyle: district.patchStyle,
+    silhouetteRule: district.silhouetteRule,
+    roomOffsets,
+    segmentRoles,
+    circulationBands: [
+      { id: 'market_low', y: base + 3.2, role: 'support_stair' },
+      { id: 'market_mid', y: base + 7.4, role: 'market_court' },
+      { id: 'market_high', y: base + 12.4, role: 'roof_lane' },
+    ],
+    massAnchors: [
+      { id: 'entry_deck', role: 'entry_deck', pos: [origin.x - 58, base - 2.0, origin.z + 26], size: [22, 8, 18] },
+      { id: 'market_core', role: 'market_core', pos: [origin.x + 34, base + 2.6, origin.z + 152], size: [38, 16, 30] },
+      { id: 'underdeck_support', role: 'underdeck_support', pos: [origin.x - 10, base - 5.0, origin.z + 202], size: [24, 10, 26] },
+      { id: 'bridge_cluster', role: 'bridge_cluster', pos: [origin.x + 84, base + 9.2, origin.z + 290], size: [24, 8, 38] },
+    ],
+    landmarkAnchor: { x: origin.x + 86, y: base + 13.6, z: origin.z + 286, role: 'market_bridge_cluster' },
+  };
+}
+
+function buildDistrictSkeletonMeta(district) {
+  if (district.skeletonType === 'hanging_market_hybrid') return buildHangingMarketDistrictMeta(district);
+  return {
+    realSourceA: district.realSourceA || null,
+    realSourceB: district.realSourceB || null,
+    skeletonType: district.skeletonType || null,
+    patchStyle: district.patchStyle || null,
+    silhouetteRule: district.silhouetteRule || null,
+    roomOffsets: null,
+    segmentRoles: [],
+    circulationBands: [],
+    massAnchors: [],
+    landmarkAnchor: null,
+  };
+}
 
 function shuffleWithRng(items, rng) {
   const list = [...items];
@@ -2810,7 +2939,13 @@ function generateDistrictPlan(levelIndex) {
       layoutPoints: layout.points,
       branchPairs: layout.branchPairs.filter(([a, b]) => a < roomCount && b < roomCount),
       preferredRoles: [...archetype.preferredRoles],
+      realSourceA: template.realSourceA || null,
+      realSourceB: template.realSourceB || null,
+      skeletonType: template.skeletonType || null,
+      patchStyle: template.patchStyle || null,
+      silhouetteRule: template.silhouetteRule || null,
     };
+    Object.assign(district, buildDistrictSkeletonMeta(district));
     for (let j = 0; j < roomCount && roomStart + j < totalRooms; j += 1) roomToDistrict[roomStart + j] = i;
     roomStart += roomCount;
     districts.push(district);
@@ -2892,7 +3027,8 @@ function districtInfoForRoomIndex(index, plan = roomState.districtPlan || ensure
 
 function batchRoomWorldOffset(index, plan = roomState.districtPlan || ensureDistrictPlan()) {
   const info = districtInfoForRoomIndex(index, plan);
-  const points = info.district?.layoutPoints || DISTRICT_LOCAL_LAYOUTS[0].points;
+  const districtPoints = info.district?.roomOffsets?.length ? info.district.roomOffsets : info.district?.layoutPoints;
+  const points = districtPoints || DISTRICT_LOCAL_LAYOUTS[0].points;
   const point = points[Math.min(info.localIndex, points.length - 1)] || points[points.length - 1] || [0, 0, 0];
   return makeVec(info.district.origin.x + point[0], info.district.origin.y + (point[2] || 0), info.district.origin.z + point[1]);
 }
@@ -3018,6 +3154,39 @@ function canEnemyTraverseBetween(room, fromAnchor, toAnchor) {
     cursor = point;
   }
   return cursor.distanceToSquared(to) < 0.04 || canEnemyTraverseSegment(cursor, to);
+}
+
+function addHangingMarketDistrictSkeleton(district) {
+  const masses = district.massAnchors || [];
+  for (const mass of masses) {
+    const center = mass.pos;
+    const size = mass.size;
+    const y = center[1] + size[1] * 0.5;
+    const mat = mass.role === 'bridge_cluster' ? MAT.bridge : mass.role === 'underdeck_support' ? MAT.iron : MAT.stone2;
+    addWalkableBox(roomGroup, 'district-' + district.id + '-' + mass.id, size, [center[0], y, center[2]], mat, true, 0.2);
+  }
+
+  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
+  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 7.4;
+  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 12.4;
+  for (let i = 0; i < 9; i += 1) {
+    const z = district.origin.z + 92 + i * 24;
+    const x = district.origin.x - 20 + (i % 3) * 18;
+    addGroundedCylinder(roomGroup, 'district-' + district.id + '-support-' + i, 1.2 + (i % 2) * 0.2, Math.max(8, highBand - district.baseElevation + 10), [x, district.baseElevation - 10, z], MAT.iron, 6);
+    addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-brace-' + i, [1.2, 10 + (i % 3) * 2, 1.2], [x + 5, district.baseElevation - 8, z + 5], MAT.trim, false, 0.03, 1).rotation.z = 0.42;
+  }
+
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-roof-cross', makeVec(district.origin.x + 24, highBand, district.origin.z + 174), makeVec(district.origin.x + 86, highBand + 0.8, district.origin.z + 272), highBand + 0.18, 4.2, MAT.bridge, 1.0);
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-underdeck-cross', makeVec(district.origin.x - 20, lowBand, district.origin.z + 146), makeVec(district.origin.x + 38, lowBand - 0.4, district.origin.z + 242), lowBand + 0.18, 3.4, MAT.connectorFloor, 1.0);
+  addBatchStairRun(roomGroup, 'district-' + district.id + '-market-rise', makeVec(district.origin.x - 6, lowBand + PLAYER_EYE_HEIGHT, district.origin.z + 82), makeVec(district.origin.x + 24, midBand + PLAYER_EYE_HEIGHT, district.origin.z + 146), lowBand + 0.18, midBand + 0.18, MAT.platform);
+
+  const landmark = district.landmarkAnchor;
+  if (landmark) addBrazier(roomGroup, 'district-' + district.id + '-landmark', [landmark.x, landmark.y - PLAYER_EYE_HEIGHT + 0.4, landmark.z], { kind: 'corpsefire' });
+}
+
+function addDistrictSkeletonGeometry(district) {
+  if (!district) return;
+  if (district.skeletonType === 'hanging_market_hybrid') addHangingMarketDistrictSkeleton(district);
 }
 
 function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
@@ -3161,6 +3330,7 @@ function buildGeneratedGauntlet(startIndex = 0) {
     const to = rooms[link.b]?.sockets?.[link.sideB];
     addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
   }
+  for (const district of districtPlan.districts) addDistrictSkeletonGeometry(district);
   const connectivity = validateAndRepairGauntletConnectivity(rooms, branchLinks);
   const first = rooms[Math.max(0, Math.min(startIndex, rooms.length - 1))] || rooms[0];
   const last = rooms[rooms.length - 1] || first;
@@ -3216,6 +3386,8 @@ function updateCurrentGauntletRoom() {
       districtBaseElevation: districtInfo.district.baseElevation,
       districtTopElevation: districtInfo.district.topElevation,
       districtMacroTemplateId: districtInfo.district.macroTemplateId,
+      districtSkeletonType: districtInfo.district.skeletonType,
+      districtSegmentRole: districtInfo.district.segmentRoles?.[districtInfo.localIndex] || null,
     };
     setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + (roomState.districtPlan?.districts.length || 0) + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (bestIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + spec.id);
   }
@@ -3262,6 +3434,12 @@ function buildRoom(movePlayer = true) {
       landmarkRole: district.landmarkRole,
       requiresVisibleBelow: district.requiresVisibleBelow,
       requiresVisibleAbove: district.requiresVisibleAbove,
+      realSourceA: district.realSourceA,
+      realSourceB: district.realSourceB,
+      skeletonType: district.skeletonType,
+      patchStyle: district.patchStyle,
+      silhouetteRule: district.silhouetteRule,
+      segmentRoles: [...(district.segmentRoles || [])],
     })),
     mainSpineEdges: districtPlan.mainSpineEdges.map((edge) => ({ ...edge })),
     returnEdges: districtPlan.returnEdges.map((edge) => ({ ...edge })),
@@ -3279,6 +3457,8 @@ function buildRoom(movePlayer = true) {
         districtBaseElevation: info.district.baseElevation,
         districtTopElevation: info.district.topElevation,
         districtMacroTemplateId: info.district.macroTemplateId,
+        districtSkeletonType: info.district.skeletonType,
+        districtSegmentRole: info.district.segmentRoles?.[info.localIndex] || null,
       };
     }),
   };
@@ -3306,14 +3486,16 @@ function buildRoom(movePlayer = true) {
     districtBaseElevation: districtInfo.district.baseElevation,
     districtTopElevation: districtInfo.district.topElevation,
     districtMacroTemplateId: districtInfo.district.macroTemplateId,
+    districtSkeletonType: districtInfo.district.skeletonType,
+    districtSegmentRole: districtInfo.district.segmentRoles?.[districtInfo.localIndex] || null,
   };
   roomState.seed = hashRoomKey(spec.id || String(startIndex));
   roomState.spawn.copy(built.spawn);
   roomState.exit.copy(built.exit);
   roomState.exitRadius = built.exitRadius;
-  roomState.enemyPositions = built.enemyPositions.map((pos) => pos.clone());
+  roomState.enemyPositions = built.enemyPositions.map((pos) => resolveEnemySpawnPoint(pos));
   roomState.levelBounds = built.bounds;
-  positionEnemy(built.enemyPositions[0]);
+  positionEnemy(roomState.enemyPositions[0]);
 
   if (movePlayer) {
     player.position.copy(roomState.spawn);
@@ -3419,6 +3601,18 @@ function chooseClip(clips, names) {
   return clips[0] || null;
 }
 
+function findClipByNames(clips, names) {
+  for (const name of names) {
+    const exact = clips.find((clip) => clip.name === name);
+    if (exact) return exact;
+  }
+  for (const name of names) {
+    const partial = clips.find((clip) => clip.name.toLowerCase().includes(name.toLowerCase()));
+    if (partial) return partial;
+  }
+  return null;
+}
+
 function interpolationFromName(name) {
   const value = String(name || '').toLowerCase();
   if (value.includes('discrete')) return THREE.InterpolateDiscrete;
@@ -3486,7 +3680,7 @@ function stripRootMotionXZ(clip) {
 }
 
 function resolvePlayerSolids(position, velocity) {
-  const radius = 0.38;
+  const radius = PLAYER_SOLID_RADIUS;
   const minY = position.y - PLAYER_EYE_HEIGHT + 0.15;
   const maxY = position.y + 0.35;
   for (let pass = 0; pass < 2; pass += 1) {
@@ -3494,6 +3688,14 @@ function resolvePlayerSolids(position, velocity) {
       if (maxY < solid.minY || minY > solid.maxY) continue;
       if (position.x < solid.minX - radius || position.x > solid.maxX + radius) continue;
       if (position.z < solid.minZ - radius || position.z > solid.maxZ + radius) continue;
+      const feetY = position.y - PLAYER_EYE_HEIGHT;
+      const topDelta = solid.maxY - feetY;
+      const stepHeight = solid.stepHeight > 0 ? solid.stepHeight : (solid.sizeY <= LOW_SOLID_MAX_HEIGHT ? LOW_SOLID_STEP_HEIGHT : 0);
+      if (stepHeight > 0 && topDelta >= -0.04 && topDelta <= stepHeight) {
+        position.y = Math.max(position.y, solid.maxY + PLAYER_EYE_HEIGHT);
+        velocity.y = Math.max(0, velocity.y);
+        continue;
+      }
       const centerX = (solid.minX + solid.maxX) * 0.5;
       const centerZ = (solid.minZ + solid.maxZ) * 0.5;
       const pushLeft = Math.abs(position.x - (solid.minX - radius));
@@ -3511,6 +3713,235 @@ function resolvePlayerSolids(position, velocity) {
       }
     }
   }
+}
+
+function solidTopWalkable(solid) {
+  return solid && solid.sizeY >= CLIMB_MIN_HEIGHT && Math.min(solid.sizeX, solid.sizeZ) >= CLIMB_MIN_TOP_SIZE;
+}
+
+function resolveSolidTopSupport(x, z, feetY, velocityY) {
+  let best = null;
+  for (const solid of solidColliders) {
+    if (!solidTopWalkable(solid)) continue;
+    if (x < solid.minX + PLAYER_SOLID_RADIUS || x > solid.maxX - PLAYER_SOLID_RADIUS) continue;
+    if (z < solid.minZ + PLAYER_SOLID_RADIUS || z > solid.maxZ - PLAYER_SOLID_RADIUS) continue;
+    const topY = solid.maxY;
+    if (velocityY > 0.5 && feetY < topY - 0.14) continue;
+    if (feetY > topY + SUPPORT_SNAP_UP) continue;
+    if (feetY < topY - SUPPORT_SNAP_DOWN) continue;
+    if (!best || topY > best.topY) best = { topY, solid };
+  }
+  return best;
+}
+
+function canStandOnSolidTop(solid, x, z) {
+  if (!solidTopWalkable(solid)) return false;
+  const feetY = solid.maxY;
+  return x >= solid.minX + PLAYER_SOLID_RADIUS
+    && x <= solid.maxX - PLAYER_SOLID_RADIUS
+    && z >= solid.minZ + PLAYER_SOLID_RADIUS
+    && z <= solid.maxZ - PLAYER_SOLID_RADIUS
+;
+}
+
+function faceYawFromNormal(normal) {
+  return Math.atan2(-normal.x, -normal.z);
+}
+
+function tryBeginClimb(attachForward = true) {
+  if (player.mode === 'climb' || player.mode === 'mantle') return false;
+  if (player.attack) return false;
+  const chestY = player.position.y - PLAYER_EYE_HEIGHT + 1.1;
+  const facing = cameraForwardYaw(player.yaw).normalize();
+  let best = null;
+  let bestScore = Infinity;
+  const candidateFaces = [];
+  for (const solid of solidColliders) {
+    if (solid.sizeY < CLIMB_MIN_HEIGHT) continue;
+    if (Math.max(solid.sizeX, solid.sizeZ) < CLIMB_MIN_TOP_SIZE) continue;
+    candidateFaces.push(
+      { axis: 'x', plane: solid.minX, normal: makeVec(-1, 0, 0), rangeA: [solid.minZ, solid.maxZ] },
+      { axis: 'x', plane: solid.maxX, normal: makeVec(1, 0, 0), rangeA: [solid.minZ, solid.maxZ] },
+      { axis: 'z', plane: solid.minZ, normal: makeVec(0, 0, -1), rangeA: [solid.minX, solid.maxX] },
+      { axis: 'z', plane: solid.maxZ, normal: makeVec(0, 0, 1), rangeA: [solid.minX, solid.maxX] },
+    );
+    for (const face of candidateFaces.splice(0)) {
+      const towardWall = face.normal.clone().multiplyScalar(-1);
+      const faceDot = facing.dot(towardWall);
+      if (attachForward && faceDot < 0.38) continue;
+      const distance = face.axis === 'x' ? Math.abs(player.position.x - face.plane) : Math.abs(player.position.z - face.plane);
+      if (distance > CLIMB_ATTACH_DISTANCE) continue;
+      const lateral = face.axis === 'x' ? player.position.z : player.position.x;
+      if (lateral < face.rangeA[0] - PLAYER_SOLID_RADIUS || lateral > face.rangeA[1] + PLAYER_SOLID_RADIUS) continue;
+      if (chestY < solid.minY + 0.2 || chestY > solid.maxY + 0.65) continue;
+      const score = distance - faceDot * 0.15 + Math.abs(chestY - clamp(chestY, solid.minY + 0.45, solid.maxY - 0.2)) * 0.05;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { solid, face };
+      }
+    }
+  }
+  if (!best) return false;
+  const { solid, face } = best;
+  const right = new THREE.Vector3(-face.normal.z, 0, face.normal.x);
+  const hangY = clamp(player.position.y, solid.minY + 0.4 + PLAYER_EYE_HEIGHT, solid.maxY - 0.12 + PLAYER_EYE_HEIGHT);
+  const lateral = face.axis === 'x'
+    ? clamp(player.position.z, solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS)
+    : clamp(player.position.x, solid.minX + PLAYER_SOLID_RADIUS, solid.maxX - PLAYER_SOLID_RADIUS);
+  player.mode = 'climb';
+  player.climb = {
+    solid,
+    normal: face.normal.clone(),
+    right,
+    planeAxis: face.axis,
+    plane: face.plane,
+    minLateral: face.rangeA[0] + PLAYER_SOLID_RADIUS,
+    maxLateral: face.rangeA[1] - PLAYER_SOLID_RADIUS,
+    minY: solid.minY + 0.12 + PLAYER_EYE_HEIGHT,
+    maxY: solid.maxY - CLIMB_TOP_OUT_THRESHOLD + PLAYER_EYE_HEIGHT,
+  };
+  player.mantle = null;
+  player.velocity.set(0, 0, 0);
+  player.grounded = false;
+  player.runCharge = 0;
+  player.isRunning = false;
+  player.lastRunIntent = false;
+  player.attack = null;
+  player.attackTimer = 0;
+  if (face.axis === 'x') {
+    player.position.x = face.plane + face.normal.x * CLIMB_FACE_OFFSET;
+    player.position.z = lateral;
+  } else {
+    player.position.z = face.plane + face.normal.z * CLIMB_FACE_OFFSET;
+    player.position.x = lateral;
+  }
+  player.position.y = hangY;
+  player.yaw = faceYawFromNormal(face.normal.clone().multiplyScalar(-1));
+  return true;
+}
+
+function startMantleFromClimb() {
+  const climb = player.climb;
+  if (!climb) return false;
+  const solid = climb.solid;
+  const topX = climb.planeAxis === 'x'
+    ? solid.centerX
+    : clamp(player.position.x + climb.normal.x * CLIMB_MANTLE_FORWARD, solid.minX + PLAYER_SOLID_RADIUS, solid.maxX - PLAYER_SOLID_RADIUS);
+  const topZ = climb.planeAxis === 'z'
+    ? solid.centerZ
+    : clamp(player.position.z + climb.normal.z * CLIMB_MANTLE_FORWARD, solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS);
+  const endX = climb.planeAxis === 'x'
+    ? clamp(climb.plane + climb.normal.x * (PLAYER_SOLID_RADIUS + CLIMB_MANTLE_FORWARD), solid.minX + PLAYER_SOLID_RADIUS, solid.maxX - PLAYER_SOLID_RADIUS)
+    : topX;
+  const endZ = climb.planeAxis === 'z'
+    ? clamp(climb.plane + climb.normal.z * (PLAYER_SOLID_RADIUS + CLIMB_MANTLE_FORWARD), solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS)
+    : topZ;
+  if (!canStandOnSolidTop(solid, endX, endZ)) return false;
+  player.mode = 'mantle';
+  player.mantle = {
+    start: player.position.clone(),
+    end: makeVec(endX, solid.maxY + PLAYER_EYE_HEIGHT, endZ),
+    elapsed: 0,
+    duration: CLIMB_MANTLE_DURATION,
+    faceYaw: player.yaw,
+  };
+  player.climb = null;
+  player.velocity.set(0, 0, 0);
+  return true;
+}
+
+function updatePlayerClimb(dt, moveX, moveY) {
+  const climb = player.climb;
+  if (!climb) {
+    player.mode = 'air';
+    return;
+  }
+  const lateralDelta = moveX * CLIMB_SPEED_HORIZONTAL * dt;
+  const verticalDelta = moveY * CLIMB_SPEED_VERTICAL * dt;
+  let lateral = climb.planeAxis === 'x' ? player.position.z : player.position.x;
+  lateral = clamp(lateral + lateralDelta, climb.minLateral, climb.maxLateral);
+  const nextY = clamp(player.position.y + verticalDelta, climb.minY, climb.maxY + 0.28);
+  if (climb.planeAxis === 'x') {
+    player.position.x = climb.plane + climb.normal.x * CLIMB_FACE_OFFSET;
+    player.position.z = lateral;
+  } else {
+    player.position.z = climb.plane + climb.normal.z * CLIMB_FACE_OFFSET;
+    player.position.x = lateral;
+  }
+  player.position.y = nextY;
+  player.velocity.set(0, 0, 0);
+  player.grounded = false;
+  player.yaw = faceYawFromNormal(climb.normal.clone().multiplyScalar(-1));
+  if (moveY > 0.18 && player.position.y >= climb.maxY - 0.02) startMantleFromClimb();
+  else if (moveY < -0.45 && player.position.y <= climb.minY + 0.02) {
+    player.mode = 'air';
+    player.climb = null;
+  }
+}
+
+function updatePlayerMantle(dt) {
+  const mantle = player.mantle;
+  if (!mantle) {
+    player.mode = 'ground';
+    return;
+  }
+  mantle.elapsed = Math.min(mantle.duration, mantle.elapsed + dt);
+  const t = clamp(mantle.elapsed / mantle.duration, 0, 1);
+  const eased = t * t * (3 - 2 * t);
+  const lift = Math.sin(Math.PI * eased) * 0.18;
+  player.position.lerpVectors(mantle.start, mantle.end, eased);
+  player.position.y += lift;
+  player.velocity.set(0, 0, 0);
+  player.grounded = false;
+  player.yaw = mantle.faceYaw;
+  if (t >= 1) {
+    player.position.copy(mantle.end);
+    player.mode = 'ground';
+    player.mantle = null;
+    player.grounded = true;
+  }
+}
+
+function finalizePlayerFrame(dt, now, stickMagnitude) {
+  player.position.x = clamp(player.position.x, roomState.levelBounds?.minX ?? -14, roomState.levelBounds?.maxX ?? 14);
+  player.position.z = clamp(player.position.z, roomState.levelBounds?.minZ ?? -18, roomState.levelBounds?.maxZ ?? 18);
+  if (player.grounded && player.runCharge < RUN_BUILD_TIME && stickMagnitude < 0.18) player.runCharge = Math.max(0, player.runCharge - dt * 0.4);
+  if (roomState.transitionLock > 0) roomState.transitionLock = Math.max(0, roomState.transitionLock - dt);
+  if (player.grounded && roomState.transitionLock <= 0) {
+    const dx = player.position.x - roomState.exit.x;
+    const dz = player.position.z - roomState.exit.z;
+    const dy = player.position.y - roomState.exit.y;
+    if (Math.hypot(dx, dz) < roomState.exitRadius && Math.abs(dy) < 1.8) completeGeneratedGauntlet();
+  }
+  updateCurrentGauntletRoom();
+  if (player.position.y < KILL_Y) {
+    player.position.copy(roomState.spawn);
+    player.visualPosition.copy(player.position);
+    player.velocity.set(0, 0, 0);
+    input.smoothMoveX = 0;
+    input.smoothMoveY = 0;
+    player.grounded = true;
+    player.mode = 'ground';
+    player.climb = null;
+    player.mantle = null;
+    player.attack = null;
+    player.attackTimer = 0;
+    setStatus('returned to start');
+  }
+
+  const horizontalSpeed = Math.hypot(player.velocity.x, player.velocity.z);
+  const bobRate = player.grounded ? (player.isRunning ? 2.05 : 1.35) * Math.min(1.2, horizontalSpeed / 5.2) : 0.35;
+  player.bob += dt * bobRate;
+  const bobAmount = player.grounded ? Math.min(1, horizontalSpeed / 5.2) : 0.08;
+  const bobY = Math.sin(player.bob * Math.PI * 2) * 0.012 * bobAmount;
+  const bobX = Math.cos(player.bob * Math.PI * 2) * 0.008 * bobAmount;
+  const followBlend = 1 - Math.exp(-(player.grounded ? CAMERA_GROUND_SMOOTH : CAMERA_AIR_SMOOTH) * dt);
+  if (!Number.isFinite(player.visualPosition.x) || player.visualPosition.distanceTo(player.position) > 4.0 || (!player.grounded && player.velocity.y > 0.35)) player.visualPosition.copy(player.position);
+  else player.visualPosition.lerp(player.position, followBlend);
+  camera.position.copy(player.visualPosition).add(new THREE.Vector3(bobX, bobY, 0));
+  skyDome.position.copy(camera.position);
+  camera.rotation.y = player.yaw + input.gyroYaw;
+  camera.rotation.x = player.pitch + input.gyroPitch;
 }
 
 function resolveSupportHeight(x, z, feetY, velocityY) {
@@ -3607,6 +4038,48 @@ function enemyBodyBlockedAt(x, z, floorY) {
   return false;
 }
 
+
+function resolveEnemySpawnPoint(position) {
+  if (!position) return position;
+  const baseY = Number.isFinite(position.y) ? position.y : 0;
+  const probes = [
+    [0, 0],
+    [2.2, 0], [-2.2, 0], [0, 2.2], [0, -2.2],
+    [3.8, 0], [-3.8, 0], [0, 3.8], [0, -3.8],
+    [2.8, 2.8], [2.8, -2.8], [-2.8, 2.8], [-2.8, -2.8],
+    [5.6, 0], [-5.6, 0], [0, 5.6], [0, -5.6],
+    [4.4, 4.4], [4.4, -4.4], [-4.4, 4.4], [-4.4, -4.4],
+  ];
+  let best = null;
+  let bestScore = Infinity;
+  for (const [ox, oz] of probes) {
+    const x = position.x + ox;
+    const z = position.z + oz;
+    const support = findEnemyCapsuleSupport(x, z, baseY, null, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
+    if (!support) continue;
+    if (enemyBodyBlockedAt(x, z, support.topY)) continue;
+    let minClear = Infinity;
+    for (const solid of solidColliders) {
+      if (support.topY + 0.08 >= solid.maxY || support.topY + ORC_BERSERKER_TARGET_HEIGHT * 0.72 <= solid.minY) continue;
+      const dx = x < solid.minX ? solid.minX - x : x > solid.maxX ? x - solid.maxX : 0;
+      const dz = z < solid.minZ ? solid.minZ - z : z > solid.maxZ ? z - solid.maxZ : 0;
+      const edge = Math.max(dx, dz);
+      if (edge <= 0) {
+        minClear = -1;
+        break;
+      }
+      minClear = Math.min(minClear, edge);
+    }
+    if (minClear < 0.45) continue;
+    const score = ox * ox + oz * oz;
+    if (score < bestScore) {
+      bestScore = score;
+      best = makeVec(x, support.topY, z);
+    }
+  }
+  return best || (position.clone ? position.clone() : position);
+}
+
 function sampleEnemyMoveSupport(from, to) {
   const dx = to.x - from.x;
   const dz = to.z - from.z;
@@ -3665,6 +4138,7 @@ function getEnemyNavState() {
       jump: null,
       lastEnemyRoomIndex: -1,
       lastPlayerRoomIndex: -1,
+      asleep: false,
     };
   }
   return enemy.userData.nav;
@@ -4519,6 +4993,27 @@ function loadMutantOrcEnemy() {
   });
 }
 
+
+function updateEnemyMixer(dt) {
+  if (!enemyMixer) return;
+  enemyMixer.update(dt);
+  if (!enemy?.userData?.dead && enemyCurrentAction) {
+    const clipName = enemyCurrentAction.getClip().name;
+    const oneShotReturns = ['jumping', 'react'];
+    if (oneShotReturns.includes(clipName) && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
+      playEnemyAction('idle', 0.12);
+      return;
+    }
+  }
+  if (!enemyCurrentAction) {
+    const idle = enemyActions.get('idle');
+    if (idle) {
+      idle.reset().fadeIn(0.01).play();
+      enemyCurrentAction = idle;
+    }
+  }
+}
+
 function loadArms() {
   loader.load('assets/models/FPSPlayer.glb', (gltf) => {
     armsModel = gltf.scene;
@@ -4544,6 +5039,11 @@ function loadArms() {
     walkAction = makeArmAction(chooseClip(gltf.animations, ['FistWalking', 'Walking']));
     runAction = walkAction;
     jumpAction = makeArmAction(chooseClip(gltf.animations, ['FistJump', 'JumpAddative', 'Jump']), { once: true, clamp: true });
+    climbIdleAction = makeArmAction(findClipByNames(gltf.animations, ['ClimbIdle', 'ClimbHold', 'LedgeHangIdle', 'HangIdle', 'Climbing']));
+    climbUpAction = makeArmAction(findClipByNames(gltf.animations, ['ClimbUp', 'VerticalClimb', 'ClimbVertical', 'Climbing']));
+    climbLeftAction = makeArmAction(findClipByNames(gltf.animations, ['ClimbLeft', 'HorizontalClimbLeft', 'ShimmyLeft', 'HorizontalClimb', 'ClimbingSide']));
+    climbRightAction = makeArmAction(findClipByNames(gltf.animations, ['ClimbRight', 'HorizontalClimbRight', 'ShimmyRight', 'HorizontalClimb', 'ClimbingSide']));
+    mantleAction = makeArmAction(findClipByNames(gltf.animations, ['ClimbMantle', 'VaultUp', 'LedgeClimb', 'Mantle']), { once: true, clamp: true });
     normalAttackDefs = [1, 2, 3, 4, 5].map((index) => {
       const clip = clipsByName.get('FistAttack' + index) || chooseClip(gltf.animations, ['FistAttack' + index]);
       const action = makeArmAction(clip, { once: true });
@@ -4647,7 +5147,7 @@ function beginHoldAttack() {
 
 function commitJump(force = 0, charge = 0, keepCharge = false) {
   ensureAudio();
-  if (!player.grounded) return;
+  if (!player.grounded || player.mode === 'climb' || player.mode === 'mantle') return;
   const forward = cameraForwardYaw(player.yaw).normalize();
   const lateral = cameraRightYaw(player.yaw).normalize();
   const moveBlend = new THREE.Vector3().addScaledVector(forward, input.moveY).addScaledVector(lateral, input.moveX);
@@ -4682,6 +5182,7 @@ function commitJump(force = 0, charge = 0, keepCharge = false) {
 
 function beginAttackDef(def) {
   ensureAudio();
+  if (player.mode === 'climb' || player.mode === 'mantle') return;
   const current = player.attack;
   if (current && current.elapsed < current.def.comboOpen) return;
   if (!def) return;
@@ -4699,6 +5200,16 @@ function beginAttackDef(def) {
 }
 
 function jump(pointerId = null) {
+  if (player.mode === 'climb') {
+    const normal = player.climb?.normal || cameraForwardYaw(player.yaw).multiplyScalar(-1);
+    player.mode = 'air';
+    player.climb = null;
+    player.velocity.set(normal.x * CLIMB_DETACH_BACK, CLIMB_DETACH_UP, normal.z * CLIMB_DETACH_BACK);
+    player.grounded = false;
+    if (jumpAction) playArmAction(jumpAction, 0.045, true);
+    return;
+  }
+  if (player.mode === 'mantle') return;
   if (!player.grounded) return;
   if (player.isRunning) {
     commitJump(0.75, 0, false);
@@ -4941,6 +5452,18 @@ function updatePlayer(dt) {
   desired.addScaledVector(right, moveX);
   if (desired.lengthSq() > 1) desired.normalize();
   const stickMagnitude = Math.hypot(moveX, moveY);
+
+  if (player.mode === 'climb') {
+    updatePlayerClimb(dt, moveX, moveY);
+    finalizePlayerFrame(dt, now, stickMagnitude);
+    return;
+  }
+  if (player.mode === 'mantle') {
+    updatePlayerMantle(dt);
+    finalizePlayerFrame(dt, now, stickMagnitude);
+    return;
+  }
+
   const forwardArc = moveY > 0.56 && Math.abs(moveX) <= Math.max(0.001, moveY);
   const buildingRun = player.grounded && forwardArc && stickMagnitude > 0.55;
   if (buildingRun) player.runCharge = Math.min(RUN_BUILD_TIME, player.runCharge + dt);
@@ -5014,74 +5537,24 @@ function updatePlayer(dt) {
   player.position.addScaledVector(player.velocity, dt);
   resolvePlayerSolids(player.position, player.velocity);
   const feetY = player.position.y - PLAYER_EYE_HEIGHT;
-  const support = player.velocity.y <= 0 ? resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y) : null;
+  const support = player.velocity.y <= 0 ? (resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y) || resolveSolidTopSupport(player.position.x, player.position.z, feetY, player.velocity.y)) : null;
   if (support) {
     if (!player.grounded && player.velocity.y < -1.2) playThud(0.7);
     player.position.y = support.topY + PLAYER_EYE_HEIGHT;
     player.velocity.y = 0;
     player.grounded = true;
-    if (player.isRunning && input.jumpCharging && input.jumpHoldStart !== 0 && player.lastRunIntent && now - input.jumpHoldStart > 35) {
-      commitJump(0.15, 0, false);
-    }
+    player.mode = 'ground';
+    if (player.isRunning && input.jumpCharging && input.jumpHoldStart !== 0 && player.lastRunIntent && now - input.jumpHoldStart > 35) commitJump(0.15, 0, false);
   } else {
     player.grounded = false;
-  }
-  player.position.x = clamp(player.position.x, roomState.levelBounds?.minX ?? -14, roomState.levelBounds?.maxX ?? 14);
-  player.position.z = clamp(player.position.z, roomState.levelBounds?.minZ ?? -18, roomState.levelBounds?.maxZ ?? 18);
-  if (player.grounded && player.runCharge < RUN_BUILD_TIME && stickMagnitude < 0.18) player.runCharge = Math.max(0, player.runCharge - dt * 0.4);
-  if (roomState.transitionLock > 0) roomState.transitionLock = Math.max(0, roomState.transitionLock - dt);
-  if (player.grounded && roomState.transitionLock <= 0) {
-    const dx = player.position.x - roomState.exit.x;
-    const dz = player.position.z - roomState.exit.z;
-    const dy = player.position.y - roomState.exit.y;
-    if (Math.hypot(dx, dz) < roomState.exitRadius && Math.abs(dy) < 1.8) {
-      completeGeneratedGauntlet();
+    player.mode = 'air';
+    if (tryBeginClimb(true)) {
+      finalizePlayerFrame(dt, now, stickMagnitude);
+      return;
     }
   }
-  updateCurrentGauntletRoom();
-  if (player.position.y < KILL_Y) {
-    player.position.copy(roomState.spawn);
-    player.visualPosition.copy(player.position);
-    player.velocity.set(0, 0, 0);
-    input.smoothMoveX = 0;
-    input.smoothMoveY = 0;
-    player.grounded = true;
-    player.attack = null;
-    player.attackTimer = 0;
-    setStatus('returned to start');
-  }
-
-  const horizontalSpeed = Math.hypot(player.velocity.x, player.velocity.z);
-  const bobRate = player.grounded ? (player.isRunning ? 2.05 : 1.35) * Math.min(1.2, horizontalSpeed / 5.2) : 0.35;
-  player.bob += dt * bobRate;
-  const bobAmount = player.grounded ? Math.min(1, horizontalSpeed / 5.2) : 0.08;
-  const bobY = Math.sin(player.bob * Math.PI * 2) * 0.012 * bobAmount;
-  const bobX = Math.cos(player.bob * Math.PI * 2) * 0.008 * bobAmount;
-  const followBlend = 1 - Math.exp(-(player.grounded ? CAMERA_GROUND_SMOOTH : CAMERA_AIR_SMOOTH) * dt);
-  if (!Number.isFinite(player.visualPosition.x) || player.visualPosition.distanceTo(player.position) > 4.0 || (!player.grounded && player.velocity.y > 0.35)) {
-    player.visualPosition.copy(player.position);
-  } else {
-    player.visualPosition.lerp(player.position, followBlend);
-  }
-  camera.position.copy(player.visualPosition).add(new THREE.Vector3(bobX, bobY, 0));
-  skyDome.position.copy(camera.position);
-  camera.rotation.y = player.yaw + input.gyroYaw;
-  camera.rotation.x = player.pitch + input.gyroPitch;
-
-  if (player.grounded && horizontalSpeed > 0.65) {
-    player.stepClock += dt * horizontalSpeed;
-    if (player.stepClock > 1.42) {
-      player.stepClock = 0;
-      playStep(Math.min(1.4, horizontalSpeed / 4.2));
-    }
-  } else {
-    player.stepClock = Math.min(player.stepClock, 0.8);
-  }
-
-  updateAttack(dt);
-  updateEnemyEngagement(dt);
+  finalizePlayerFrame(dt, now, stickMagnitude);
 }
-
 
 function startEnemyAttack() {
   if (!enemy || enemy.userData.attackTimer > 0) return;
@@ -5096,18 +5569,6 @@ function startEnemyAttack() {
   enemy.userData.attackElapsed = 0;
   enemy.userData.attackHitDone = false;
   playEnemyAction(attackName, 0.055);
-}
-
-function updateEnemyMixer(dt) {
-  if (!enemyMixer) return;
-  enemyMixer.update(dt);
-  if (!enemy.userData.dead && enemyCurrentAction) {
-    const clipName = enemyCurrentAction.getClip().name;
-    const oneShotReturns = ['jumping', 'react'];
-    if (oneShotReturns.includes(clipName) && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
-      playEnemyAction('idle', 0.12);
-    }
-  }
 }
 
 function updateEnemyEngagement(dt) {
@@ -5139,19 +5600,50 @@ function updateEnemyEngagement(dt) {
   const playerFloorY = playerGoalY;
   const verticalGap = playerFloorY - enemy.userData.baseY;
   const directCombatGoal = enemyCombatGoalPoint();
+  const toPlayer = player.position.clone().sub(enemy.position);
+  toPlayer.y = 0;
+  const dist = toPlayer.length();
+  const toPlayerDir = dist > 0.001 ? toPlayer.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1);
 
-  let playerRoomIndex = -1;
-  let enemyRoomIndex = -1;
+  let playerRoomIndex = findNearestGauntletRoomIndex(player.position);
+  let enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
   if (nav) {
-    nav.goal = routeGoal.clone();
     nav.lastSeenPlayer = player.position.clone();
     nav.repathTimer = Math.max(0, nav.repathTimer - dt);
     if (nav.jump) {
       advanceEnemyJump(dt);
       return;
     }
-    playerRoomIndex = findNearestGauntletRoomIndex(player.position);
-    enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
+    const roomDelta = (playerRoomIndex >= 0 && enemyRoomIndex >= 0)
+      ? Math.abs(playerRoomIndex - enemyRoomIndex)
+      : Number.POSITIVE_INFINITY;
+    const shouldWake = dist <= ENEMY_AI_WAKE_DISTANCE || roomDelta <= ENEMY_AI_WAKE_ROOM_DELTA;
+    const shouldSleep = dist >= ENEMY_AI_SLEEP_DISTANCE || roomDelta > ENEMY_AI_SLEEP_ROOM_DELTA;
+    if (nav.asleep ? !shouldWake : shouldSleep) {
+      if (!nav.asleep) {
+        nav.asleep = true;
+        clearEnemyRoute(nav);
+      }
+      nav.goal = null;
+      nav.jump = null;
+      nav.repathTimer = ENEMY_NAV_REPATH_INTERVAL;
+      nav.stallCount = 0;
+      enemy.userData.attackTimer = 0;
+      enemy.userData.attackElapsed = 0;
+      enemy.userData.attackHitDone = false;
+      enemy.userData.attackName = '';
+      enemy.userData.mode = 'hold';
+      enemy.userData.modeTimer = 0;
+      playEnemyAction('idle', 0.16);
+      return;
+    }
+    if (nav.asleep) {
+      nav.asleep = false;
+      nav.repathTimer = 0;
+      nav.lastEnemyRoomIndex = -1;
+      nav.lastPlayerRoomIndex = -1;
+    }
+    nav.goal = routeGoal.clone();
     const goalChanged = !previousGoal || (player.grounded ? previousGoal.distanceToSquared(nav.goal) > 0.36 : ((previousGoal.x - nav.goal.x) ** 2 + (previousGoal.z - nav.goal.z) ** 2 > 0.36));
     const roomChanged = nav.lastEnemyRoomIndex !== enemyRoomIndex || nav.lastPlayerRoomIndex !== playerRoomIndex;
     const staleRoute = nav.waypoints.length === 0 || nav.repathTimer <= 0 || roomChanged || goalChanged;
@@ -5159,11 +5651,6 @@ function updateEnemyEngagement(dt) {
     nav.lastEnemyRoomIndex = enemyRoomIndex;
     nav.lastPlayerRoomIndex = playerRoomIndex;
   }
-
-  const toPlayer = player.position.clone().sub(enemy.position);
-  toPlayer.y = 0;
-  const dist = toPlayer.length();
-  const toPlayerDir = dist > 0.001 ? toPlayer.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1);
   enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
 
   enemy.userData.attackCooldown = Math.max(0, (enemy.userData.attackCooldown || 0) - dt);
@@ -5384,9 +5871,28 @@ function updateAttack(dt) {
 function updateArms(dt) {
   if (armsMixer) armsMixer.update(dt);
   const moving = Math.hypot(input.smoothMoveX, input.smoothMoveY) > 0.18;
-  if (!player.attack && player.grounded && moving && walkAction) walkAction.timeScale = player.isRunning ? 1.55 : 1;
-  if (!player.attack && player.grounded) playArmAction(moving ? walkAction : idleAction, 0.12);
-  else if (!player.attack && !player.grounded && jumpAction) playArmAction(jumpAction, 0.12);
+  if (!player.attack && player.mode === 'mantle' && mantleAction) playArmAction(mantleAction, 0.08, activeArmAction !== mantleAction);
+  else if (!player.attack && player.mode === 'climb') {
+    if (input.smoothMoveY > 0.18 && climbUpAction) {
+      climbUpAction.timeScale = 1;
+      playArmAction(climbUpAction, 0.1);
+    }
+    else if (input.smoothMoveX < -0.18 && climbLeftAction) {
+      climbLeftAction.timeScale = 1;
+      playArmAction(climbLeftAction, 0.1);
+    }
+    else if (input.smoothMoveX > 0.18 && climbRightAction) {
+      climbRightAction.timeScale = 1;
+      playArmAction(climbRightAction, 0.1);
+    }
+    else if (climbIdleAction) {
+      climbIdleAction.timeScale = 0;
+      playArmAction(climbIdleAction, 0.08);
+    }
+  }
+  else if (!player.attack && player.grounded && moving && walkAction) walkAction.timeScale = player.isRunning ? 1.55 : 1;
+  if (!player.attack && player.mode === 'ground') playArmAction(moving ? walkAction : idleAction, 0.12);
+  else if (!player.attack && player.mode === 'air' && jumpAction) playArmAction(jumpAction, 0.12);
   if (armsModel && armsCameraBone) {
     armsModel.updateMatrixWorld(true);
     const pos = new THREE.Vector3();
@@ -5421,6 +5927,8 @@ function render() {
   try {
     const dt = Math.min(0.045, clock.getDelta());
     updatePlayer(dt);
+    updateAttack(dt);
+    updateEnemyEngagement(dt);
     updateArms(dt);
     updateDiegeticLights(performance.now() / 1000);
     updatePad();
@@ -5432,7 +5940,8 @@ function render() {
     const node = roomState.spec;
     const districtText = node?.districtName ? ` | D${(node.districtIndex ?? 0) + 1} ${node.districtName}${node.districtElevationBand ? `(${node.districtElevationBand})` : ''}` : '';
     const enemyNav = getEnemyNavState();
-    const navText = enemyNav ? ` | nav ${(enemyNav.waypointKinds[0] || enemy.userData.mode || 'idle')} w${enemyNav.waypoints.length} e${enemyNav.routePath.length}` : '';
+    const navMode = enemyNav?.asleep ? 'sleep' : (enemyNav?.waypointKinds[0] || enemy.userData.mode || 'idle');
+    const navText = enemyNav ? ` | nav ${navMode} w${enemyNav.waypoints.length} e${enemyNav.routePath.length}` : '';
     refreshEnemyRouteDebug(enemyNav);
     readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${navText} | ${input.gyro ? 'gyro' : 'touch'}`;
   } catch (err) {

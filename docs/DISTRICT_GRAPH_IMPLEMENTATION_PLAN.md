@@ -73,63 +73,201 @@ Short-term runtime objects:
 
 ## Phase Plan
 
-### Phase 1: Seeded District Layout Over Existing Room Batch
+### Phase 1: District Skeleton Schema
 
-Implement now.
+Implement first.
 
-- Replace fixed 12-room chapters with seeded districts.
-- Keep the existing `GENERATED_ROOM_BATCH` as the room source.
-- Partition the 48 specs into variable-sized district slices.
-- Give each district a distinct local layout pattern and branch pair set.
-- Build the full gauntlet from district offsets instead of chapter offsets.
-- Expose district metadata in status/readout so the run feels like traversing places with purpose.
-
-Success condition:
-
-- Same runtime remains playable.
-- Replays produce different district order/archetype/layout combinations.
-- The world is still one continuous physical layout.
-
-### Phase 2: District-Aware Room Selection
-
-- Stop treating the batch order as sacred.
-- Reorder or draw room specs by district purpose and preferred semantic roles.
-- Example: intake prefers `start`, `choice`, `corner`, `ambush`; furnace prefers `vertical_transition`, `hazard_crossing`, `switch`; shrine prefers `vista`, `locked`, `reward`, `hub`.
+- Extend district archetypes with architectural-source fields instead of only purpose/layout fields.
+- Add runtime district fields for:
+  - `skeletonType`
+  - `massPattern`
+  - `circulationPattern`
+  - `supportStyle`
+  - `patchStyle`
+  - `landmarkType`
+  - `silhouetteRule`
+  - `verticalProfile`
+- Keep the existing room/spec corpus, but stop treating it as the top-level world shape.
 
 Success condition:
 
-- The same district archetype tends to produce coherent route language and local gameplay pressures.
+- the generator can describe what a district is architecturally before it places local routes
 
-### Phase 3: District State And Return Loops
+### Phase 2: Architectural Skeleton Generation
 
-- Add per-district state changes.
-- Add route changes caused by switches, powered lifts, opened gates, moved cranes, or collapsed bridges.
-- Permit revisits and changed shortcuts instead of one-way consumption only.
-
-Success condition:
-
-- The settlement feels like a working hostile machine, not a chain of static scenes.
-
-### Phase 4: Streaming And Proxy World
-
-- Fully build the current district and adjacent districts.
-- Render distant districts as cheap silhouettes and landmark proxies.
-- Allow a larger world graph without loading the whole thing at full detail.
+- Generate `3 to 6` primary masses per district before room fitting.
+- Generate explicit `voids`, `support zones`, and one `landmark anchor`.
+- Make the blockout readable without local clutter or props.
+- Ensure each district has one dominant silhouette sentence.
 
 Success condition:
 
-- Open-world feel without destroying phone performance or navigational clarity.
+- a no-props screenshot reads as a real place instead of combat pads plus walls
+
+### Phase 3: Circulation Grammar Over Skeleton
+
+- Replace generic local layout offsets with circulation segments such as:
+  - `terrace_run`
+  - `roof_crossing`
+  - `switchback_stair`
+  - `bridge_span`
+  - `undercroft_return`
+  - `tower_core`
+- Fit room bundles onto those segment roles instead of placing them as abstract route units.
+
+Success condition:
+
+- route logic feels embedded in the architecture instead of laid on top of it
+
+### Phase 4: Patchwork Adaptation Pass
+
+- After the skeleton and circulation pass, add district-specific repair language:
+  - scaffold infill
+  - chained crosswalks
+  - bolted catwalks
+  - masonry patch walls
+  - cage lifts
+  - diagonal braces
+- Keep patchwork subordinate to the older structural mass.
+
+Success condition:
+
+- the world still reads as patched and piecemeal, but the underlying structure is legible and culturally grounded
+
+### Phase 5: District Validation And Expansion
+
+- Validate district readability, not only traversability.
+- Reject or repair districts that fail silhouette, over-under, or landmark reads.
+- Expand the skeleton-first method to the remaining archetypes after one district proves out.
+
+Success condition:
+
+- replay variety comes from distinct architectural skeletons, not only shuffled room order
 
 ## First Executable Slice
 
-The first slice in this session should do only the following:
+The next production slice should prove the new architectural direction with one district, not spread a weak version across all of them.
 
-- Add a seeded district archetype library in `src/main.js`.
-- Generate a deterministic district plan from `roomState.levelIndex`.
-- Replace `BATCH_CHAPTER_*` layout logic with district-plan layout logic.
-- Keep rooms, combat, collision, and enemy spawn behavior otherwise intact.
-- Update runtime status/readout to show district name and purpose.
-- Document the new runtime shape in the existing room-batch implementation doc.
+### Target district: `Hanging Market`
+
+Use a `medina_kasbah + stilt_wharf_settlement` hybrid.
+
+Required blockout:
+
+- `4` major masses
+  - entry deck mass
+  - central stacked market block
+  - side underdeck support block
+  - far landmark bridge cluster
+- `3` occupiable circulation bands
+  - roof / high-crosswalk band
+  - market / middle band
+  - underdeck / return band
+- visible support forest under the main circulation
+- at least one exposed suspended crossing
+- at least one visible over-under relationship inside the district
+
+Required room-role mapping:
+
+- `roof_lane`
+- `market_court`
+- `bridge_landing`
+- `support_stair`
+- `underdeck_pass`
+
+Validation for this slice:
+
+- a raw screenshot reads as a stacked market settlement, not a generic combat gauntlet
+- the main route is visibly embedded in the masses
+- the under-route is visible and legible
+- the patchwork layer reads as adaptation, not random clutter
+
+Only after this passes should the same pipeline be copied to liftworks, shrine rim, refuse underworks, intake, and furnace.
+
+## Runtime Touchpoints For The First Conversion
+
+The current runtime already has the correct top-level insertion points. The first implementation pass should stay inside them instead of attempting a full generator rewrite.
+
+### Existing symbols to extend
+
+- `DISTRICT_MACRO_TEMPLATES`
+  - add architectural-source fields here first
+  - this is where `scaffolds` should become the real `Hanging Market` proof district instead of only a placement template
+- `DISTRICT_ARCHETYPE_TEMPLATES`
+  - keep the current mapping, but point `scaffolds` at a richer skeleton-aware template
+- `generateDistrictPlan(levelIndex)`
+  - add district-level skeleton metadata to the generated district records
+- `batchRoomWorldOffset(index, plan)`
+  - replace pure layout-point interpretation for the proof district with skeleton-segment fitting
+- `buildGeneratedGauntlet(startIndex)`
+  - use district skeleton masses and circulation bands before room fitting, then place rooms into those structural roles
+- `buildRoom(movePlayer)`
+  - expose the new district metadata in `roomState.plan` and `roomState.spec` for debugging and later validation
+
+### New short-term runtime fields
+
+Add these to each generated district object:
+
+- `realSourceA`
+- `realSourceB`
+- `skeletonType`
+- `massAnchors`
+- `circulationBands`
+- `segmentRoles`
+- `patchStyle`
+- `landmarkAnchor`
+- `silhouetteRule`
+
+These fields are enough for one proof district. Do not add a bigger generalized content schema until `Hanging Market` actually reads correctly.
+
+## Hanging Market Implementation Order
+
+Do this in sequence.
+
+1. Extend the `scaffolds` entry in `DISTRICT_MACRO_TEMPLATES`
+   - set `realSourceA = medina_kasbah`
+   - set `realSourceB = stilt_wharf_settlement`
+   - add `skeletonType = hanging_market_hybrid`
+   - add `patchStyle = scaffold_chain_infill`
+   - add `silhouetteRule = lateral stacked market over a visible support forest`
+
+2. Add a district-local skeleton generator for `hanging_market_hybrid`
+   - output `4` major mass anchors
+   - output `3` circulation bands
+   - output one landmark crosswalk anchor
+   - output one underdeck support zone
+
+3. Fit the existing `layoutPoints` to structural roles instead of free space
+   - high points become `roof_lane`
+   - middle points become `market_court`
+   - transition points become `support_stair`
+   - low points become `underdeck_pass`
+   - exposed connectors become `bridge_landing`
+
+4. Only after the structural fit works, add patchwork geometry
+   - chained crosswalks
+   - scaffold braces
+   - bolted catwalk inserts
+   - infill stalls or roof bridges
+
+5. Validate the proof district on screenshots before copying the method
+   - no flat pad read
+   - clear upper and lower occupiable bands
+   - visible underside support depth
+   - one strong landmark silhouette
+   - route visibly embedded in architecture
+
+## Explicit Anti-Scope Rules
+
+For the first district conversion:
+
+- do not rework enemy routing logic
+- do not redesign combat spaces globally
+- do not add general clutter passes to all districts
+- do not try to convert all archetypes in one patch
+- do not replace the room corpus
+
+The correct first win is one district whose skeleton reads properly on screenshot.
 
 ## Explicit Non-Goals For This Slice
 

@@ -33,6 +33,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 - `docs/ROOM_JUNCTION_BATCH_LIST.md`: human-readable room junction build list.
 - `docs/ROOM_BATCH_IMPLEMENTATION.md`: runtime wiring notes for the generated room sequence.
 - `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`: district-level route graph and implementation status.
+- `docs/DISTRICT_RUNTIME_CONTRACT.md`: authoritative runtime contract for district build order, skeleton geometry, support snapping, spawns, and enemy traversal.
 
 ## Direction
 
@@ -48,6 +49,7 @@ Level-design workflow is split in two places:
 - project-specific workflow: `docs/LEVEL_DESIGN_WORKFLOW.md`
 - realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
 - district graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
+- runtime contract: `docs/DISTRICT_RUNTIME_CONTRACT.md`
 
 When a level-design pass produces a durable critique/fix pattern, update the general Thunder note if it generalizes and this project-local note if it is Infinite Brutality-specific.
 
