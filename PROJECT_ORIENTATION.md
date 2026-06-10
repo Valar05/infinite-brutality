@@ -51,6 +51,10 @@ Level-design workflow is split in two places:
 
 When a level-design pass produces a durable critique/fix pattern, update the general Thunder note if it generalizes and this project-local note if it is Infinite Brutality-specific.
 
+Before combat changes, also read `docs/COMBAT_BRINGUP_PLAN.md`. That note captures the Gravity Fist-derived combat contract: explicit attack ownership, permission gating, one active hit window, stateful hurt reaction, and no reseat on ordinary room changes.
+
+If the runtime starts ignoring a `.poseclip.json` attack clip, check the asset path first. Pose clips should be loaded from the project asset URL directly, not by resolving through `import.meta.url`.
+
 Before making changes:
 
 1. Explain the problem.

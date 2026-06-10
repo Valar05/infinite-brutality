@@ -7,6 +7,7 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 - Prototype lessons: `../thunder-brainstorm/generated/session_learnings/2026-06-08_infinite_brutality_prototype_lessons.md`
 - General level-design workflow: `../thunder-brainstorm/generated/skills/level_design_environment_grammar.md`
 - Project-specific level-design workflow: `docs/LEVEL_DESIGN_WORKFLOW.md`
+- Project combat bring-up plan: `docs/COMBAT_BRINGUP_PLAN.md`
 - Vertical district realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
 - District graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
 - Project links: `../thunder-brainstorm/generated/project_links/infinite_brutality_project_links.md`

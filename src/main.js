@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.30';
+const BUILD = '0.8.35';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -1493,8 +1493,6 @@ const PRO_MELEE_AXE_CLIPS = {
   run: 'assets/models/pro_melee_axe/standing_run_forward.fbx',
   jumping: 'assets/models/pro_melee_axe/standing_jump.fbx',
   attackHorizontal: 'assets/models/pro_melee_axe/standing_melee_attack_horizontal_smooth.poseclip.json',
-  attackDownward: 'assets/models/pro_melee_axe/standing_melee_attack_downward.fbx',
-  attackCombo: 'assets/models/pro_melee_axe/standing_melee_combo_attack_v1.fbx',
   react: 'assets/models/pro_melee_axe/standing_react_large_gut.fbx',
 };
 const ENEMY_RING_RADIUS = 4.0;
@@ -3300,7 +3298,7 @@ function deserializePoseClip(data, fallbackName = 'pose clip') {
 }
 
 function loadPoseClip(path) {
-  return fetch(new URL(path, import.meta.url)).then((response) => {
+  return fetch(path).then((response) => {
     if (!response.ok) throw new Error('failed to load pose clip ' + path + ' (' + response.status + ')');
     return response.json();
   }).then((data) => deserializePoseClip(data, path.split('/').pop().replace(/\.poseclip\.json$/i, '').replace(/\.[^.]+$/, '')));
@@ -4065,8 +4063,6 @@ function loadProMeleeAxeEnemyClips() {
   loadEnemyClip('run', PRO_MELEE_AXE_CLIPS.run, { stripRootMotionXZ: true, timeScale: 1.1 });
   loadEnemyClip('jumping', PRO_MELEE_AXE_CLIPS.jumping, { once: true, stripRootMotionXZ: true });
   loadEnemyClip('attackHorizontal', PRO_MELEE_AXE_CLIPS.attackHorizontal, { once: true });
-  loadEnemyClip('attackDownward', PRO_MELEE_AXE_CLIPS.attackDownward, { once: true });
-  loadEnemyClip('attackCombo', PRO_MELEE_AXE_CLIPS.attackCombo, { once: true });
   loadEnemyClip('react', PRO_MELEE_AXE_CLIPS.react, { once: true });
   loadEnemyClip('dying', PRO_MELEE_AXE_CLIPS.react, { once: true, timeScale: 0.72 });
 }
@@ -4658,7 +4654,11 @@ function updatePlayer(dt) {
 
 function startEnemyAttack() {
   if (!enemy || enemy.userData.attackTimer > 0) return;
-  const attackName = enemyActions.has('attackHorizontal') ? 'attackHorizontal' : (enemyActions.has('attackDownward') ? 'attackDownward' : (enemyActions.has('attackCombo') ? 'attackCombo' : 'idle'));
+  const attackName = enemyActions.has('attackHorizontal') ? 'attackHorizontal' : '';
+  if (!attackName) {
+    console.warn('enemy attack missing attackHorizontal; refusing fallback attack');
+    return;
+  }
   const clipDuration = enemyActions.get(attackName)?.getClip?.().duration || ENEMY_ATTACK_RECOVERY;
   enemy.userData.attackName = attackName;
   enemy.userData.attackTimer = Math.max(clipDuration, ENEMY_ATTACK_RECOVERY);
@@ -4672,7 +4672,7 @@ function updateEnemyMixer(dt) {
   enemyMixer.update(dt);
   if (!enemy.userData.dead && enemyCurrentAction) {
     const clipName = enemyCurrentAction.getClip().name;
-    const oneShotReturns = ['jumping', 'react', 'attackDownward', 'attackCombo'];
+    const oneShotReturns = ['jumping', 'react'];
     if (oneShotReturns.includes(clipName) && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
       playEnemyAction('idle', 0.12);
     }
