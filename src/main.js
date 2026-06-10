@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.60';
+const BUILD = '0.8.61';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -2213,10 +2213,24 @@ function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, cente
   const sideSign = (hashRoomKey(spec.id || String(options.index || 0)) % 2) ? 1 : -1;
   const isGoalTeaseCorner = options.wantsCorner && /goal_tease|blocked_goal_view|exit_gate_read/.test(role + ' ' + routeText);
   const attachWall = (name, side, span = 0.34, height = 4.4) => {
-    if (side === 'north') addWallBox(parent, prefix + '-' + name, [width * span, height, 1.0], [0, height * 0.5, depth * 0.5 - 1.0], MAT.connectorWall, false);
-    if (side === 'south') addWallBox(parent, prefix + '-' + name, [width * span, height, 1.0], [0, height * 0.5, -depth * 0.5 + 1.0], MAT.connectorWall, false);
-    if (side === 'east') addWallBox(parent, prefix + '-' + name, [1.0, height, depth * span], [width * 0.5 - 1.0, height * 0.5, 0], MAT.connectorWall, false);
-    if (side === 'west') addWallBox(parent, prefix + '-' + name, [1.0, height, depth * span], [-width * 0.5 + 1.0, height * 0.5, 0], MAT.connectorWall, false);
+    const alongX = side === 'north' || side === 'south';
+    const length = alongX ? width * span : depth * span;
+    const wallX = side === 'east' ? width * 0.5 - 1.0 : side === 'west' ? -width * 0.5 + 1.0 : 0;
+    const wallZ = side === 'north' ? depth * 0.5 - 1.0 : side === 'south' ? -depth * 0.5 + 1.0 : 0;
+    const curbSize = alongX ? [length, 0.28, 0.72] : [0.72, 0.28, length];
+    const curbPos = alongX ? [0, 0.14, wallZ] : [wallX, 0.14, 0];
+    addBeveledBox(parent, prefix + '-' + name + '-curb', curbSize, curbPos, MAT.trim, false, 0.02, 1);
+    const postHeight = Math.max(2.4, height * 0.72);
+    const endOffset = Math.max(0.6, length * 0.5 - 0.42);
+    if (alongX) {
+      addBeveledBox(parent, prefix + '-' + name + '-post-a', [0.34, postHeight, 0.52], [-endOffset, postHeight * 0.5, wallZ], MAT.connectorWall, false, 0.03, 1);
+      addBeveledBox(parent, prefix + '-' + name + '-post-b', [0.34, postHeight, 0.52], [endOffset, postHeight * 0.5, wallZ], MAT.connectorWall, false, 0.03, 1);
+      addBeveledBox(parent, prefix + '-' + name + '-cap', [Math.max(1.0, length - 0.68), 0.18, 0.28], [0, postHeight - 0.12, wallZ], MAT.iron, false, 0.02, 1);
+    } else {
+      addBeveledBox(parent, prefix + '-' + name + '-post-a', [0.52, postHeight, 0.34], [wallX, postHeight * 0.5, -endOffset], MAT.connectorWall, false, 0.03, 1);
+      addBeveledBox(parent, prefix + '-' + name + '-post-b', [0.52, postHeight, 0.34], [wallX, postHeight * 0.5, endOffset], MAT.connectorWall, false, 0.03, 1);
+      addBeveledBox(parent, prefix + '-' + name + '-cap', [0.28, 0.18, Math.max(1.0, length - 0.68)], [wallX, postHeight - 0.12, 0], MAT.iron, false, 0.02, 1);
+    }
   };
   const sideWall = routeAlongX ? (sideSign > 0 ? 'north' : 'south') : (sideSign > 0 ? 'east' : 'west');
   const oppositeWall = routeAlongX ? (sideSign > 0 ? 'south' : 'north') : (sideSign > 0 ? 'west' : 'east');
