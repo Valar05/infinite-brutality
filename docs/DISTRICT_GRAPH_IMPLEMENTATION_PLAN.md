@@ -220,6 +220,32 @@ Add these to each generated district object:
 
 These fields are enough for one proof district. Do not add a bigger generalized content schema until `Hanging Market` actually reads correctly.
 
+## Landmark Schema And Validation Contract
+
+For the next generator pass, every proof-district landmark should produce a minimal schema record derived from `docs/LEVEL_DESIGN_BIBLE.md`:
+
+- `formerUse`
+- `damageCause`
+- `currentOccupant`
+- `silhouetteFamily`
+- `wonderTags[]`
+- `tacticalFeatures[]`
+- `combatSentence`
+- `climbRoutes[]`
+- `visibilityTargets[]`
+- `habitationProof[]`
+- `acceptanceChecks[]`
+
+And every district should validate these categories before acceptance:
+
+- historical read
+- Hanging Gardens wonder read
+- tactical read
+- climb value
+- visibility and pull
+
+The first proof implementation should fail or repair `Hanging Market` if it cannot produce at least one chokepoint, one strongpoint, one kill zone, one escape route, one meaningful climb recovery path, and one visible future destination.
+
 ## Hanging Market Implementation Order
 
 Do this in sequence.

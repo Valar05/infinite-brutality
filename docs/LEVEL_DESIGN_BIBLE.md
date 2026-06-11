@@ -423,3 +423,197 @@ It must also ask:
 - why would someone want to climb it
 - what tactical sentence does this space create
 - why does the player want to go there
+
+
+## Generator Landmark Schema
+
+The bible needs a concrete landmark contract so the generator can fail incomplete spaces early.
+
+Every major landmark should carry a schema record like this:
+
+```js
+{
+  id,
+  districtId,
+  formerUse,
+  damageCause,
+  currentOccupant,
+  silhouetteFamily,
+  wonderTags: [],
+  tacticalFeatures: [],
+  combatSentence,
+  climbRoutes: [],
+  visibilityTargets: [],
+  lowerLayer,
+  middleLayer,
+  upperLayer,
+  supportLanguage,
+  habitationProof: [],
+  landmarkAnchors: [],
+  acceptanceChecks: []
+}
+```
+
+### Required fields
+
+- `formerUse`
+  - what this structure originally was
+- `damageCause`
+  - how it was broken, collapsed, burned, besieged, or scavenged
+- `currentOccupant`
+  - who survives here now or what uses it now
+- `silhouetteFamily`
+  - the dominant historical read such as bathhouse, monastery, aqueduct, harbor wall, or market terrace
+- `wonderTags`
+  - the Hanging Gardens attraction set such as water, lanterns, terraces, bridges, vegetation, sky exposure, or hanging structures
+- `tacticalFeatures`
+  - explicit landmark outputs like chokepoint, strongpoint, kill_zone, escape_route
+- `combatSentence`
+  - the main tactical decision this space creates
+- `climbRoutes`
+  - where climbing creates alternate, recovery, ambush, or overlook value
+- `visibilityTargets`
+  - what future place or shortcut the landmark reveals
+- `lowerLayer`, `middleLayer`, `upperLayer`
+  - what each layer is for and why it exists
+- `supportLanguage`
+  - what physically holds it up over the abyss
+- `habitationProof`
+  - evidence that survivors actually used it
+- `acceptanceChecks`
+  - screenshot-visible tests that must all pass
+
+### Landmark archetype examples
+
+#### Hanging market bridge cluster
+
+- `formerUse`: trade terrace / retaining wall marketplace
+- `damageCause`: partial collapse, scavenged decking, hanging repairs
+- `currentOccupant`: toll keepers, scavenger stalls, corpsefire watchers
+- `tacticalFeatures`: chokepoint, strongpoint, escape_route
+- `combatSentence`: push across the bridge or drop to the underdeck return
+- `climbRoutes`: side support ladder, broken brace climb, awning-to-roof recovery
+- `visibilityTargets`: next market tier, shrine rim, lower return pass
+
+#### Broken bathhouse court
+
+- `formerUse`: Roman bath complex
+- `damageCause`: roof collapse, drained channels, fire damage
+- `currentOccupant`: squatters, corpse burners, patrol survivors
+- `tacticalFeatures`: kill_zone, escape_route, upper_strongpoint
+- `combatSentence`: circle the court floor or take the gallery
+- `climbRoutes`: collapsed wall grip route to upper gallery
+- `visibilityTargets`: aqueduct spine, hidden cistern shortcut
+
+## District Validation Rules
+
+A district is not valid because traversal works.
+
+A district is valid only if traversal, wonder, history, and tactics all read together.
+
+### District-level required outputs
+
+Every district must produce at least:
+
+- `1` dominant former-use skeleton
+- `1` landmark that passes the Hanging Gardens test
+- `1` chokepoint
+- `1` strongpoint
+- `1` kill zone
+- `1` escape route
+- `1` meaningful climb recovery path
+- `1` visible future destination or shortcut
+- `1` upper/lower over-under read
+- `1` clear sign of habitation or maintenance
+
+### Validation categories
+
+#### 1. Historical read
+
+Pass only if all are true:
+
+- the screenshot suggests a real former structure
+- the silhouette family is legible without UI context
+- patchwork reads as adaptation layered over prior architecture
+- damage language explains why routes are broken, elevated, or exposed
+
+#### 2. Hanging Gardens wonder read
+
+Pass only if all are true:
+
+- the player sees at least one place they want to reach for the place itself
+- the district contains at least `3` wonder tags
+- sky exposure, suspended structure, and elevation work together
+- the landmark still reads as a destination before combat starts
+
+#### 3. Tactical read
+
+Pass only if all are true:
+
+- the district contains a declared combat sentence for each major arena
+- there is at least one retreat-or-commit decision
+- there is at least one elevation-advantage decision
+- there is at least one route where enemies can pressure from more than one direction
+- there is at least one recovery route for player mistakes
+
+#### 4. Climb value
+
+Pass only if all are true:
+
+- climbing opens an alternate or recovery path
+- climbing changes tactical position, not just collectible access
+- a failed jump often spills into a survivable recovery path
+- upper layers connect back into the main route meaningfully
+
+#### 5. Visibility and pull
+
+Pass only if all are true:
+
+- the player can see a future landmark, route, or shortcut
+- the visibility question is spatial, not only reward-driven
+- at least one reveal creates a "how do I get there" moment
+
+### District rejection triggers
+
+Reject or repair a district if any of these are true:
+
+- it reads as floating boxes instead of a former structure
+- combat spaces do not create a tactical sentence
+- climbing exists but does not change decision-making
+- the upper layer is decorative only
+- the lower layer is only death space with no recovery logic
+- there is no visible habitation proof
+- patchwork fully obscures the historical silhouette
+- traversal works but the place is not desirable to explore
+
+## Room Bundle Translation Rules
+
+Room bundles should stop being generic route pads.
+
+Each room bundle fitted into a district should declare:
+
+- `structuralRole`
+  - roof_lane, market_court, bridge_landing, support_stair, tower_core, underdeck_pass, courtyard_floor, gate_step
+- `historicalAttachment`
+  - what part of the former structure this bundle belongs to
+- `tacticalOutput`
+  - chokepoint, strongpoint, kill_zone, escape_route, or transition
+- `combatSentence`
+  - the decision the player makes here
+- `climbValue`
+  - alternate, recovery, ambush, or observation
+
+If a room bundle cannot answer those fields, it is not ready to be placed into a historical district.
+
+## Implementation Bias
+
+The generator should now validate in this order:
+
+1. former-use skeleton exists
+2. landmark schema is complete
+3. district validation categories pass
+4. room bundles fit structural and tactical roles
+5. traversal and enemy pathing still work
+6. local dressing reinforces the result
+
+This prevents the current failure mode where a level is technically traversable but still reads as abstract pads with no history and no tactical sentence.

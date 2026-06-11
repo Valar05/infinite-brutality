@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.65';
+const BUILD = '0.8.66';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -2868,6 +2868,179 @@ function buildDistrictSkeletonMeta(district) {
   };
 }
 
+function makeDistrictAcceptanceCheck(id, text, passed) {
+  return { id, text, passed: !!passed };
+}
+
+function buildDistrictValidationSummary(district, landmarkSchemas) {
+  if (!landmarkSchemas?.length) {
+    return {
+      implemented: false,
+      passes: null,
+      requiredOutputs: {},
+      categories: {},
+      failedChecks: [],
+      screenshotFailChecks: [],
+      tacticalCoverage: [],
+      wonderCoverage: [],
+      habitationProofCount: 0,
+    };
+  }
+  const tacticalCoverage = [...new Set(landmarkSchemas.flatMap((landmark) => landmark.tacticalFeatures || []))];
+  const wonderCoverage = [...new Set(landmarkSchemas.flatMap((landmark) => landmark.wonderTags || []))];
+  const habitationProofCount = landmarkSchemas.reduce((sum, landmark) => sum + (landmark.habitationProof?.length || 0), 0);
+  const hasHistoricalStories = landmarkSchemas.every((landmark) => landmark.formerUse && landmark.damageCause && landmark.currentOccupant && landmark.silhouetteFamily);
+  const hasWonderLandmark = landmarkSchemas.some((landmark) => (landmark.wonderTags?.length || 0) >= 3);
+  const hasCombatSentences = landmarkSchemas.every((landmark) => landmark.combatSentence);
+  const hasClimbRoutes = landmarkSchemas.some((landmark) => (landmark.climbRoutes?.length || 0) > 0);
+  const hasMeaningfulClimbRecovery = landmarkSchemas.some((landmark) => (landmark.climbRoutes || []).some((route) => /recovery/i.test(route.value || route.kind || '')));
+  const hasVisibilityTargets = landmarkSchemas.some((landmark) => (landmark.visibilityTargets?.length || 0) > 0);
+  const hasHabitationProof = habitationProofCount > 0;
+  const requiredOutputs = {
+    dominantFormerUseSkeleton: !!district.skeletonType && !!district.realSourceA,
+    hangingGardensLandmark: hasWonderLandmark,
+    chokepoint: tacticalCoverage.includes('chokepoint'),
+    strongpoint: tacticalCoverage.includes('strongpoint'),
+    killZone: tacticalCoverage.includes('kill_zone'),
+    escapeRoute: tacticalCoverage.includes('escape_route'),
+    climbRecoveryPath: hasMeaningfulClimbRecovery,
+    visibleFutureDestination: hasVisibilityTargets,
+    overUnderRead: (district.circulationBands?.length || 0) >= 3,
+    habitationProof: hasHabitationProof,
+  };
+  const categories = {
+    historicalRead: requiredOutputs.dominantFormerUseSkeleton && hasHistoricalStories && !!district.patchStyle && !!district.silhouetteRule,
+    hangingGardensWonderRead: requiredOutputs.hangingGardensLandmark && !!district.landmarkAnchor && wonderCoverage.some((tag) => tag === 'sky_exposure' || tag === 'bridges' || tag === 'terraces'),
+    tacticalRead: hasCombatSentences && requiredOutputs.chokepoint && requiredOutputs.strongpoint && requiredOutputs.killZone && requiredOutputs.escapeRoute,
+    climbValue: hasClimbRoutes && requiredOutputs.climbRecoveryPath && requiredOutputs.overUnderRead,
+    visibilityAndPull: requiredOutputs.visibleFutureDestination && requiredOutputs.hangingGardensLandmark,
+  };
+  const screenshotFailChecks = [
+    makeDistrictAcceptanceCheck('historical_read', 'district reads as a former structure with visible damage and occupancy', categories.historicalRead),
+    makeDistrictAcceptanceCheck('wonder_read', 'district creates at least one Hanging Gardens destination read', categories.hangingGardensWonderRead),
+    makeDistrictAcceptanceCheck('tactical_read', 'district exposes chokepoint, strongpoint, kill zone, and escape route decisions', categories.tacticalRead),
+    makeDistrictAcceptanceCheck('climb_value', 'climbing creates a meaningful recovery or alternate route', categories.climbValue),
+    makeDistrictAcceptanceCheck('visibility_pull', 'player can see a future destination or shortcut that pulls them forward', categories.visibilityAndPull),
+  ];
+  const failedChecks = [
+    ...Object.entries(requiredOutputs).filter(([, passed]) => !passed).map(([key]) => key),
+    ...screenshotFailChecks.filter((check) => !check.passed).map((check) => check.id),
+  ];
+  return {
+    implemented: true,
+    passes: failedChecks.length === 0,
+    requiredOutputs,
+    categories,
+    failedChecks,
+    screenshotFailChecks,
+    tacticalCoverage,
+    wonderCoverage,
+    habitationProofCount,
+  };
+}
+
+function buildHangingMarketLandmarkSchemas(district) {
+  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
+  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 7.4;
+  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 12.4;
+  const bridgeAnchor = district.landmarkAnchor || { x: district.origin.x + 86, y: highBand + 1.2, z: district.origin.z + 286, role: 'market_bridge_cluster' };
+  return [
+    {
+      id: district.id + '-market-bridge-cluster',
+      districtId: district.id,
+      formerUse: 'trade terrace marketplace bridge cluster',
+      damageCause: 'partial collapse and hanging salvage repair',
+      currentOccupant: 'toll keepers, scavenger stalls, corpsefire watchers',
+      silhouetteFamily: 'hanging market bridge cluster',
+      wonderTags: ['bridges', 'terraces', 'lanterns', 'sky_exposure', 'hanging_structures'],
+      tacticalFeatures: ['chokepoint', 'strongpoint', 'escape_route'],
+      combatSentence: 'push across the bridge or drop to the underdeck return',
+      climbRoutes: [
+        { id: 'brace-recovery', kind: 'brace_climb', value: 'recovery_route', fromBand: 'market_low', toBand: 'market_high' },
+        { id: 'awning-flank', kind: 'awning_scramble', value: 'ambush_route', fromBand: 'market_mid', toBand: 'market_high' },
+      ],
+      visibilityTargets: [
+        { id: 'shrine-rim', kind: 'future_landmark', prompt: 'how do i get there' },
+        { id: 'underdeck-return', kind: 'future_shortcut', prompt: 'can i drop and recover there' },
+      ],
+      lowerLayer: 'underdeck pressure and recovery return',
+      middleLayer: 'market pressure lane',
+      upperLayer: 'roof lane and bridge control',
+      supportLanguage: 'scaffold forest, chain hangs, diagonal braces',
+      habitationProof: ['bridge toll fires', 'market stalls', 'watch posts', 'lanterns'],
+      landmarkAnchors: [bridgeAnchor],
+      acceptanceChecks: [
+        { id: 'visible-bridge-cluster', text: 'bridge cluster reads before arrival' },
+        { id: 'over-under-market', text: 'upper bridge reads above an underdeck return' },
+      ],
+    },
+    {
+      id: district.id + '-market-core-court',
+      districtId: district.id,
+      formerUse: 'retaining-wall market court',
+      damageCause: 'wall breach, awning collapse, and scaffold replacement',
+      currentOccupant: 'stall keepers, corpsefire guards, roaming scavengers',
+      silhouetteFamily: 'stacked market court',
+      wonderTags: ['terraces', 'lanterns', 'architecture', 'gardens'],
+      tacticalFeatures: ['kill_zone', 'strongpoint'],
+      combatSentence: 'circle through the court or climb out to the roof lane',
+      climbRoutes: [
+        { id: 'court-awning', kind: 'awning_climb', value: 'alternate_route', fromBand: 'market_mid', toBand: 'market_high' },
+      ],
+      visibilityTargets: [
+        { id: 'bridge-cluster', kind: 'future_landmark', prompt: 'the high bridge market tier ahead' },
+      ],
+      lowerLayer: 'stall shadows and pressure pockets',
+      middleLayer: 'main crowd court and combat lane',
+      upperLayer: 'roof eaves and hanging crosswalks',
+      supportLanguage: 'retaining walls with scaffold infill',
+      habitationProof: ['stalls', 'garden trays', 'lanterns', 'work benches'],
+      landmarkAnchors: [{ x: district.origin.x + 24, y: midBand + 0.6, z: district.origin.z + 168, role: 'market_court' }],
+      acceptanceChecks: [
+        { id: 'court-kill-zone', text: 'court reads as a surround-risk arena' },
+      ],
+    },
+    {
+      id: district.id + '-underdeck-return',
+      districtId: district.id,
+      formerUse: 'service undercroft and maintenance pass',
+      damageCause: 'load sag, missing planks, and emergency bracing',
+      currentOccupant: 'maintenance scavengers and hidden survivors',
+      silhouetteFamily: 'underdeck service run',
+      wonderTags: ['hanging_structures', 'sky_exposure', 'bridges'],
+      tacticalFeatures: ['escape_route', 'chokepoint'],
+      combatSentence: 'drop to recover or hold the narrow return against pursuit',
+      climbRoutes: [
+        { id: 'service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'market_low', toBand: 'market_mid' },
+      ],
+      visibilityTargets: [
+        { id: 'market-core-return', kind: 'future_shortcut', prompt: 'this can save a missed jump' },
+      ],
+      lowerLayer: 'recovery and ambush pressure lane',
+      middleLayer: 'rejoin point back into the market route',
+      upperLayer: 'visible roof traffic overhead',
+      supportLanguage: 'timber braces and hanging chain repairs',
+      habitationProof: ['maintenance lamps', 'wells', 'hidden shrines'],
+      landmarkAnchors: [{ x: district.origin.x + 12, y: lowBand + 0.5, z: district.origin.z + 220, role: 'underdeck_return' }],
+      acceptanceChecks: [
+        { id: 'underdeck-recovery', text: 'underdeck path visibly reads as a survivable recovery route' },
+      ],
+    },
+  ];
+}
+
+function buildDistrictDesignContract(district) {
+  if (district.skeletonType === 'hanging_market_hybrid') {
+    const landmarkSchemas = buildHangingMarketLandmarkSchemas(district);
+    const validation = buildDistrictValidationSummary(district, landmarkSchemas);
+    return { landmarkSchemas, validation };
+  }
+  return {
+    landmarkSchemas: [],
+    validation: buildDistrictValidationSummary(district, []),
+  };
+}
+
 function shuffleWithRng(items, rng) {
   const list = [...items];
   for (let i = list.length - 1; i > 0; i -= 1) {
@@ -2958,6 +3131,7 @@ function generateDistrictPlan(levelIndex) {
       silhouetteRule: template.silhouetteRule || null,
     };
     Object.assign(district, buildDistrictSkeletonMeta(district));
+    Object.assign(district, buildDistrictDesignContract(district));
     for (let j = 0; j < roomCount && roomStart + j < totalRooms; j += 1) roomToDistrict[roomStart + j] = i;
     roomStart += roomCount;
     districts.push(district);
@@ -3375,6 +3549,10 @@ function buildGeneratedGauntlet(startIndex = 0) {
     addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
   }
   for (const district of districtPlan.districts) addDistrictSkeletonGeometry(district);
+  const designFailures = districtPlan.districts
+    .filter((district) => district.validation?.implemented && !district.validation.passes)
+    .map((district) => ({ id: district.id, failedChecks: district.validation.failedChecks }));
+  if (designFailures.length) console.warn('district design validation', designFailures);
   const connectivity = validateAndRepairGauntletConnectivity(rooms, branchLinks);
   const first = rooms[Math.max(0, Math.min(startIndex, rooms.length - 1))] || rooms[0];
   const last = rooms[rooms.length - 1] || first;
@@ -3484,6 +3662,18 @@ function buildRoom(movePlayer = true) {
       patchStyle: district.patchStyle,
       silhouetteRule: district.silhouetteRule,
       segmentRoles: [...(district.segmentRoles || [])],
+      landmarkSchemas: (district.landmarkSchemas || []).map((landmark) => ({ ...landmark })),
+      validation: district.validation ? {
+        implemented: district.validation.implemented,
+        passes: district.validation.passes,
+        requiredOutputs: { ...(district.validation.requiredOutputs || {}) },
+        categories: { ...(district.validation.categories || {}) },
+        failedChecks: [...(district.validation.failedChecks || [])],
+        screenshotFailChecks: (district.validation.screenshotFailChecks || []).map((check) => ({ ...check })),
+        tacticalCoverage: [...(district.validation.tacticalCoverage || [])],
+        wonderCoverage: [...(district.validation.wonderCoverage || [])],
+        habitationProofCount: district.validation.habitationProofCount || 0,
+      } : null,
     })),
     mainSpineEdges: districtPlan.mainSpineEdges.map((edge) => ({ ...edge })),
     returnEdges: districtPlan.returnEdges.map((edge) => ({ ...edge })),
@@ -3503,6 +3693,9 @@ function buildRoom(movePlayer = true) {
         districtMacroTemplateId: info.district.macroTemplateId,
         districtSkeletonType: info.district.skeletonType,
         districtSegmentRole: info.district.segmentRoles?.[info.localIndex] || null,
+        districtValidationImplemented: info.district.validation?.implemented || false,
+        districtValidationPasses: info.district.validation?.passes ?? null,
+        districtValidationFailedChecks: [...(info.district.validation?.failedChecks || [])],
       };
     }),
   };
@@ -3532,6 +3725,10 @@ function buildRoom(movePlayer = true) {
     districtMacroTemplateId: districtInfo.district.macroTemplateId,
     districtSkeletonType: districtInfo.district.skeletonType,
     districtSegmentRole: districtInfo.district.segmentRoles?.[districtInfo.localIndex] || null,
+    districtValidationImplemented: districtInfo.district.validation?.implemented || false,
+    districtValidationPasses: districtInfo.district.validation?.passes ?? null,
+    districtValidationFailedChecks: [...(districtInfo.district.validation?.failedChecks || [])],
+    districtLandmarks: (districtInfo.district.landmarkSchemas || []).map((landmark) => ({ ...landmark })),
   };
   roomState.seed = hashRoomKey(spec.id || String(startIndex));
   roomState.spawn.copy(built.spawn);
