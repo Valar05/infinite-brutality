@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.68';
+const BUILD = '0.8.69';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -2785,6 +2785,31 @@ const DISTRICT_ARCHETYPE_TEMPLATES = {
   shrine: DISTRICT_MACRO_TEMPLATES.shrine,
 };
 
+const DEFAULT_ARCHITECTURAL_FAMILY = 'hanging_gardens';
+
+const HANGING_GARDENS_DISTRICT_NAMES = {
+  intake: ['Arrival Terraces', 'Cistern Gate', 'Garden Customs'],
+  scaffolds: ['Hanging Market', 'Ropewalk Court', 'Lantern Bazaar'],
+  liftworks: ['Winch Gardens', 'Counterweight Galleries', 'Lift Court'],
+  furnace: ['Ash Gardens', 'Kiln Terraces', 'Fire Court'],
+  refuse: ['Undercroft Gardens', 'Rooted Gutters', 'Drain Court'],
+  shrine: ['Shrine Arches', 'Crown Terrace', 'Garden Rim'],
+};
+
+function applyDefaultArchitecturalFamily(archetype, template) {
+  if (DEFAULT_ARCHITECTURAL_FAMILY !== 'hanging_gardens') return template;
+  const family = DISTRICT_MACRO_TEMPLATES.scaffolds;
+  return {
+    ...template,
+    realSourceA: family.realSourceA,
+    realSourceB: family.realSourceB,
+    skeletonType: family.skeletonType,
+    patchStyle: family.patchStyle,
+    silhouetteRule: family.silhouetteRule,
+    familyNameSet: HANGING_GARDENS_DISTRICT_NAMES[archetype.id] || family.names || archetype.names,
+  };
+}
+
 function lerpNumber(a, b, t) {
   return a + (b - a) * t;
 }
@@ -3193,7 +3218,7 @@ function generateDistrictPlan(levelIndex) {
   const descentArchetype = pick(rng, [DISTRICT_ARCHETYPES.furnace, DISTRICT_ARCHETYPES.refuse]);
   const archetypes = [DISTRICT_ARCHETYPES.intake, climbArchetype, descentArchetype, DISTRICT_ARCHETYPES.shrine];
   const counts = [...pick(rng, DISTRICT_ROOM_COUNT_PROFILES)];
-  const templates = archetypes.map((archetype) => DISTRICT_ARCHETYPE_TEMPLATES[archetype.id] || DISTRICT_MACRO_TEMPLATES.intake);
+  const templates = archetypes.map((archetype) => applyDefaultArchitecturalFamily(archetype, DISTRICT_ARCHETYPE_TEMPLATES[archetype.id] || DISTRICT_MACRO_TEMPLATES.intake));
   const origins = buildDistrictMacroOrigins(rng, templates);
   const districts = [];
   const roomToDistrict = new Array(totalRooms).fill(0);
@@ -3210,7 +3235,7 @@ function generateDistrictPlan(levelIndex) {
       index: i,
       id: archetype.id + '-' + (i + 1),
       archetype: archetype.id,
-      name: pick(rng, archetype.names),
+      name: pick(rng, template.familyNameSet || archetype.names),
       purpose: archetype.purpose,
       signal: archetype.signal,
       roomStart,
