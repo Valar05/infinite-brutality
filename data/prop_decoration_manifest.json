@@ -1,6 +1,6 @@
 {
-  "version": "2026-06-10",
-  "scope": "Hanging Gardens decoration and prop pass",
+  "version": "2026-06-11",
+  "scope": "Hanging Gardens decoration and prop pass, including Lift Court mechanical and execution props",
   "family": "hanging_gardens",
   "policy": {
     "goal": "Fill the world with ancient layered habitation and tactical props using primitive combinations first.",
@@ -174,7 +174,9 @@
       "placement": [
         "terrace_run",
         "market_court",
-        "strongpoint_edges"
+        "strongpoint_edges",
+        "gate_step",
+        "winch_gallery"
       ],
       "tactical_effect": [
         "visual depth",
@@ -320,7 +322,9 @@
       "placement": [
         "upper_layer",
         "bridge_landing",
-        "overlook"
+        "overlook",
+        "winch_gallery",
+        "strongpoint_gallery"
       ],
       "tactical_effect": [
         "strongpoint",
@@ -487,7 +491,10 @@
       "placement": [
         "market_stall_back",
         "underdeck_pass",
-        "bridge_landing"
+        "bridge_landing",
+        "kill_court",
+        "winch_gallery",
+        "undercroft_pass"
       ],
       "tactical_effect": [
         "cover",
@@ -513,7 +520,9 @@
       "placement": [
         "market_court",
         "rest_pocket",
-        "habitation_cluster"
+        "habitation_cluster",
+        "gate_step",
+        "undercroft_pass"
       ],
       "tactical_effect": [
         "human scale",
@@ -541,7 +550,9 @@
       "placement": [
         "upper_lane",
         "court_edge",
-        "bridge_entry"
+        "bridge_entry",
+        "undercroft_pass",
+        "winch_gallery"
       ],
       "tactical_effect": [
         "layering",
@@ -681,12 +692,217 @@
       "placement": [
         "liftworks_role",
         "bridge_anchor",
-        "upper_layer"
+        "upper_layer",
+        "tower_core",
+        "winch_gallery",
+        "strongpoint_gallery"
       ],
       "tactical_effect": [
         "purpose read",
         "strong silhouette"
       ]
+    },
+    {
+      "id": "cargo_lift_cage",
+      "class": "mechanical_cargo",
+      "primitive_recipe": [
+        "1 timber cage base",
+        "4 iron corner bars",
+        "2 roof rails",
+        "1 crate bundle or hanging load"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "kill_court",
+        "winch_gallery",
+        "bridge_landing"
+      ],
+      "tactical_effect": [
+        "hard cover",
+        "purpose read",
+        "vertical hazard framing"
+      ],
+      "implementation_status": "runtime_first_pass"
+    },
+    {
+      "id": "cargo_hook_post",
+      "class": "mechanical",
+      "primitive_recipe": [
+        "1 timber post",
+        "1 lateral hook arm",
+        "1 iron hook drop"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "kill_court_edge",
+        "tower_core",
+        "winch_gallery"
+      ],
+      "tactical_effect": [
+        "route framing",
+        "overhead threat read",
+        "mechanical identity"
+      ],
+      "implementation_status": "runtime_first_pass"
+    },
+    {
+      "id": "maintenance_tool_bench",
+      "class": "mechanical_habitation",
+      "primitive_recipe": [
+        "1 timber bench top",
+        "1 lower shelf",
+        "2 to 3 iron tool blocks",
+        "1 repair tray"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "kill_court_edge",
+        "undercroft_pass",
+        "tower_core"
+      ],
+      "tactical_effect": [
+        "human scale",
+        "soft cover",
+        "maintenance read"
+      ],
+      "implementation_status": "runtime_first_pass"
+    },
+    {
+      "id": "brake_lever_pedestal",
+      "class": "mechanical_control",
+      "primitive_recipe": [
+        "1 stone pedestal",
+        "1 angled iron lever",
+        "1 bronze grip block"
+      ],
+      "texture_dependencies": [
+        "ib-vector-plaster-20260610.svg",
+        "ib-vector-timber-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "tower_core",
+        "winch_gallery",
+        "strongpoint_gallery"
+      ],
+      "tactical_effect": [
+        "interaction focus",
+        "strongpoint marker",
+        "purpose read"
+      ],
+      "implementation_status": "runtime_first_pass"
+    },
+    {
+      "id": "execution_tribunal_dais",
+      "class": "ritual_punitive",
+      "primitive_recipe": [
+        "1 raised dais slab",
+        "1 execution block",
+        "2 upright posts",
+        "1 crossbeam or blade frame"
+      ],
+      "texture_dependencies": [
+        "ib-vector-plaster-20260610.svg",
+        "ib-vector-timber-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze",
+        "stone"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "kill_court",
+        "strongpoint_gallery"
+      ],
+      "tactical_effect": [
+        "kill zone centerpiece",
+        "court identity",
+        "former use read"
+      ],
+      "implementation_status": "runtime_first_pass"
+    }
+  ],
+  "district_prop_sets": [
+    {
+      "id": "hanging_market_hybrid",
+      "skeleton_type": "hanging_market_hybrid",
+      "district_roles": [
+        "market_court",
+        "roof_lane",
+        "underdeck_pass",
+        "bridge_landing"
+      ],
+      "kit_ids": [
+        "market_stall_open",
+        "market_stall_closed",
+        "planter_terrace_bed",
+        "hanging_planter_chain",
+        "jar_cluster",
+        "cloth_line_cluster",
+        "bridge_railing_cluster",
+        "watch_post"
+      ],
+      "rules": [
+        "Keep trade and garden props dominant.",
+        "Favor layered awnings, stalls, planters, and bridge clutter before punitive mechanical reads."
+      ],
+      "implementation_status": "runtime_first_pass"
+    },
+    {
+      "id": "lift_court_hybrid",
+      "skeleton_type": "lift_court_hybrid",
+      "district_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "kit_ids": [
+        "counterweight_winch",
+        "cargo_lift_cage",
+        "cargo_hook_post",
+        "maintenance_tool_bench",
+        "brake_lever_pedestal",
+        "execution_tribunal_dais",
+        "crate_bundle",
+        "watch_post"
+      ],
+      "rules": [
+        "Do not reuse hanging-market stall density as the main read.",
+        "Mechanical hauling and punitive court props should dominate the district silhouette.",
+        "Floor props in the lift court must sit on actual support surfaces, not assumed elevation bands."
+      ],
+      "implementation_status": "runtime_first_pass"
     }
   ]
 }

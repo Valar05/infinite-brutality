@@ -3,13 +3,15 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.71';
+const BUILD = '0.8.102';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
+const DEBUG_RAGDOLL = new URLSearchParams(window.location.search).get('ragdebug') === '1';
 const canvas = document.getElementById('game');
 const statusEl = document.getElementById('status');
 const readoutEl = document.getElementById('readout');
 const hintEl = document.getElementById('hint');
+const errorCopyButton = document.getElementById('errorCopyButton');
 const leftStick = document.getElementById('leftStick');
 const stickKnob = leftStick.querySelector('div');
 const actionPad = document.getElementById('actionPad');
@@ -19,15 +21,18 @@ const gyroButton = document.getElementById('gyroButton');
 const fsButton = document.getElementById('fsButton');
 
 window.addEventListener('error', (event) => {
-  console.error(event.error || event.message);
-  setStatus('runtime error: ' + (event.error?.message || event.message || 'unknown'));
-  hintEl.textContent = 'Runtime error: ' + (event.error?.message || event.message || 'unknown');
+  const detail = event.error || event.message;
+  console.error(detail);
+  const summary = rememberError('Runtime error', detail);
+  setStatus(summary.toLowerCase());
+  hintEl.textContent = summary;
   hintEl.style.opacity = '1';
 });
 window.addEventListener('unhandledrejection', (event) => {
   console.error(event.reason);
-  setStatus('promise error: ' + (event.reason?.message || event.reason || 'unknown'));
-  hintEl.textContent = 'Promise error: ' + (event.reason?.message || event.reason || 'unknown');
+  const summary = rememberError('Promise error', event.reason);
+  setStatus(summary.toLowerCase());
+  hintEl.textContent = summary;
   hintEl.style.opacity = '1';
 });
 
@@ -90,6 +95,13 @@ const MOVE_INPUT_SMOOTH_GROUND = 13.5;
 const MOVE_INPUT_SMOOTH_AIR = 9.5;
 const CAMERA_GROUND_SMOOTH = 18.0;
 const CAMERA_AIR_SMOOTH = 26.0;
+const HIT_FREEZE_TIME = 0.05;
+const HIT_SLOW_TIME = 0.24;
+const HIT_SLOW_SCALE = 0.26;
+const HIT_SHAKE_TIME = 0.28;
+const HIT_SHAKE_STRENGTH = 0.05;
+const ENEMY_BLOOD_PARTICLE_COUNT = 14;
+const ENEMY_BLOOD_PARTICLE_LIFETIME = 0.42;
 const AIR_CRUISE_SPEED = 6.2;
 const AIR_MAX_SPEED = 8.8;
 const AIR_TURN_ACCEL = 14.0;
@@ -135,13 +147,11 @@ const walkableSurfaces = [];
 const solidColliders = [];
 const diegeticLights = [];
 const bootParams = new URLSearchParams(window.location.search);
+const bootDistrictTarget = (bootParams.get('district') || '').trim();
+const bootLevelTarget = bootParams.has('level') ? Math.max(0, Math.floor(Number(bootParams.get('level') || 0) || 0)) : null;
 if (bootParams.has('reset')) {
   localStorage.setItem('infinite-brutality-level-index', '0');
   localStorage.setItem('infinite-brutality-node-index', '0');
-}
-if (bootParams.has('room')) {
-  const roomIndex = clamp(Number(bootParams.get('room') || 1) - 1, 0, GENERATED_ROOM_BATCH.length - 1);
-  localStorage.setItem('infinite-brutality-node-index', String(Math.floor(roomIndex)));
 }
 const roomState = {
   levelIndex: Number(localStorage.getItem('infinite-brutality-level-index') || 0) || 0,
@@ -169,6 +179,16 @@ navDebug.graphGroup.name = 'nav-graph-debug';
 navDebug.routeGroup.name = 'nav-route-debug';
 scene.add(navDebug.graphGroup);
 scene.add(navDebug.routeGroup);
+
+const combatFx = {
+  timeScale: 1,
+  slowTimer: 0,
+  shakeTime: 0,
+  shakeDuration: 0,
+  shakeStrength: 0,
+};
+let enemyBloodGroup = null;
+const enemyBloodParticles = [];
 
 const input = {
   moveX: 0,
@@ -214,9 +234,99 @@ let sprintAttackDef = null;
 let airAttackDef = null;
 let airForwardAttackDef = null;
 let crouchAttackDef = null;
+let lastErrorClipboardText = '';
 
 function setStatus(text) {
   statusEl.textContent = 'build ' + BUILD + ' | ' + text;
+}
+
+function shortErrorText(detail) {
+  if (detail instanceof Error) return detail.message || detail.name || 'unknown';
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail.message === 'string') return detail.message;
+  if (detail === undefined || detail === null) return 'unknown';
+  try {
+    return JSON.stringify(detail);
+  } catch (err) {
+    return String(detail);
+  }
+}
+
+function formatErrorDetail(detail) {
+  if (detail instanceof Error) return detail.stack || detail.message || detail.name || 'unknown';
+  if (typeof detail === 'string') return detail;
+  if (detail === undefined || detail === null) return 'unknown';
+  try {
+    return JSON.stringify(detail, null, 2);
+  } catch (err) {
+    return String(detail);
+  }
+}
+
+function updateErrorCopyButton() {
+  if (!errorCopyButton) return;
+  const hasError = !!lastErrorClipboardText;
+  errorCopyButton.hidden = !hasError;
+  errorCopyButton.disabled = !hasError;
+}
+
+function rememberError(kind, detail) {
+  const short = shortErrorText(detail);
+  const summary = kind + ': ' + short;
+  const detailText = formatErrorDetail(detail);
+  const lines = ['build ' + BUILD + ' | ' + summary];
+  if (readoutEl.textContent) lines.push('readout: ' + readoutEl.textContent);
+  if (detailText && detailText !== short) lines.push(detailText);
+  lastErrorClipboardText = lines.join('\n');
+  updateErrorCopyButton();
+  return summary;
+}
+
+function fallbackCopyText(text) {
+  const probe = document.createElement('textarea');
+  probe.value = text;
+  probe.setAttribute('readonly', 'readonly');
+  probe.style.position = 'fixed';
+  probe.style.opacity = '0';
+  probe.style.pointerEvents = 'none';
+  document.body.appendChild(probe);
+  probe.select();
+  probe.setSelectionRange(0, probe.value.length);
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch (err) {
+    copied = false;
+  }
+  probe.remove();
+  return copied;
+}
+
+async function copyLastErrorToClipboard() {
+  if (!lastErrorClipboardText) return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(lastErrorClipboardText);
+    } else if (!fallbackCopyText(lastErrorClipboardText)) {
+      throw new Error('clipboard unavailable');
+    }
+    setStatus('error copied');
+    hintEl.textContent = 'Copied last error to clipboard.';
+    hintEl.style.opacity = '1';
+  } catch (err) {
+    console.error(err);
+    const summary = rememberError('Copy failed', err);
+    setStatus(summary.toLowerCase());
+    hintEl.textContent = summary;
+    hintEl.style.opacity = '1';
+  }
+}
+
+if (errorCopyButton) {
+  errorCopyButton.addEventListener('click', () => {
+    void copyLastErrorToClipboard();
+  });
+  updateErrorCopyButton();
 }
 
 function clamp(value, min, max) {
@@ -258,6 +368,113 @@ function makeLightPoolMat(color, opacity = 0.22) {
     polygonOffsetUnits: -2,
     toneMapped: false,
   });
+}
+
+function ensureEnemyBloodGroup() {
+  if (enemyBloodGroup) return enemyBloodGroup;
+  enemyBloodGroup = new THREE.Group();
+  enemyBloodGroup.name = 'enemy-blood-particles';
+  scene.add(enemyBloodGroup);
+  return enemyBloodGroup;
+}
+
+function spawnEnemyBloodBurst(worldPoint, direction, strength = 1) {
+  if (!worldPoint) return;
+  const group = ensureEnemyBloodGroup();
+  const count = Math.max(6, Math.round(ENEMY_BLOOD_PARTICLE_COUNT * clamp(strength, 0.6, 1.5)));
+  for (let i = 0; i < count; i += 1) {
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshBasicMaterial({
+      color: i % 3 === 0 ? 0x3c0b0e : 0x8a2020,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    const size = 0.035 + Math.random() * 0.065;
+    mesh.scale.set(size, size * (0.8 + Math.random() * 0.7), size);
+    mesh.position.copy(worldPoint);
+    group.add(mesh);
+    const spray = direction ? direction.clone() : new THREE.Vector3(0, 0, -1);
+    spray.y = Math.max(0.18, spray.y + 0.25 + Math.random() * 0.35);
+    spray.x += (Math.random() - 0.5) * 0.75;
+    spray.z += (Math.random() - 0.5) * 0.75;
+    spray.normalize().multiplyScalar(1.8 + Math.random() * 2.6 + strength * 0.7);
+    enemyBloodParticles.push({
+      mesh,
+      material: mat,
+      velocity: spray,
+      age: 0,
+      life: ENEMY_BLOOD_PARTICLE_LIFETIME * (0.75 + Math.random() * 0.55),
+      spin: new THREE.Vector3((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14),
+    });
+  }
+}
+
+function updateEnemyBloodParticles(dt) {
+  if (!enemyBloodParticles.length) return;
+  for (let i = enemyBloodParticles.length - 1; i >= 0; i -= 1) {
+    const particle = enemyBloodParticles[i];
+    particle.age += dt;
+    if (particle.age >= particle.life) {
+      particle.mesh.removeFromParent();
+      particle.mesh.geometry.dispose();
+      particle.material.dispose();
+      enemyBloodParticles.splice(i, 1);
+      continue;
+    }
+    particle.velocity.y -= 5.8 * dt;
+    particle.mesh.position.addScaledVector(particle.velocity, dt);
+    particle.mesh.rotation.x += particle.spin.x * dt;
+    particle.mesh.rotation.y += particle.spin.y * dt;
+    particle.mesh.rotation.z += particle.spin.z * dt;
+    particle.material.opacity = Math.max(0, 1 - particle.age / particle.life);
+  }
+}
+
+function triggerHitJuice(worldPoint, direction, damage = 1) {
+  const strength = clamp(0.72 + damage * 0.18, 0.72, 1.5);
+  player.hitPause = Math.max(player.hitPause || 0, HIT_FREEZE_TIME);
+  combatFx.timeScale = Math.min(combatFx.timeScale, HIT_SLOW_SCALE);
+  combatFx.slowTimer = Math.max(combatFx.slowTimer, HIT_SLOW_TIME + damage * 0.03);
+  combatFx.shakeTime = Math.max(combatFx.shakeTime, HIT_SHAKE_TIME + damage * 0.03);
+  combatFx.shakeDuration = Math.max(combatFx.shakeDuration, combatFx.shakeTime);
+  combatFx.shakeStrength = Math.max(combatFx.shakeStrength, HIT_SHAKE_STRENGTH * strength);
+  spawnEnemyBloodBurst(worldPoint, direction, strength);
+}
+
+function updateCombatFx(realDt) {
+  player.hitPause = Math.max(0, (player.hitPause || 0) - realDt);
+  player.healthPulse = Math.max(0, (player.healthPulse || 0) - realDt * 1.8);
+  if (combatFx.slowTimer > 0) {
+    combatFx.slowTimer = Math.max(0, combatFx.slowTimer - realDt);
+    const recoverBlend = 1 - Math.exp(-10 * realDt);
+    combatFx.timeScale += (1 - combatFx.timeScale) * recoverBlend;
+  } else {
+    combatFx.timeScale += (1 - combatFx.timeScale) * (1 - Math.exp(-14 * realDt));
+  }
+  if (combatFx.shakeTime > 0) {
+    combatFx.shakeTime = Math.max(0, combatFx.shakeTime - realDt);
+    if (combatFx.shakeTime <= 0.0001) {
+      combatFx.shakeTime = 0;
+      combatFx.shakeDuration = 0;
+      combatFx.shakeStrength = 0;
+    }
+  }
+}
+
+function currentHitShake() {
+  if (combatFx.shakeTime <= 0 || combatFx.shakeDuration <= 0) return null;
+  const fade = clamp(combatFx.shakeTime / combatFx.shakeDuration, 0, 1);
+  const amp = combatFx.shakeStrength * fade * fade;
+  const t = performance.now() * 0.028;
+  return {
+    x: (Math.sin(t * 1.9) + Math.sin(t * 3.7 + 1.1)) * 0.5 * amp,
+    y: (Math.cos(t * 2.3 + 0.6) + Math.sin(t * 4.1 + 0.2)) * 0.5 * amp,
+    yaw: Math.sin(t * 2.1 + 0.4) * amp * 0.22,
+    pitch: Math.cos(t * 2.9 + 0.7) * amp * 0.18,
+  };
 }
 
 const MAT = {
@@ -894,6 +1111,10 @@ function levelSeedKey(index) {
   return 'infinite-brutality-level-seed-' + index;
 }
 
+function normalizeDistrictTarget(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
 function setLevelIndex(value) {
   localStorage.setItem(levelIndexKey(), String(value));
 }
@@ -1025,6 +1246,67 @@ function buildLevelSeed(index) {
   const seedKey = localStorage.getItem(levelSeedKey(index)) || (Date.now().toString(16) + '-' + index + '-limbo');
   localStorage.setItem(levelSeedKey(index), seedKey);
   return hashRoomKey(seedKey);
+}
+
+function districtMatchesBootTarget(district, target) {
+  const normalizedTarget = normalizeDistrictTarget(target);
+  if (!normalizedTarget || !district) return false;
+  const candidates = [
+    district.archetype,
+    district.id,
+    district.name,
+    district.skeletonType,
+    district.macroTemplateId,
+    district.landmarkRole,
+  ];
+  return candidates.some((candidate) => {
+    const normalizedCandidate = normalizeDistrictTarget(candidate);
+    return normalizedCandidate && (normalizedCandidate === normalizedTarget || normalizedCandidate.includes(normalizedTarget) || normalizedTarget.includes(normalizedCandidate));
+  });
+}
+
+function findBootDistrictStart(target, startLevel = roomState.levelIndex, maxLevels = 32) {
+  const normalizedTarget = normalizeDistrictTarget(target);
+  if (!normalizedTarget) return null;
+  for (let offset = 0; offset < maxLevels; offset += 1) {
+    const levelIndex = Math.max(0, startLevel + offset);
+    const plan = generateDistrictPlan(levelIndex);
+    const districtIndex = plan.districts.findIndex((district) => districtMatchesBootTarget(district, normalizedTarget));
+    if (districtIndex >= 0) {
+      const district = plan.districts[districtIndex];
+      return {
+        levelIndex,
+        districtIndex,
+        roomIndex: district.roomStart,
+      };
+    }
+  }
+  return null;
+}
+
+function applyBootNavigationTarget() {
+  if (bootLevelTarget !== null) {
+    roomState.levelIndex = bootLevelTarget;
+    setLevelIndex(roomState.levelIndex);
+    roomState.districtPlan = null;
+  }
+  if (bootDistrictTarget) {
+    const target = findBootDistrictStart(bootDistrictTarget, roomState.levelIndex);
+    if (target) {
+      roomState.levelIndex = target.levelIndex;
+      roomState.nodeIndex = target.roomIndex;
+      roomState.districtPlan = null;
+      setLevelIndex(roomState.levelIndex);
+      setNodeIndex(roomState.nodeIndex);
+      return;
+    }
+    console.warn('boot district target not found', bootDistrictTarget);
+  }
+  if (bootParams.has('room')) {
+    const roomIndex = clamp(Number(bootParams.get('room') || 1) - 1, 0, GENERATED_ROOM_BATCH.length - 1);
+    roomState.nodeIndex = Math.floor(roomIndex);
+    setNodeIndex(roomState.nodeIndex);
+  }
 }
 
 function buildPortal(type, kind, socket, fallback = [0, 0, 0]) {
@@ -1251,6 +1533,13 @@ function positionEnemy(position) {
   enemy.userData.commitElapsed = 0;
   enemy.userData.orbitSign = enemy.userData.orbitSign || 1;
   enemy.userData.pursuitStall = 0;
+  enemy.userData.lastHitReaction = '';
+  enemy.userData.lastHitZone = '';
+  enemy.userData.lastHitLocalX = 0;
+  enemy.userData.lastHitLocalY = 0;
+  enemy.userData.dissolveProgress = 0;
+  resetEnemyDissolve();
+  resetEnemyDeathState();
   if (nav) {
     nav.goal = null;
     nav.waypoints.length = 0;
@@ -1594,7 +1883,45 @@ const PRO_MELEE_AXE_CLIPS = {
   jumping: 'assets/models/pro_melee_axe/standing_jump.fbx',
   attackHorizontal: 'assets/models/pro_melee_axe/standing_melee_attack_horizontal_smooth.poseclip.json',
   react: 'assets/models/pro_melee_axe/standing_react_large_gut.fbx',
+  reactBodyCenter: 'assets/models/orc_berserker/react_body_center.poseclip.json',
+  reactHeadLeft: 'assets/models/orc_berserker/react_head_left_turn.poseclip.json',
+  reactHeadRight: 'assets/models/orc_berserker/react_head_right.poseclip.json',
+  dying: 'assets/models/orc_berserker/mutant_dying.fbx',
 };
+const ENEMY_HIT_HEAD_SIDE_THRESHOLD = 0.12;
+const ENEMY_HIT_HEAD_NORMALIZED_Y = 0.64;
+const ENEMY_PLAYER_COLLISION_VERTICAL_GRACE = 0.18;
+const ENEMY_DEATH_DESPAWN_DELAY = 10.0;
+const ENEMY_DEATH_LAUNCH_SPEED = 4.45;
+const ENEMY_DEATH_UPWARD_SPEED = 3.7;
+const ENEMY_RAGDOLL_GRAVITY = 17.5;
+const ENEMY_RAGDOLL_DRAG = 0.985;
+const ENEMY_RAGDOLL_GROUNDED_DRAG = 0.82;
+const ENEMY_RAGDOLL_FLOOR_BOUNCE = 0.04;
+const ENEMY_RAGDOLL_FLOOR_FRICTION = 0.22;
+const ENEMY_RAGDOLL_FLOOR_IMPACT_FRICTION = 0.1;
+const ENEMY_RAGDOLL_FLOOR_IMPACT_BOUNCE = 0.008;
+const ENEMY_RAGDOLL_DECAY_DELAY = 0.52;
+const ENEMY_RAGDOLL_DECAY_DURATION = 1.35;
+const ENEMY_RAGDOLL_FORCE_SETTLE_TIME = 1.75;
+const ENEMY_RAGDOLL_SETTLE_ENTRY_DAMPING = 0.14;
+const ENEMY_RAGDOLL_SETTLE_CORE_DAMPING = 0.03;
+const ENEMY_RAGDOLL_SETTLE_AIR_DAMPING = 0.22;
+const ENEMY_RAGDOLL_SETTLE_SPEED_SQ = 0.006;
+const ENEMY_RAGDOLL_SUBSTEPS = 2;
+const ENEMY_RAGDOLL_ITERATIONS = 6;
+const ENEMY_RAGDOLL_SELF_COLLISION_SCALE = 0.72;
+const ENEMY_RAGDOLL_SELF_COLLISION_STIFFNESS = 0.72;
+const ENEMY_RAGDOLL_SELF_COLLISION_GROUNDED_STIFFNESS = 0.38;
+const ENEMY_RAGDOLL_SELF_COLLISION_VERTICAL_SCALE = 0.16;
+const ENEMY_RAGDOLL_SELF_COLLISION_MAX_PUSH = 0.08;
+const ENEMY_DISSOLVE_VORONOI_SCALE = 7.4;
+const ENEMY_DISSOLVE_EDGE_WIDTH = 0.14;
+const ENEMY_DISSOLVE_EDGE_INTENSITY = 2.4;
+const ENEMY_DISSOLVE_EDGE_COLOR = new THREE.Color(0xff6b1a);
+const ENEMY_DISSOLVE_SHARD_COUNT = 22;
+const ENEMY_DISSOLVE_SHARD_DRIFT = 0.82;
+const ENEMY_DISSOLVE_SHARD_RISE = 0.58;
 const ENEMY_RING_RADIUS = 4.0;
 const ENEMY_RING_TOLERANCE = 0.45;
 const ENEMY_ATTACK_RANGE = 2.45;
@@ -1613,6 +1940,8 @@ const ENEMY_LUNGE_SPEED = 2.9;
 const ENEMY_FLOOR_RADIUS = 0.36;
 const ENEMY_SOLID_RADIUS = 0.44;
 const ENEMY_CAPSULE_RADIUS = 0.44;
+const ENEMY_PLAYER_COLLISION_RADIUS = PLAYER_SOLID_RADIUS + ENEMY_CAPSULE_RADIUS + 0.04;
+const ENEMY_PLAYER_COLLISION_RADIUS_SQ = ENEMY_PLAYER_COLLISION_RADIUS * ENEMY_PLAYER_COLLISION_RADIUS;
 const ENEMY_CAPSULE_FOOT_OFFSET = 0.3;
 const ENEMY_CAPSULE_SUPPORT_TOLERANCE = 0.26;
 // Match the player's snap range so the enemy can clear the same tiny seams and ledges.
@@ -1638,6 +1967,9 @@ let enemyModel = null;
 let enemyMixer = null;
 let enemyCurrentAction = null;
 const enemyActions = new Map();
+let enemyRagdollDebugGroup = null;
+let enemyRagdollDebugPoints = [];
+let enemyRagdollDebugLines = [];
 
 function getNodeLayoutOrigin(nodeOrIndex) {
   if (typeof nodeOrIndex === 'number') return makeVec(0, 0, nodeOrIndex * ROOM_LAYOUT_STEP);
@@ -2771,6 +3103,11 @@ const DISTRICT_MACRO_TEMPLATES = {
     routeType: 'climb',
     requiresVisibleBelow: true,
     requiresVisibleAbove: true,
+    realSourceA: 'fortified_hoist_yard',
+    realSourceB: 'cliff_granary_terraces',
+    skeletonType: 'lift_court_hybrid',
+    patchStyle: 'counterweight_chain_retrofit',
+    silhouetteRule: 'a hoist court stacked around a visible counterweight tower and upper winch gallery',
   },
   furnace: {
     id: 'furnace_drop',
@@ -2847,11 +3184,11 @@ function applyDefaultArchitecturalFamily(archetype, template) {
   const family = DISTRICT_MACRO_TEMPLATES.scaffolds;
   return {
     ...template,
-    realSourceA: family.realSourceA,
-    realSourceB: family.realSourceB,
-    skeletonType: family.skeletonType,
-    patchStyle: family.patchStyle,
-    silhouetteRule: family.silhouetteRule,
+    realSourceA: template.realSourceA || family.realSourceA,
+    realSourceB: template.realSourceB || family.realSourceB,
+    skeletonType: template.skeletonType || family.skeletonType,
+    patchStyle: template.patchStyle || family.patchStyle,
+    silhouetteRule: template.silhouetteRule || family.silhouetteRule,
     familyNameSet: HANGING_GARDENS_DISTRICT_NAMES[archetype.id] || family.names || archetype.names,
   };
 }
@@ -2923,8 +3260,80 @@ function buildHangingMarketDistrictMeta(district) {
   };
 }
 
+
+function buildLiftCourtDistrictMeta(district) {
+  const base = district.baseElevation;
+  const origin = district.origin;
+  const roomOffsets = [];
+  const segmentRoles = [];
+  const total = Math.max(1, district.roomCount);
+  for (let i = 0; i < total; i += 1) {
+    const t = total <= 1 ? 0 : i / (total - 1);
+    let x = 0;
+    let z = 0;
+    let y = 0;
+    let role = 'gate_step';
+    if (t < 0.18) {
+      const s = t / 0.18;
+      x = lerpNumber(-30, -10, s);
+      z = lerpNumber(24, 82, s);
+      y = lerpNumber(3.0, 6.0, s);
+      role = s < 0.55 ? 'gate_step' : 'court_edge';
+    } else if (t < 0.48) {
+      const s = (t - 0.18) / 0.30;
+      x = lerpNumber(-8, 18, s);
+      z = lerpNumber(98, 156, s);
+      y = lerpNumber(7.0, 9.2, s);
+      role = s < 0.45 ? 'kill_court' : 'cargo_stage';
+    } else if (t < 0.72) {
+      const s = (t - 0.48) / 0.24;
+      x = lerpNumber(18, 58, s);
+      z = lerpNumber(160, 214, s);
+      y = lerpNumber(10.2, 15.4, s);
+      role = s < 0.55 ? 'tower_core' : 'winch_gallery';
+    } else if (t < 0.86) {
+      const s = (t - 0.72) / 0.14;
+      x = lerpNumber(58, 92, s);
+      z = lerpNumber(216, 266, s);
+      y = lerpNumber(15.6, 18.8, s);
+      role = s < 0.5 ? 'bridge_landing' : 'strongpoint_gallery';
+    } else {
+      const s = (t - 0.86) / 0.14;
+      x = lerpNumber(8, -12, s);
+      z = lerpNumber(190, 248, s);
+      y = lerpNumber(2.4, 4.4, s);
+      role = s < 0.5 ? 'undercroft_pass' : 'recovery_return';
+    }
+    roomOffsets.push([x, z, y]);
+    segmentRoles.push(role);
+  }
+  return {
+    realSourceA: district.realSourceA,
+    realSourceB: district.realSourceB,
+    skeletonType: district.skeletonType,
+    patchStyle: district.patchStyle,
+    silhouetteRule: district.silhouetteRule,
+    roomOffsets,
+    segmentRoles,
+    circulationBands: [
+      { id: 'lift_low', y: base + 3.2, role: 'undercroft_pass' },
+      { id: 'lift_mid', y: base + 9.0, role: 'kill_court' },
+      { id: 'lift_high', y: base + 16.2, role: 'winch_gallery' },
+    ],
+    massAnchors: [
+      { id: 'gate_terrace', role: 'gate_terrace', pos: [origin.x - 22, base + 2.2, origin.z + 54], size: [30, 10, 22] },
+      { id: 'execution_court', role: 'execution_court', pos: [origin.x + 8, base + 6.4, origin.z + 142], size: [44, 14, 36] },
+      { id: 'counterweight_tower', role: 'counterweight_tower', pos: [origin.x + 42, base + 10.0, origin.z + 196], size: [18, 26, 18] },
+      { id: 'undercroft_return', role: 'undercroft_return', pos: [origin.x - 2, base + 0.6, origin.z + 216], size: [30, 10, 28] },
+      { id: 'upper_gallery', role: 'upper_gallery', pos: [origin.x + 78, base + 16.0, origin.z + 258], size: [20, 12, 38] },
+    ],
+    landmarkAnchor: { x: origin.x + 44, y: base + 18.8, z: origin.z + 214, role: 'counterweight_crown' },
+  };
+}
+
 function buildDistrictSkeletonMeta(district) {
   if (district.skeletonType === 'hanging_market_hybrid') return buildHangingMarketDistrictMeta(district);
+  if (district.skeletonType === 'lift_court_hybrid') return buildLiftCourtDistrictMeta(district);
   return {
     realSourceA: district.realSourceA || null,
     realSourceB: district.realSourceB || null,
@@ -3100,6 +3509,94 @@ function buildHangingMarketLandmarkSchemas(district) {
   ];
 }
 
+
+function buildLiftCourtLandmarkSchemas(district) {
+  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
+  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 9.0;
+  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 16.2;
+  const crownAnchor = district.landmarkAnchor || { x: district.origin.x + 44, y: highBand + 2.4, z: district.origin.z + 214, role: 'counterweight_crown' };
+  return [
+    {
+      id: district.id + '-counterweight-crown',
+      districtId: district.id,
+      formerUse: 'fortified hoist tower and lift crown',
+      damageCause: 'partial collapse, seized rigging, and emergency chain retrofits',
+      currentOccupant: 'watch crews, execution wardens, and salvage haulers',
+      silhouetteFamily: 'counterweight tower crown',
+      wonderTags: ['height', 'bridges', 'lanterns', 'sky_exposure', 'hanging_structures'],
+      tacticalFeatures: ['strongpoint', 'chokepoint'],
+      combatSentence: 'take the upper gallery or get pinned below the hoist crown',
+      climbRoutes: [
+        { id: 'tower-maintenance-climb', kind: 'tower_climb', value: 'alternate_route', fromBand: 'lift_mid', toBand: 'lift_high' },
+      ],
+      visibilityTargets: [
+        { id: 'crown-gallery', kind: 'future_landmark', prompt: 'how do i reach the hoist crown' },
+      ],
+      lowerLayer: 'counterweight shaft and chain pit',
+      middleLayer: 'tower approach and winch floor',
+      upperLayer: 'crown gallery and bridge control',
+      supportLanguage: 'old stone piers with timber winch retrofits',
+      habitationProof: ['signal lanterns', 'warden perch', 'rope stores'],
+      landmarkAnchors: [crownAnchor],
+      acceptanceChecks: [
+        { id: 'crown-reads-early', text: 'counterweight crown reads before arrival' },
+      ],
+    },
+    {
+      id: district.id + '-execution-court',
+      districtId: district.id,
+      formerUse: 'cargo staging and tribunal court',
+      damageCause: 'public violence, dropped loads, and broken retaining edges',
+      currentOccupant: 'haulers, guards, and scavengers moving salvage through the court',
+      silhouetteFamily: 'execution and cargo court',
+      wonderTags: ['architecture', 'terraces', 'lanterns'],
+      tacticalFeatures: ['kill_zone', 'chokepoint'],
+      combatSentence: 'hold the court or break toward the flanking lanes and stairs',
+      climbRoutes: [
+        { id: 'court-scramble', kind: 'gantry_scramble', value: 'ambush_route', fromBand: 'lift_mid', toBand: 'lift_high' },
+      ],
+      visibilityTargets: [
+        { id: 'upper-gallery', kind: 'future_shortcut', prompt: 'there is a higher route over the court' },
+      ],
+      lowerLayer: 'load shadow and choke pressure',
+      middleLayer: 'main kill court',
+      upperLayer: 'gallery gunslit equivalent and pressure rail',
+      supportLanguage: 'retaining walls, hoist beams, and partial screen walls',
+      habitationProof: ['tool benches', 'water buckets', 'cargo pallets'],
+      landmarkAnchors: [{ x: district.origin.x + 8, y: midBand + 0.4, z: district.origin.z + 144, role: 'execution_court' }],
+      acceptanceChecks: [
+        { id: 'court-is-kill-zone', text: 'court reads as a surround-risk kill zone' },
+      ],
+    },
+    {
+      id: district.id + '-undercroft-return',
+      districtId: district.id,
+      formerUse: 'maintenance undercroft and brake access corridor',
+      damageCause: 'chain drag, water seepage, and blocked shaft collapse',
+      currentOccupant: 'maintenance survivors and hidden runners',
+      silhouetteFamily: 'machinery undercroft',
+      wonderTags: ['hanging_structures', 'bridges', 'architecture'],
+      tacticalFeatures: ['escape_route'],
+      combatSentence: 'drop to recover and re-enter or stay above and risk the choke',
+      climbRoutes: [
+        { id: 'service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'lift_low', toBand: 'lift_mid' },
+      ],
+      visibilityTargets: [
+        { id: 'court-return', kind: 'future_shortcut', prompt: 'this can save a bad fight or missed movement line' },
+      ],
+      lowerLayer: 'recovery and maintenance lane',
+      middleLayer: 'rejoin point into the hoist court',
+      upperLayer: 'visible hoist tower overhead',
+      supportLanguage: 'stone undercroft with chained service braces',
+      habitationProof: ['bucket stations', 'repair alcoves', 'hidden shrines'],
+      landmarkAnchors: [{ x: district.origin.x - 4, y: lowBand + 0.2, z: district.origin.z + 220, role: 'maintenance_return' }],
+      acceptanceChecks: [
+        { id: 'undercroft-is-recovery', text: 'undercroft reads as a survivable recovery route' },
+      ],
+    },
+  ];
+}
+
 function cloneDistrictLandmarkSchemas(landmarkSchemas) {
   return landmarkSchemas.map((landmark) => ({
     ...landmark,
@@ -3201,6 +3698,85 @@ function applyHangingMarketDesignRepairs(district, initialLandmarkSchemas, initi
   return { landmarkSchemas, validation, repairsApplied };
 }
 
+
+function applyLiftCourtDesignRepairs(district, initialLandmarkSchemas, initialValidation) {
+  const landmarkSchemas = cloneDistrictLandmarkSchemas(initialLandmarkSchemas);
+  const repairsApplied = [];
+  let budget = 6;
+  const noteRepair = (id, detail) => {
+    if (budget <= 0) return false;
+    repairsApplied.push({ id, detail });
+    budget -= 1;
+    return true;
+  };
+  const crown = landmarkSchemas.find((landmark) => /counterweight-crown$/.test(landmark.id)) || landmarkSchemas[0];
+  const court = landmarkSchemas.find((landmark) => /execution-court$/.test(landmark.id)) || landmarkSchemas[1] || crown;
+  const undercroft = landmarkSchemas.find((landmark) => /undercroft-return$/.test(landmark.id)) || landmarkSchemas[2] || crown;
+
+  if ((!district.realSourceA || !district.skeletonType || !district.patchStyle || !district.silhouetteRule) && noteRepair('historical_defaults', 'restored missing Lift Court historical skeleton fields')) {
+    district.realSourceA = district.realSourceA || 'fortified_hoist_yard';
+    district.realSourceB = district.realSourceB || 'cliff_granary_terraces';
+    district.skeletonType = district.skeletonType || 'lift_court_hybrid';
+    district.patchStyle = district.patchStyle || 'counterweight_chain_retrofit';
+    district.silhouetteRule = district.silhouetteRule || 'a hoist court stacked around a visible counterweight tower and upper winch gallery';
+  }
+
+  if ((district.circulationBands?.length || 0) < 3 && noteRepair('circulation_band_fallback', 'forced three circulation bands for Lift Court readability')) {
+    district.circulationBands = [
+      { id: 'lift_low', y: district.baseElevation + 3.2, role: 'undercroft_pass' },
+      { id: 'lift_mid', y: district.baseElevation + 9.0, role: 'kill_court' },
+      { id: 'lift_high', y: district.baseElevation + 16.2, role: 'winch_gallery' },
+    ];
+  }
+
+  let validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.hangingGardensLandmark || !validation.categories.hangingGardensWonderRead) && noteRepair('wonder_boost', 'reinforced the hoist crown and upper gallery as the district wonder destination')) {
+    addUniqueValues(crown.wonderTags, ['height', 'bridges', 'lanterns', 'sky_exposure', 'hanging_structures']);
+    district.landmarkAnchor = district.landmarkAnchor || { x: district.origin.x + 44, y: district.baseElevation + 18.8, z: district.origin.z + 214, role: 'counterweight_crown' };
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.chokepoint || !validation.requiredOutputs.strongpoint || !validation.requiredOutputs.killZone || !validation.requiredOutputs.escapeRoute || !validation.categories.tacticalRead) && noteRepair('tactical_sentence_boost', 'completed tactical coverage across crown, court, and undercroft')) {
+    addUniqueValues(crown.tacticalFeatures, ['strongpoint', 'chokepoint']);
+    addUniqueValues(court.tacticalFeatures, ['kill_zone', 'chokepoint']);
+    addUniqueValues(undercroft.tacticalFeatures, ['escape_route']);
+    crown.combatSentence = crown.combatSentence || 'take the upper gallery or get pinned below the hoist crown';
+    court.combatSentence = court.combatSentence || 'hold the court or break toward the flanking lanes and stairs';
+    undercroft.combatSentence = undercroft.combatSentence || 'drop to recover and re-enter or stay above and risk the choke';
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.climbRecoveryPath || !validation.categories.climbValue) && noteRepair('climb_recovery_boost', 'added recovery climbs and alternate tower scrambles')) {
+    undercroft.climbRoutes = undercroft.climbRoutes || [];
+    crown.climbRoutes = crown.climbRoutes || [];
+    undercroft.climbRoutes.push({ id: 'repair-service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'lift_low', toBand: 'lift_mid' });
+    crown.climbRoutes.push({ id: 'repair-tower-scramble', kind: 'tower_climb', value: 'alternate_route', fromBand: 'lift_mid', toBand: 'lift_high' });
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.visibleFutureDestination || !validation.categories.visibilityAndPull) && noteRepair('visibility_pull_boost', 'added crown and return-path visibility targets')) {
+    crown.visibilityTargets = crown.visibilityTargets || [];
+    undercroft.visibilityTargets = undercroft.visibilityTargets || [];
+    crown.visibilityTargets.push({ id: 'repair-crown-gallery', kind: 'future_landmark', prompt: 'how do i reach the hoist crown' });
+    undercroft.visibilityTargets.push({ id: 'repair-court-return', kind: 'future_shortcut', prompt: 'this can save a bad fight' });
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.habitationProof || !validation.categories.historicalRead) && noteRepair('habitation_proof_boost', 'added worker and survivor evidence across the lift court')) {
+    addUniqueValues(crown.habitationProof, ['signal lanterns', 'warden perch', 'rope stores']);
+    addUniqueValues(court.habitationProof, ['tool benches', 'water buckets', 'cargo pallets']);
+    addUniqueValues(undercroft.habitationProof, ['bucket stations', 'repair alcoves', 'hidden shrines']);
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+  return { landmarkSchemas, validation, repairsApplied };
+}
+
 function buildDistrictDesignContract(district) {
   if (district.skeletonType === 'hanging_market_hybrid') {
     let landmarkSchemas = buildHangingMarketLandmarkSchemas(district);
@@ -3208,6 +3784,15 @@ function buildDistrictDesignContract(district) {
     let repairsApplied = [];
     if (!validation.passes) {
       ({ landmarkSchemas, validation, repairsApplied } = applyHangingMarketDesignRepairs(district, landmarkSchemas, validation));
+    }
+    return { landmarkSchemas, validation, repairsApplied };
+  }
+  if (district.skeletonType === 'lift_court_hybrid') {
+    let landmarkSchemas = buildLiftCourtLandmarkSchemas(district);
+    let validation = buildDistrictValidationSummary(district, landmarkSchemas);
+    let repairsApplied = [];
+    if (!validation.passes) {
+      ({ landmarkSchemas, validation, repairsApplied } = applyLiftCourtDesignRepairs(district, landmarkSchemas, validation));
     }
     return { landmarkSchemas, validation, repairsApplied };
   }
@@ -3711,6 +4296,110 @@ function addTrellisWall(parent, prefix, x, y, z, width, height, yaw = 0) {
   return group;
 }
 
+
+function addPulleyDrum(parent, prefix, x, y, z, radius = 0.72, width = 1.6, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedCylinder(group, prefix + '-drum', radius, width, [0, y + radius, 0], MAT.timber, 10).rotation.z = Math.PI * 0.5;
+  addGroundedCylinder(group, prefix + '-cap-left', radius * 0.18, width + 0.18, [0, y + radius, 0], MAT.iron, 10).rotation.z = Math.PI * 0.5;
+  addBeveledBox(group, prefix + '-axle', [0.22, 0.22, width + 1.2], [0, y + radius, 0], MAT.iron, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-brace-left', [0.18, 1.4, 0.18], [-0.8, y + 0.7, 0], MAT.iron, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-brace-right', [0.18, 1.4, 0.18], [0.8, y + 0.7, 0], MAT.iron, false, 0.01, 1);
+  parent.add(group);
+  return group;
+}
+
+function addCounterweightFrame(parent, prefix, x, y, z, height = 8.8, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    addBeveledBox(group, prefix + '-leg-' + sx + '-' + sz, [0.34, height, 0.34], [sx * 1.2, y + height * 0.5, sz * 0.9], MAT.timber, false, 0.01, 1);
+  }
+  addBeveledBox(group, prefix + '-beam-top', [3.1, 0.28, 2.0], [0, y + height, 0], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-cross', [3.0, 0.12, 0.14], [0, y + height * 0.62, 0], MAT.iron, false, 0.01, 1);
+  addPulleyDrum(group, prefix + '-pulley', 0, y + height - 1.1, 0, 0.56, 1.2, 0);
+  parent.add(group);
+  return group;
+}
+
+function addHangingWeightCluster(parent, prefix, x, y, z, topY, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  const drop = Math.max(1.2, topY - (y + 1.0));
+  addBeveledBox(group, prefix + '-chain-a', [0.06, drop, 0.06], [-0.28, y + 1.0 + drop * 0.5, 0], MAT.iron, false, 0.008, 1);
+  addBeveledBox(group, prefix + '-chain-b', [0.06, drop * 0.86, 0.06], [0.28, y + 1.0 + drop * 0.43, 0], MAT.iron, false, 0.008, 1);
+  addGroundedBeveledBox(group, prefix + '-weight-a', [0.88, 1.8, 0.88], [-0.28, y, 0], MAT.stone2, false, 0.02, 1);
+  addGroundedBeveledBox(group, prefix + '-weight-b', [0.76, 1.5, 0.76], [0.28, y, 0], MAT.stone2, false, 0.02, 1);
+  parent.add(group);
+  return group;
+}
+
+function addCargoCage(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-base', [2.8, 0.18, 2.2], [0, y, 0], MAT.timber, false, 0.01, 1);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    addBeveledBox(group, prefix + '-bar-' + sx + '-' + sz, [0.08, 2.2, 0.08], [sx * 1.18, y + 1.1, sz * 0.88], MAT.iron, false, 0.008, 1);
+  }
+  addBeveledBox(group, prefix + '-rail-front', [2.5, 0.08, 0.08], [0, y + 1.9, 0.92], MAT.iron, false, 0.008, 1);
+  addBeveledBox(group, prefix + '-rail-back', [2.5, 0.08, 0.08], [0, y + 1.9, -0.92], MAT.iron, false, 0.008, 1);
+  addCrateBundle(group, prefix + '-cargo', 0, y + 0.18, 0, 0, 4);
+  parent.add(group);
+  return group;
+}
+
+function addHookPost(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addBeveledBox(group, prefix + '-post', [0.22, 2.8, 0.22], [0, y + 1.4, 0], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-arm', [1.2, 0.14, 0.14], [0.44, y + 2.42, 0], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-hook', [0.12, 0.56, 0.12], [0.92, y + 1.98, 0], MAT.iron, false, 0.01, 1);
+  parent.add(group);
+  return group;
+}
+
+function addToolBench(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-top', [2.4, 0.14, 0.96], [0, y + 0.56, 0], MAT.timber, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-shelf', [2.0, 0.12, 0.66], [0, y + 0.22, 0], MAT.timber, false, 0.01, 1);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    addGroundedBeveledBox(group, prefix + '-leg-' + sx + '-' + sz, [0.1, 0.54, 0.1], [sx * 0.92, y, sz * 0.3], MAT.timber, false, 0.01, 1);
+  }
+  addGroundedBeveledBox(group, prefix + '-tool-a', [0.46, 0.08, 0.18], [-0.48, y + 0.66, 0], MAT.iron, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-tool-b', [0.24, 0.24, 0.24], [0.4, y + 0.66, 0.1], MAT.bronze, false, 0.01, 1);
+  parent.add(group);
+  return group;
+}
+
+function addBrakeLeverStand(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-pedestal', [0.9, 1.2, 0.9], [0, y, 0], MAT.plaster, false, 0.02, 1);
+  const lever = addBeveledBox(group, prefix + '-lever', [0.12, 1.6, 0.12], [0.08, y + 1.4, 0], MAT.iron, false, 0.01, 1);
+  lever.rotation.z = -0.42;
+  addGroundedBeveledBox(group, prefix + '-handle', [0.24, 0.12, 0.24], [-0.24, y + 2.06, 0], MAT.bronze, false, 0.01, 1);
+  parent.add(group);
+  return group;
+}
+
+function addScreenWallSegment(parent, prefix, x, y, z, width, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-base', [width, 1.8, 0.42], [0, y, 0], MAT.plaster, false, 0.02, 1);
+  addBeveledBox(group, prefix + '-cap', [width + 0.12, 0.14, 0.56], [0, y + 1.86, 0], MAT.trim, false, 0.01, 1);
+  parent.add(group);
+  return group;
+}
+
 function addHangingMarketStall(parent, prefix, x, y, z, width, depth, yaw = 0) {
   const postHeight = 1.9;
   const roofY = y + postHeight + 0.16;
@@ -3840,9 +4529,91 @@ function addHangingMarketDistrictSkeleton(district) {
   }
 }
 
+
+function addLiftCourtDistrictSkeleton(district) {
+  const origin = district.origin;
+  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
+  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 9.0;
+  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 16.2;
+
+  addWalkableBox(roomGroup, 'district-' + district.id + '-gate-terrace', [28, 0.56, 24], [origin.x - 22, lowBand - 0.18, origin.z + 56], MAT.stone2, false, 0.1);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-kill-court', [42, 0.62, 36], [origin.x + 6, midBand - 0.18, origin.z + 144], MAT.plaster, false, 0.1);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-tower-platform', [18, 0.56, 18], [origin.x + 42, midBand + 4.4, origin.z + 198], MAT.platform, false, 0.08);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-upper-gallery', [18, 0.48, 40], [origin.x + 78, highBand - 0.16, origin.z + 258], MAT.bridge, true, 0.08);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-undercroft-return', [28, 0.42, 26], [origin.x - 2, lowBand - 0.76, origin.z + 220], MAT.connectorFloor, false, 0.08);
+
+  addWallBox(roomGroup, 'district-' + district.id + '-retaining-west-a', [5.8, 9.2, 30], [origin.x - 40, district.baseElevation + 1.8, origin.z + 84], MAT.wall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-retaining-west-b', [5.8, 11.4, 42], [origin.x - 30, district.baseElevation + 3.8, origin.z + 152], MAT.wall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-retaining-east', [4.8, 8.8, 26], [origin.x + 34, district.baseElevation + 5.4, origin.z + 146], MAT.wall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-screen-north', [36, 3.8, 1.8], [origin.x + 4, midBand + 1.6, origin.z + 126], MAT.plaster, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-screen-south', [30, 3.2, 1.8], [origin.x + 12, midBand + 1.4, origin.z + 164], MAT.plaster, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-tower-core', [10.0, 22.0, 10.0], [origin.x + 42, district.baseElevation + 11.0, origin.z + 198], MAT.connectorWall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-undercroft-back', [24, 6.2, 2.4], [origin.x - 2, lowBand + 1.2, origin.z + 234], MAT.connectorWall, false);
+
+  addBatchStairRun(roomGroup, 'district-' + district.id + '-entry-rise', makeVec(origin.x - 38, lowBand + PLAYER_EYE_HEIGHT, origin.z + 22), makeVec(origin.x - 12, lowBand + PLAYER_EYE_HEIGHT, origin.z + 92), lowBand - 0.08, midBand - 2.4, MAT.platform);
+  addBatchStairRun(roomGroup, 'district-' + district.id + '-court-rise', makeVec(origin.x + 10, midBand + PLAYER_EYE_HEIGHT, origin.z + 158), makeVec(origin.x + 54, highBand + PLAYER_EYE_HEIGHT, origin.z + 214), midBand + 0.1, highBand - 0.2, MAT.platform);
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-gallery-run', makeVec(origin.x + 48, highBand, origin.z + 214), makeVec(origin.x + 92, highBand + 0.24, origin.z + 268), highBand + 0.14, 4.0, MAT.bridge, 0.95);
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-undercroft-run', makeVec(origin.x - 20, lowBand - 0.52, origin.z + 178), makeVec(origin.x + 8, lowBand - 0.62, origin.z + 238), lowBand - 0.38, 3.0, MAT.connectorFloor, 0.92);
+
+  const liftSupportTop = (x, z, fallbackY) => resolveSupportHeight(x, z, fallbackY + 0.24, 0)?.topY ?? fallbackY;
+
+  addCounterweightFrame(roomGroup, 'district-' + district.id + '-tower-frame', origin.x + 42, midBand + 0.3, origin.z + 198, 10.8, 0);
+  addHangingWeightCluster(roomGroup, 'district-' + district.id + '-weights-a', origin.x + 46, midBand + 0.3, origin.z + 190, highBand + 5.2, 0);
+  addHangingWeightCluster(roomGroup, 'district-' + district.id + '-weights-b', origin.x + 38, midBand + 0.3, origin.z + 206, highBand + 4.8, 0);
+  addPulleyDrum(roomGroup, 'district-' + district.id + '-drum-a', origin.x + 20, midBand + 0.1, origin.z + 136, 0.82, 2.2, 0.2);
+  addPulleyDrum(roomGroup, 'district-' + district.id + '-drum-b', origin.x + 66, highBand + 0.1, origin.z + 244, 0.72, 1.8, -0.12);
+  addCargoCage(roomGroup, 'district-' + district.id + '-cage-a', origin.x + 4, liftSupportTop(origin.x + 4, origin.z + 148, midBand) + 0.02, origin.z + 148, 0.08);
+  addCargoCage(roomGroup, 'district-' + district.id + '-cage-b', origin.x + 76, liftSupportTop(origin.x + 76, origin.z + 264, highBand) + 0.02, origin.z + 264, -0.14);
+  addHookPost(roomGroup, 'district-' + district.id + '-hook-a', origin.x - 8, liftSupportTop(origin.x - 8, origin.z + 132, midBand) + 0.02, origin.z + 132, 0.12);
+  addHookPost(roomGroup, 'district-' + district.id + '-hook-b', origin.x + 62, liftSupportTop(origin.x + 62, origin.z + 254, highBand) + 0.02, origin.z + 254, -0.22);
+  addToolBench(roomGroup, 'district-' + district.id + '-bench-a', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 154, midBand) + 0.02, origin.z + 154, -0.08);
+  addToolBench(roomGroup, 'district-' + district.id + '-bench-b', origin.x - 6, liftSupportTop(origin.x - 6, origin.z + 226, lowBand - 0.42) + 0.02, origin.z + 226, 0.18);
+  addBrakeLeverStand(roomGroup, 'district-' + district.id + '-lever-a', origin.x + 34, liftSupportTop(origin.x + 34, origin.z + 176, midBand) + 0.02, origin.z + 176, 0.16);
+  addBrakeLeverStand(roomGroup, 'district-' + district.id + '-lever-b', origin.x + 84, liftSupportTop(origin.x + 84, origin.z + 248, highBand) + 0.02, origin.z + 248, -0.18);
+  addScreenWallSegment(roomGroup, 'district-' + district.id + '-screen-a', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 124, midBand) + 0.02, origin.z + 124, 6.2, 0.02);
+  addScreenWallSegment(roomGroup, 'district-' + district.id + '-screen-b', origin.x + 20, liftSupportTop(origin.x + 20, origin.z + 166, midBand) + 0.02, origin.z + 166, 5.8, -0.22);
+
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-execution-dais', [6.2, 0.82, 3.8], [origin.x + 10, midBand + 0.1, origin.z + 140], MAT.trim, true, 0.05, 1);
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-execution-block', [1.8, 1.0, 1.4], [origin.x + 10, midBand + 0.92, origin.z + 138], MAT.bronze, true, 0.04, 1);
+  addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-post-left', [0.28, 3.6, 0.28], [origin.x + 8.7, midBand + 2.3, origin.z + 140], MAT.timber, false, 0.02, 1);
+  addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-post-right', [0.28, 3.6, 0.28], [origin.x + 11.3, midBand + 2.3, origin.z + 140], MAT.timber, false, 0.02, 1);
+  addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-beam', [2.9, 0.22, 0.28], [origin.x + 10, midBand + 4.0, origin.z + 140], MAT.timber, false, 0.02, 1);
+  const blade = addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-blade', [0.94, 1.3, 0.12], [origin.x + 10, midBand + 2.74, origin.z + 140], MAT.iron, false, 0.01, 1);
+  blade.rotation.z = Math.PI * 0.25;
+
+  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-court-a', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 138, midBand) + 0.02, origin.z + 138, 0.22, 5);
+  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-court-b', origin.x + 28, liftSupportTop(origin.x + 28, origin.z + 154, midBand) + 0.02, origin.z + 154, -0.2, 5);
+  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-gallery', origin.x + 82, liftSupportTop(origin.x + 82, origin.z + 276, highBand) + 0.02, origin.z + 276, -0.12, 4);
+  addBenchTableSet(roomGroup, 'district-' + district.id + '-bench-set', origin.x - 16, liftSupportTop(origin.x - 16, origin.z + 72, lowBand) + 0.02, origin.z + 72, 0.06);
+  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-court', origin.x + 24, liftSupportTop(origin.x + 24, origin.z + 162, midBand) + 0.02, origin.z + 162, 5, 1.4);
+  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-undercroft', origin.x - 8, liftSupportTop(origin.x - 8, origin.z + 232, lowBand - 0.42) + 0.02, origin.z + 232, 4, 1.1);
+  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line', origin.x - 18, liftSupportTop(origin.x - 18, origin.z + 88, lowBand) + 0.02, origin.z + 88, 4.8, 0.1);
+  addWatchPost(roomGroup, 'district-' + district.id + '-watch-post', origin.x + 84, liftSupportTop(origin.x + 84, origin.z + 258, highBand) + 0.02, origin.z + 258, -0.16);
+  addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 226, lowBand - 0.56), origin.z + 226, 0.18);
+  addWellSet(roomGroup, 'district-' + district.id + '-water-station', origin.x - 4, liftSupportTop(origin.x - 4, origin.z + 148, midBand) + 0.02, origin.z + 148);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-a', origin.x - 24, liftSupportTop(origin.x - 24, origin.z + 64, lowBand) + 0.02, origin.z + 64, 2.8, 1.0, 4);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-b', origin.x + 70, liftSupportTop(origin.x + 70, origin.z + 246, highBand) + 0.02, origin.z + 246, 2.2, 0.9, 3);
+  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis', origin.x - 26, liftSupportTop(origin.x - 26, origin.z + 58, lowBand) + 0.02, origin.z + 58, 4.0, 2.2, 0);
+
+  for (let i = 0; i < 4; i += 1) {
+    addHangingChain(roomGroup, 'district-' + district.id + '-tower-chain-' + i, origin.x + 36 + i * 4.6, origin.z + 190 + i * 6.5, highBand + 5.8, 7, MAT.iron, rngFromSeed(hashRoomKey(district.id + '-tower-chain-' + i)), { length: 3.1 + (i % 2) * 0.6, sway: 0.015, dropStone: false });
+  }
+
+  addBrazier(roomGroup, 'district-' + district.id + '-court-brazier-a', [origin.x - 8, liftSupportTop(origin.x - 8, origin.z + 132, midBand) + 0.18, origin.z + 132], { kind: 'flame' });
+  addBrazier(roomGroup, 'district-' + district.id + '-court-brazier-b', [origin.x + 28, liftSupportTop(origin.x + 28, origin.z + 158, midBand) + 0.18, origin.z + 158], { kind: 'corpsefire' });
+  addBrazier(roomGroup, 'district-' + district.id + '-gallery-brazier', [origin.x + 84, liftSupportTop(origin.x + 84, origin.z + 252, highBand) + 0.18, origin.z + 252], { kind: 'flame' });
+
+  const landmark = district.landmarkAnchor;
+  if (landmark) {
+    addBrazier(roomGroup, 'district-' + district.id + '-landmark', [landmark.x, landmark.y - PLAYER_EYE_HEIGHT + 0.4, landmark.z], { kind: 'corpsefire' });
+    addBeveledBox(roomGroup, 'district-' + district.id + '-landmark-crown', [4.8, 0.64, 4.8], [landmark.x, landmark.y + 0.8, landmark.z], MAT.bronze, false, 0.03, 1);
+  }
+}
+
 function addDistrictSkeletonGeometry(district) {
   if (!district) return;
   if (district.skeletonType === 'hanging_market_hybrid') addHangingMarketDistrictSkeleton(district);
+  if (district.skeletonType === 'lift_court_hybrid') addLiftCourtDistrictSkeleton(district);
 }
 
 function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
@@ -4202,6 +4973,7 @@ function buildRoom(movePlayer = true) {
 
 
 function buildEnemy() {
+  if (enemy) despawnEnemyCorpse();
   if (enemy && enemy.parent) enemy.parent.remove(enemy);
   enemy = new THREE.Group();
   enemy.name = 'enemy-root';
@@ -4221,6 +4993,12 @@ function buildEnemy() {
   enemy.userData.commitTimer = ENEMY_COMMIT_INTERVAL * 0.55;
   enemy.userData.commitElapsed = 0;
   enemy.userData.orbitSign = 1;
+  enemy.userData.dissolveProgress = 0;
+  enemy.userData.lastHitReaction = '';
+  enemy.userData.lastHitZone = '';
+  enemy.userData.lastHitLocalX = 0;
+  enemy.userData.lastHitLocalY = 0;
+  enemy.userData.hitBox = fallbackEnemyHitBox();
 
   enemyPrimitiveVisual = new THREE.Group();
   enemyPrimitiveVisual.name = 'broken-knight-fallback';
@@ -4232,6 +5010,7 @@ function buildEnemy() {
   addBox(enemyPrimitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [0.26, 0.48, 0], MAT.iron);
   const sword = addBox(enemyPrimitiveVisual, 'execution-sword', [0.16, 1.9, 0.16], [1.25, 1.25, 0.08], MAT.bone);
   sword.rotation.z = -0.42;
+  enemyPrimitiveVisual.visible = false;
   enemy.add(enemyPrimitiveVisual);
   enemy.traverse((node) => { if (node.isMesh) node.castShadow = USE_DYNAMIC_SHADOWS; });
   scene.add(enemy);
@@ -4265,10 +5044,955 @@ function buildFallbackArms() {
 }
 const fallbackArms = buildFallbackArms();
 
+function collectBones(root) {
+  if (!root) return [];
+  const bones = [];
+  const seen = new Set();
+  root.traverse((node) => {
+    if (!node?.isBone || seen.has(node)) return;
+    seen.add(node);
+    bones.push(node);
+  });
+  root.traverse((node) => {
+    const skeletonBones = node?.skeleton?.bones || [];
+    for (const bone of skeletonBones) {
+      if (!bone || seen.has(bone)) continue;
+      seen.add(bone);
+      bones.push(bone);
+    }
+  });
+  return bones;
+}
+
+function normalizeBoneName(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
 function findBone(root, name) {
-  let found = null;
-  root.traverse((node) => { if (!found && node.isBone && node.name === name) found = node; });
-  return found;
+  const target = normalizeBoneName(name);
+  if (!target) return null;
+  const bones = collectBones(root);
+  for (const bone of bones) {
+    if (normalizeBoneName(bone.name) === target) return bone;
+  }
+  return null;
+}
+
+function findBoneByAliases(root, names = []) {
+  const bones = collectBones(root);
+  if (!bones.length) return null;
+  const normalizedTargets = names.map(normalizeBoneName).filter(Boolean);
+  for (const target of normalizedTargets) {
+    for (const bone of bones) {
+      if (normalizeBoneName(bone.name) === target) return bone;
+    }
+  }
+  for (const target of normalizedTargets) {
+    for (const bone of bones) {
+      const candidate = normalizeBoneName(bone.name);
+      if (candidate.endsWith(target) || candidate.includes(target)) return bone;
+    }
+  }
+  return null;
+}
+
+const ENEMY_RAGDOLL_DEFS = [
+  { key: 'hips', names: ['mixamorig:Hips', 'Hips'], childKey: 'spine', radius: 0.34, maxAngle: 1.1, invMass: 0.1 },
+  { key: 'spine', names: ['mixamorig:Spine', 'Spine'], childKey: 'chest', radius: 0.28, maxAngle: 0.72, invMass: 0.14 },
+  { key: 'chest', names: ['mixamorig:Spine2', 'mixamorig:Spine1', 'Spine2', 'Spine1'], childKey: 'neck', radius: 0.26, maxAngle: 0.82, invMass: 0.18 },
+  { key: 'neck', names: ['mixamorig:Neck', 'Neck'], childKey: 'head', radius: 0.13, maxAngle: 0.9, invMass: 0.24 },
+  { key: 'head', names: ['mixamorig:Head', 'Head'], childKey: null, radius: 0.17, maxAngle: 0.0, invMass: 0.28 },
+  { key: 'lShoulder', names: ['mixamorig:LeftShoulder', 'LeftShoulder'], childKey: 'lArm', radius: 0.13, maxAngle: 1.35, invMass: 0.34 },
+  { key: 'lArm', names: ['mixamorig:LeftArm', 'LeftArm'], childKey: 'lForeArm', radius: 0.11, maxAngle: 1.05, invMass: 0.42 },
+  { key: 'lForeArm', names: ['mixamorig:LeftForeArm', 'LeftForeArm'], childKey: 'lHand', radius: 0.09, maxAngle: 0.62, invMass: 0.58 },
+  { key: 'lHand', names: ['mixamorig:LeftHand', 'LeftHand'], childKey: null, radius: 0.07, maxAngle: 0.0, invMass: 0.82 },
+  { key: 'rShoulder', names: ['mixamorig:RightShoulder', 'RightShoulder'], childKey: 'rArm', radius: 0.13, maxAngle: 1.35, invMass: 0.34 },
+  { key: 'rArm', names: ['mixamorig:RightArm', 'RightArm'], childKey: 'rForeArm', radius: 0.11, maxAngle: 1.05, invMass: 0.42 },
+  { key: 'rForeArm', names: ['mixamorig:RightForeArm', 'RightForeArm'], childKey: 'rHand', radius: 0.09, maxAngle: 0.62, invMass: 0.58 },
+  { key: 'rHand', names: ['mixamorig:RightHand', 'RightHand'], childKey: null, radius: 0.07, maxAngle: 0.0, invMass: 0.82 },
+  { key: 'lUpLeg', names: ['mixamorig:LeftUpLeg', 'LeftUpLeg'], childKey: 'lLeg', radius: 0.17, maxAngle: 1.08, invMass: 0.28 },
+  { key: 'lLeg', names: ['mixamorig:LeftLeg', 'LeftLeg'], childKey: 'lFoot', radius: 0.13, maxAngle: 0.58, invMass: 0.48 },
+  { key: 'lFoot', names: ['mixamorig:LeftFoot', 'LeftFoot'], childKey: null, radius: 0.09, maxAngle: 0.0, invMass: 0.76 },
+  { key: 'rUpLeg', names: ['mixamorig:RightUpLeg', 'RightUpLeg'], childKey: 'rLeg', radius: 0.17, maxAngle: 1.08, invMass: 0.28 },
+  { key: 'rLeg', names: ['mixamorig:RightLeg', 'RightLeg'], childKey: 'rFoot', radius: 0.13, maxAngle: 0.58, invMass: 0.48 },
+  { key: 'rFoot', names: ['mixamorig:RightFoot', 'RightFoot'], childKey: null, radius: 0.09, maxAngle: 0.0, invMass: 0.76 },
+];
+const ENEMY_RAGDOLL_BRACES = [
+  ['hips', 'chest'],
+  ['chest', 'lShoulder'],
+  ['chest', 'rShoulder'],
+  ['lShoulder', 'rShoulder'],
+  ['hips', 'lUpLeg'],
+  ['hips', 'rUpLeg'],
+  ['lUpLeg', 'rUpLeg'],
+  ['lShoulder', 'rUpLeg'],
+  ['rShoulder', 'lUpLeg'],
+];
+const ENEMY_RAGDOLL_ROOT_ANCHOR_KEYS = ['hips', 'spine', 'chest'];
+const ENEMY_RAGDOLL_GROUND_CONTACT_KEYS = ['hips', 'spine', 'chest', 'lUpLeg', 'rUpLeg'];
+const ENEMY_RAGDOLL_SETTLE_FREEZE_FRAMES = 32;
+const ENEMY_RAGDOLL_SETTLE_DURATION = ENEMY_RAGDOLL_SETTLE_FREEZE_FRAMES / 60;
+const ENEMY_DISSOLVE_DURATION = ENEMY_RAGDOLL_FORCE_SETTLE_TIME + ENEMY_RAGDOLL_SETTLE_DURATION;
+
+function ensureEnemyRagdollDebugVisual() {
+  if (!DEBUG_RAGDOLL || enemyRagdollDebugGroup) return;
+  enemyRagdollDebugGroup = new THREE.Group();
+  enemyRagdollDebugGroup.name = 'enemy-ragdoll-debug';
+  enemyRagdollDebugGroup.visible = false;
+  scene.add(enemyRagdollDebugGroup);
+}
+
+function clearEnemyRagdollDebugVisual() {
+  if (!enemyRagdollDebugGroup) return;
+  enemyRagdollDebugGroup.visible = false;
+  enemyRagdollDebugPoints.length = 0;
+  enemyRagdollDebugLines.length = 0;
+  while (enemyRagdollDebugGroup.children.length) enemyRagdollDebugGroup.remove(enemyRagdollDebugGroup.children[enemyRagdollDebugGroup.children.length - 1]);
+}
+
+function rebuildEnemyRagdollDebugVisual(state) {
+  if (!DEBUG_RAGDOLL) return;
+  ensureEnemyRagdollDebugVisual();
+  clearEnemyRagdollDebugVisual();
+  if (!state || !enemyRagdollDebugGroup) return;
+  const pointGeo = new THREE.SphereGeometry(0.06, 6, 6);
+  const pointMat = new THREE.MeshBasicMaterial({ color: 0x6cf3ff, depthTest: false });
+  const headMat = new THREE.MeshBasicMaterial({ color: 0xffd36c, depthTest: false });
+  for (const entry of state.entries) {
+    const mesh = new THREE.Mesh(pointGeo, entry.key === 'head' ? headMat : pointMat);
+    mesh.renderOrder = 10;
+    enemyRagdollDebugGroup.add(mesh);
+    enemyRagdollDebugPoints.push({ key: entry.key, mesh });
+  }
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x7cff7c, depthTest: false });
+  for (const constraint of state.constraints) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3));
+    const line = new THREE.Line(geo, lineMat);
+    line.renderOrder = 9;
+    enemyRagdollDebugGroup.add(line);
+    enemyRagdollDebugLines.push({ constraint, line });
+  }
+  enemyRagdollDebugGroup.visible = true;
+}
+
+function updateEnemyRagdollDebugVisual(state) {
+  if (!DEBUG_RAGDOLL || !enemyRagdollDebugGroup) return;
+  if (!state) {
+    enemyRagdollDebugGroup.visible = false;
+    return;
+  }
+  enemyRagdollDebugGroup.visible = true;
+  for (const point of enemyRagdollDebugPoints) {
+    const entry = state.entryMap.get(point.key);
+    if (!entry) continue;
+    point.mesh.position.copy(entry.position);
+  }
+  for (const item of enemyRagdollDebugLines) {
+    const a = state.entryMap.get(item.constraint.a);
+    const b = state.entryMap.get(item.constraint.b);
+    if (!a || !b) continue;
+    const positions = item.line.geometry.attributes.position.array;
+    positions[0] = a.position.x;
+    positions[1] = a.position.y;
+    positions[2] = a.position.z;
+    positions[3] = b.position.x;
+    positions[4] = b.position.y;
+    positions[5] = b.position.z;
+    item.line.geometry.attributes.position.needsUpdate = true;
+    item.line.geometry.computeBoundingSphere();
+  }
+}
+
+function computeEnemyRagdollBodyAnchor(state) {
+  if (!state?.entryMap) return null;
+  const anchor = new THREE.Vector3();
+  let weightTotal = 0;
+  for (const key of ENEMY_RAGDOLL_ROOT_ANCHOR_KEYS) {
+    const entry = state.entryMap.get(key);
+    if (!entry) continue;
+    const weight = key === 'hips' ? 6.0 : (key === 'spine' ? 1.6 : 0.35);
+    anchor.addScaledVector(entry.position, weight);
+    weightTotal += weight;
+  }
+  return weightTotal > 0 ? anchor.multiplyScalar(1 / weightTotal) : null;
+}
+
+function computeEnemyRagdollPoseAnchor(state) {
+  if (!state?.entryMap) return null;
+  const anchor = new THREE.Vector3();
+  let weightTotal = 0;
+  for (const key of ENEMY_RAGDOLL_ROOT_ANCHOR_KEYS) {
+    const entry = state.entryMap.get(key);
+    if (!entry?.bone) continue;
+    const world = new THREE.Vector3();
+    entry.bone.getWorldPosition(world);
+    const weight = key === 'hips' ? 6.0 : (key === 'spine' ? 1.6 : 0.35);
+    anchor.addScaledVector(world, weight);
+    weightTotal += weight;
+  }
+  return weightTotal > 0 ? anchor.multiplyScalar(1 / weightTotal) : null;
+}
+
+function computeEnemyRagdollGroundContacts(state) {
+  if (!state?.entryMap) return 0;
+  let contacts = 0;
+  for (const key of ENEMY_RAGDOLL_GROUND_CONTACT_KEYS) {
+    const entry = state.entryMap.get(key);
+    if (!entry) continue;
+    const floorY = findRagdollSupportY(entry.position, entry.radius);
+    if (floorY === null) continue;
+    if (entry.position.y <= floorY + 0.06) contacts += 1;
+  }
+  return contacts;
+}
+
+function computeEnemyRagdollTorsoContacts(state) {
+  if (!state?.entryMap) return 0;
+  let contacts = 0;
+  for (const key of ENEMY_RAGDOLL_ROOT_ANCHOR_KEYS) {
+    const entry = state.entryMap.get(key);
+    if (!entry || !entry.grounded) continue;
+    contacts += 1;
+  }
+  return contacts;
+}
+
+function isEnemyRagdollCoreNode(node) {
+  return Boolean(node && ['hips', 'spine', 'chest', 'neck', 'head'].includes(node.key));
+}
+
+function enemyRagdollCollisionFamily(key) {
+  if (!key) return 'none';
+  if (['hips', 'spine', 'chest', 'neck'].includes(key)) return 'core';
+  if (key === 'head') return 'head';
+  if (key.startsWith('lShoulder') || key.startsWith('lArm') || key.startsWith('lForeArm') || key === 'lHand') return 'left-arm';
+  if (key.startsWith('rShoulder') || key.startsWith('rArm') || key.startsWith('rForeArm') || key === 'rHand') return 'right-arm';
+  if (key.startsWith('lUpLeg') || key.startsWith('lLeg') || key === 'lFoot') return 'left-leg';
+  if (key.startsWith('rUpLeg') || key.startsWith('rLeg') || key === 'rFoot') return 'right-leg';
+  return 'other';
+}
+
+function enemyRagdollAllowsSelfCollision(nodeA, nodeB) {
+  if (!nodeA || !nodeB) return false;
+  const familyA = enemyRagdollCollisionFamily(nodeA.key);
+  const familyB = enemyRagdollCollisionFamily(nodeB.key);
+  if (familyA === familyB) return false;
+  if (familyA === 'core' && familyB === 'core') return false;
+  if ((familyA === 'core' && familyB === 'head') || (familyA === 'head' && familyB === 'core')) return false;
+  const armLike = new Set(['left-arm', 'right-arm']);
+  const legLike = new Set(['left-leg', 'right-leg']);
+  if ((armLike.has(familyA) && legLike.has(familyB)) || (armLike.has(familyB) && legLike.has(familyA))) return false;
+  if ((familyA === 'core' && armLike.has(familyB)) || (familyB === 'core' && armLike.has(familyA))) {
+    return nodeA.key.endsWith('Hand') || nodeB.key.endsWith('Hand');
+  }
+  if ((familyA === 'core' && legLike.has(familyB)) || (familyB === 'core' && legLike.has(familyA))) {
+    return nodeA.key.endsWith('Foot') || nodeB.key.endsWith('Foot');
+  }
+  if (familyA === 'head' || familyB === 'head') {
+    return familyA === 'left-arm' || familyA === 'right-arm' || familyB === 'left-arm' || familyB === 'right-arm';
+  }
+  return (familyA === 'left-arm' && familyB === 'right-arm')
+    || (familyA === 'right-arm' && familyB === 'left-arm')
+    || (familyA === 'left-leg' && familyB === 'right-leg')
+    || (familyA === 'right-leg' && familyB === 'left-leg');
+}
+
+function isEnemyCorpseActive() {
+  return Boolean(enemy?.userData?.corpseActive);
+}
+
+function summarizeEnemyRagdollDebug() {
+  const debug = enemy?.userData?.ragdollDebug;
+  if (debug?.failure) return ` | rag FAIL ${debug.failure}`;
+  if (!DEBUG_RAGDOLL || !debug) return '';
+  const action = debug.currentAction ? String(debug.currentAction).slice(0, 8) : '-';
+  const audit = debug.dead
+    ? ` o${debug.owner || '-'} m${debug.mode || '-'} a${(debug.attackTimer || 0).toFixed(2)} j${debug.navJump ? 1 : 0} x${action} ph${debug.phase || '-'} i${(debug.maxImpactVelocity || 0).toFixed(2)} f${debug.floorHits || 0} cp${(debug.selfCollisionPush || 0).toFixed(2)}`
+    : '';
+  return ` | rag ${debug.entries}n ${debug.constraints}c ${debug.collisions || 0}p v${debug.maxVelocity.toFixed(2)} d${debug.maxDisplacement.toFixed(2)} h${debug.hipsDisplacement.toFixed(2)} a${(debug.anchorDisplacement || 0).toFixed(2)} s${(debug.maxStretch || 0).toFixed(2)} g${debug.groundContacts || 0} q${(debug.dissolveProgress || 0).toFixed(2)}${audit}`;
+}
+
+function buildEnemyRagdollProfile() {
+  if (!enemyModel) {
+    if (enemy) enemy.userData.ragdollProfileInfo = { reason: 'no-model', entries: 0, links: 0, missingKeys: [], resolvedKeys: [] };
+    return null;
+  }
+  const entries = [];
+  for (const def of ENEMY_RAGDOLL_DEFS) {
+    const bone = findBoneByAliases(enemyModel, def.names);
+    if (!bone) continue;
+    entries.push({
+      key: def.key,
+      bone,
+      childKey: def.childKey || null,
+      radius: def.radius,
+      maxAngle: def.maxAngle || 0,
+      bindLocalPosition: bone.position.clone(),
+      bindLocalQuaternion: bone.quaternion.clone(),
+    });
+  }
+  const entryMap = new Map(entries.map((entry) => [entry.key, entry]));
+  const requiredKeys = ['hips', 'spine', 'chest', 'head', 'lArm', 'rArm', 'lUpLeg', 'rUpLeg'];
+  const missingKeys = requiredKeys.filter((key) => !entryMap.has(key));
+  const earlyReason = !entryMap.has('hips') ? 'missing-hips' : (entries.length < 10 ? 'too-few-entries' : '');
+  if (earlyReason) {
+    if (enemy) enemy.userData.ragdollProfileInfo = { reason: earlyReason, entries: entries.length, links: 0, missingKeys, resolvedKeys: entries.map((entry) => entry.key) };
+    return null;
+  }
+  const links = [];
+  for (const entry of entries) {
+    if (entry.childKey && entryMap.has(entry.childKey)) links.push([entry.key, entry.childKey]);
+  }
+  for (const [a, b] of ENEMY_RAGDOLL_BRACES) {
+    if (entryMap.has(a) && entryMap.has(b)) links.push([a, b]);
+  }
+  const profile = { entries, entryMap, links, missingKeys, resolvedKeys: entries.map((entry) => entry.key) };
+  if (enemy) {
+    enemy.userData.ragdollProfile = missingKeys.length ? null : profile;
+    enemy.userData.ragdollProfileInfo = { reason: missingKeys.length ? 'missing-required' : 'ok', entries: entries.length, links: links.length, missingKeys, resolvedKeys: profile.resolvedKeys.slice() };
+  }
+  return missingKeys.length ? null : profile;
+}
+
+function computeObjectLocalBounds(root) {
+  if (!root) return null;
+  root.updateMatrixWorld(true);
+  const rootInverse = root.matrixWorld.clone().invert();
+  const bounds = new THREE.Box3();
+  let hasBounds = false;
+  root.traverse((node) => {
+    if (!node.isMesh && !node.isSkinnedMesh) return;
+    const geometry = node.geometry;
+    if (!geometry) return;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    if (!geometry.boundingBox) return;
+    const localBox = geometry.boundingBox.clone();
+    const nodeToRoot = rootInverse.clone().multiply(node.matrixWorld);
+    localBox.applyMatrix4(nodeToRoot);
+    if (!hasBounds) {
+      bounds.copy(localBox);
+      hasBounds = true;
+    } else {
+      bounds.union(localBox);
+    }
+  });
+  return hasBounds ? bounds : null;
+}
+
+function fallbackEnemyHitBox() {
+  return new THREE.Box3(
+    new THREE.Vector3(-0.55, 0, -0.42),
+    new THREE.Vector3(0.55, ORC_BERSERKER_TARGET_HEIGHT, 0.42)
+  );
+}
+
+function cacheEnemyHitBox() {
+  if (!enemy) return;
+  enemy.userData.hitBox = computeObjectLocalBounds(enemyModel) || fallbackEnemyHitBox();
+}
+
+function resetEnemyDeathState() {
+  if (!enemy) return;
+  clearEnemyRagdollDebugVisual();
+  enemy.userData.ragdollDebug = null;
+  const state = enemy.userData.ragdollState;
+  const profile = enemy.userData.ragdollProfile;
+  const sourceEntries = state?.entries || profile?.entries || [];
+  for (const entry of sourceEntries) {
+    if (!entry?.bone) continue;
+    const bindPos = entry.bindLocalPosition || entry.startLocalPosition;
+    const bindQuat = entry.bindLocalQuaternion || entry.startLocalQuaternion;
+    if (bindPos) entry.bone.position.copy(bindPos);
+    if (bindQuat) entry.bone.quaternion.copy(bindQuat);
+  }
+  enemy.userData.ragdollState = null;
+  enemy.userData.corpseActive = false;
+  enemy.userData.suppressEnemyMixer = false;
+  enemy.userData.physicsOwner = '';
+  resetEnemyDissolve();
+  enemyCurrentAction = null;
+  if (enemyModel) enemyModel.updateMatrixWorld(true);
+}
+
+function despawnEnemyCorpse() {
+  if (!enemy) return;
+  resetEnemyDeathState();
+  enemy.userData.dead = false;
+  enemy.userData.deathTimer = 0;
+  enemy.userData.mode = 'down';
+  enemy.scale.setScalar(1);
+  enemy.visible = false;
+}
+
+function captureEnemyDeathRig() {
+  const profile = enemy?.userData?.ragdollProfile || buildEnemyRagdollProfile();
+  if (!enemy || !profile) {
+    const info = enemy?.userData?.ragdollProfileInfo;
+    if (enemy) {
+      const failure = info?.reason === 'missing-required' && info?.missingKeys?.length
+        ? 'profile-' + info.missingKeys.join(',')
+        : ('profile-' + (info?.reason || 'unknown'));
+      enemy.userData.ragdollDebug = { failure };
+    }
+    return null;
+  }
+  enemyModel?.updateMatrixWorld?.(true);
+  const entries = [];
+  const entryMap = new Map();
+  for (const profileEntry of profile.entries) {
+    const worldPosition = new THREE.Vector3();
+    const worldQuaternion = new THREE.Quaternion();
+    profileEntry.bone.getWorldPosition(worldPosition);
+    profileEntry.bone.getWorldQuaternion(worldQuaternion);
+    const entry = {
+      key: profileEntry.key,
+      bone: profileEntry.bone,
+      childKey: profileEntry.childKey,
+      radius: profileEntry.radius,
+      maxAngle: profileEntry.maxAngle || 0,
+      invMass: Number.isFinite(profileEntry.invMass) ? profileEntry.invMass : 1,
+      bindLocalPosition: profileEntry.bindLocalPosition.clone(),
+      bindLocalQuaternion: profileEntry.bindLocalQuaternion.clone(),
+      startLocalPosition: profileEntry.bone.position.clone(),
+      startLocalQuaternion: profileEntry.bone.quaternion.clone(),
+      startWorldQuaternion: worldQuaternion,
+      position: worldPosition,
+      previous: worldPosition.clone(),
+      previousPinned: worldPosition.clone(),
+      baseChildDirection: null,
+      grounded: false,
+      groundedFrames: 0,
+      justHitGround: false,
+      impactVelocity: 0,
+    };
+    entries.push(entry);
+    entryMap.set(entry.key, entry);
+  }
+  const constraints = [];
+  const linkedPairs = new Set();
+  for (const [a, b] of profile.links) {
+    const entryA = entryMap.get(a);
+    const entryB = entryMap.get(b);
+    if (!entryA || !entryB) continue;
+    const direct = entryA.childKey === b;
+    constraints.push({ a, b, length: entryA.position.distanceTo(entryB.position), brace: !direct, direct });
+    linkedPairs.add(a < b ? `${a}|${b}` : `${b}|${a}`);
+  }
+  const collisionPairs = [];
+  for (let i = 0; i < entries.length; i += 1) {
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const entryA = entries[i];
+      const entryB = entries[j];
+      const pairKey = entryA.key < entryB.key ? `${entryA.key}|${entryB.key}` : `${entryB.key}|${entryA.key}`;
+      if (linkedPairs.has(pairKey)) continue;
+      if (!enemyRagdollAllowsSelfCollision(entryA, entryB)) continue;
+      const minDistance = (entryA.radius + entryB.radius) * ENEMY_RAGDOLL_SELF_COLLISION_SCALE;
+      if (minDistance <= 0.000001) continue;
+      collisionPairs.push({ a: entryA.key, b: entryB.key, minDistance });
+    }
+  }
+  for (const entry of entries) {
+    if (!entry.childKey || !entryMap.has(entry.childKey)) continue;
+    const child = entryMap.get(entry.childKey);
+    const dir = child.position.clone().sub(entry.position);
+    if (dir.lengthSq() > 0.000001) entry.baseChildDirection = dir.normalize();
+  }
+  const hips = entryMap.get('hips');
+  const anchorStart = computeEnemyRagdollBodyAnchor({ entryMap }) || hips?.position.clone() || enemy.position.clone();
+  const state = {
+    entries,
+    entryMap,
+    constraints,
+    collisionPairs,
+    settleFrames: 0,
+    settleElapsed: 0,
+    settled: false,
+    phase: 'flight',
+    elapsed: 0,
+    motionFade: 0,
+    velocityWindow: [],
+    rootOffset: enemy.position.clone().sub(anchorStart),
+    startHipsPosition: hips ? hips.position.clone() : enemy.position.clone(),
+    startAnchorPosition: anchorStart.clone(),
+  };
+  enemy.userData.ragdollState = state;
+  enemy.userData.ragdollDebug = { entries: entries.length, constraints: constraints.length, collisions: collisionPairs.length, maxVelocity: 0, maxDisplacement: 0, hipsDisplacement: 0, owner: 'ragdoll' };
+  rebuildEnemyRagdollDebugVisual(state);
+  return state;
+}
+
+function findRagdollSupportY(position, radius) {
+  const support = findEnemySupport(position.x, position.z, position.y + radius + 0.2, ENEMY_STEP_UP + 1.4, ENEMY_STEP_DOWN + 10.0);
+  return support ? support.topY + radius : null;
+}
+
+function integrateEnemyRagdollNode(node, dtSq, phase = 'flight', motionFade = 0) {
+  const settling = phase === 'settle';
+  const decaying = phase === 'decay';
+  const fade = settling ? 1 : (decaying ? motionFade : 0);
+  const drag = settling
+    ? (node.groundedFrames > 0 ? 0.45 : 0.58)
+    : (node.groundedFrames > 0 ? ENEMY_RAGDOLL_GROUNDED_DRAG : ENEMY_RAGDOLL_DRAG);
+  const velocity = node.position.clone().sub(node.previous).multiplyScalar(drag);
+  if (settling) {
+    const core = isEnemyRagdollCoreNode(node);
+    const damp = node.groundedFrames > 0
+      ? (core ? ENEMY_RAGDOLL_SETTLE_CORE_DAMPING : ENEMY_RAGDOLL_SETTLE_ENTRY_DAMPING)
+      : ENEMY_RAGDOLL_SETTLE_AIR_DAMPING;
+    velocity.x *= damp;
+    velocity.z *= damp;
+    if (velocity.y > 0) velocity.y = 0;
+    else velocity.y *= node.groundedFrames > 0 ? 0.05 : 0.18;
+  } else if (decaying) {
+    const groundedHoriz = 0.9 + (0.18 - 0.9) * fade;
+    const airHoriz = 1.0 + (0.3 - 1.0) * fade;
+    const horiz = node.groundedFrames > 0 ? groundedHoriz : airHoriz;
+    velocity.x *= horiz;
+    velocity.z *= horiz;
+    if (velocity.y > 0) velocity.y *= Math.max(0, 1 - fade);
+    else velocity.y *= node.groundedFrames > 0 ? Math.max(0.06, 0.35 - 0.22 * fade) : Math.max(0.2, 0.65 - 0.3 * fade);
+  } else if (node.groundedFrames > 0) {
+    velocity.x *= 0.9;
+    velocity.z *= 0.9;
+    if (velocity.y > 0) velocity.y *= 0.18;
+  }
+  node.justHitGround = false;
+  node.previous.copy(node.position);
+  node.position.add(velocity);
+  node.position.y -= ENEMY_RAGDOLL_GRAVITY * dtSq;
+}
+
+function constrainEnemyRagdollNode(node, phase = 'flight', motionFade = 0) {
+  const bounds = roomState.bounds;
+  if (bounds) {
+    node.position.x = clamp(node.position.x, bounds.minX + node.radius, bounds.maxX - node.radius);
+    node.position.z = clamp(node.position.z, bounds.minZ + node.radius, bounds.maxZ - node.radius);
+  }
+  const floorY = findRagdollSupportY(node.position, node.radius);
+  if (floorY === null || node.position.y >= floorY) {
+    node.grounded = false;
+    node.groundedFrames = 0;
+    node.impactVelocity = 0;
+    return;
+  }
+  const wasGrounded = node.groundedFrames > 0;
+  const settling = phase === 'settle';
+  const decaying = phase === 'decay';
+  const fade = settling ? 1 : (decaying ? motionFade : 0);
+  const vx = node.position.x - node.previous.x;
+  const vy = node.position.y - node.previous.y;
+  const vz = node.position.z - node.previous.z;
+  const core = isEnemyRagdollCoreNode(node);
+  node.position.y = floorY;
+  node.grounded = true;
+  node.justHitGround = !wasGrounded;
+  node.groundedFrames = wasGrounded ? (node.groundedFrames + 1) : 1;
+  node.impactVelocity = Math.max(0, -vy);
+  const baseRetain = node.justHitGround ? ENEMY_RAGDOLL_FLOOR_IMPACT_FRICTION : (core ? ENEMY_RAGDOLL_FLOOR_FRICTION : ENEMY_RAGDOLL_FLOOR_FRICTION + 0.06);
+  const targetRetain = core ? ENEMY_RAGDOLL_SETTLE_CORE_DAMPING : ENEMY_RAGDOLL_SETTLE_ENTRY_DAMPING;
+  const horizontalRetain = settling
+    ? targetRetain
+    : (decaying ? (baseRetain + (targetRetain - baseRetain) * fade) : baseRetain);
+  const baseBounce = node.justHitGround ? (core ? 0 : ENEMY_RAGDOLL_FLOOR_IMPACT_BOUNCE) : (core ? 0 : ENEMY_RAGDOLL_FLOOR_BOUNCE);
+  const bounce = settling
+    ? 0
+    : (decaying ? baseBounce * Math.max(0, 1 - fade) : baseBounce);
+  node.previous.x = node.position.x - vx * horizontalRetain;
+  node.previous.z = node.position.z - vz * horizontalRetain;
+  node.previous.y = node.position.y + node.impactVelocity * bounce;
+}
+
+function beginEnemyRagdollSettle(state) {
+  if (!state || state.phase === 'settle' || state.settled) return;
+  state.phase = 'settle';
+  state.motionFade = 1;
+  state.settleFrames = 0;
+  state.settleElapsed = 0;
+  state.velocityWindow.length = 0;
+  for (const entry of state.entries) {
+    const core = isEnemyRagdollCoreNode(entry);
+    const vx = entry.position.x - entry.previous.x;
+    const vz = entry.position.z - entry.previous.z;
+    const damp = entry.groundedFrames > 0
+      ? (core ? ENEMY_RAGDOLL_SETTLE_CORE_DAMPING : ENEMY_RAGDOLL_SETTLE_ENTRY_DAMPING)
+      : ENEMY_RAGDOLL_SETTLE_AIR_DAMPING;
+    entry.previous.x = entry.position.x - vx * damp;
+    entry.previous.z = entry.position.z - vz * damp;
+    entry.previous.y = entry.position.y;
+  }
+}
+
+function solveEnemyRagdollConstraint(nodeA, nodeB, length, direct = false, brace = false) {
+  const delta = nodeB.position.clone().sub(nodeA.position);
+  const dist = delta.length();
+  if (dist <= 0.000001) return;
+  const error = (dist - length) / dist;
+  const stiffness = direct ? 0.96 : (brace ? 0.16 : 0.5);
+  const totalInvMass = Math.max(0.000001, (nodeA.invMass || 1) + (nodeB.invMass || 1));
+  const moveA = (nodeA.invMass || 1) / totalInvMass;
+  const moveB = (nodeB.invMass || 1) / totalInvMass;
+  const correction = delta.multiplyScalar(error * stiffness);
+  nodeA.position.addScaledVector(correction, moveA);
+  nodeB.position.addScaledVector(correction, -moveB);
+}
+
+function solveEnemyRagdollVolumeCollision(nodeA, nodeB, minDistance) {
+  if (!nodeA || !nodeB || minDistance <= 0.000001) return 0;
+  const groundedA = nodeA.groundedFrames > 0;
+  const groundedB = nodeB.groundedFrames > 0;
+  const delta = nodeB.position.clone().sub(nodeA.position);
+  if (groundedA && groundedB) delta.y *= ENEMY_RAGDOLL_SELF_COLLISION_VERTICAL_SCALE;
+  let dist = delta.length();
+  if (dist <= 0.000001) {
+    delta.set(nodeB.key < nodeA.key ? -1 : 1, 0, 0);
+    dist = 1;
+  }
+  if (dist >= minDistance) return 0;
+  const dir = delta.multiplyScalar(1 / dist);
+  const stiffness = groundedA || groundedB
+    ? ENEMY_RAGDOLL_SELF_COLLISION_GROUNDED_STIFFNESS
+    : ENEMY_RAGDOLL_SELF_COLLISION_STIFFNESS;
+  const correction = Math.min(ENEMY_RAGDOLL_SELF_COLLISION_MAX_PUSH, (minDistance - dist) * stiffness);
+  const totalInvMass = Math.max(0.000001, (nodeA.invMass || 1) + (nodeB.invMass || 1));
+  let moveA = correction * ((nodeA.invMass || 1) / totalInvMass);
+  let moveB = correction * ((nodeB.invMass || 1) / totalInvMass);
+  if (groundedA && !groundedB) {
+    moveA = correction * 0.18;
+    moveB = correction * 0.82;
+  } else if (!groundedA && groundedB) {
+    moveA = correction * 0.82;
+    moveB = correction * 0.18;
+  }
+  const offsetA = dir.clone().multiplyScalar(-moveA);
+  const offsetB = dir.clone().multiplyScalar(moveB);
+  if (groundedA) offsetA.y *= groundedB ? 0.05 : 0.12;
+  if (groundedB) offsetB.y *= groundedA ? 0.05 : 0.12;
+  nodeA.position.add(offsetA);
+  nodeB.position.add(offsetB);
+  return correction;
+}
+
+function applyEnemyRagdollVolumeCollisions(state) {
+  if (!state?.collisionPairs?.length || state.phase === 'settle' || (state.motionFade || 0) > 0.6) return 0;
+  let totalPush = 0;
+  for (const pair of state.collisionPairs) {
+    const nodeA = state.entryMap.get(pair.a);
+    const nodeB = state.entryMap.get(pair.b);
+    if (!nodeA || !nodeB) continue;
+    totalPush += solveEnemyRagdollVolumeCollision(nodeA, nodeB, pair.minDistance);
+  }
+  return totalPush;
+}
+
+function clampEnemyRagdollJointLimit(parent, child) {
+  if (!parent?.baseChildDirection || !child || !parent.maxAngle || parent.maxAngle <= 0) return;
+  const delta = child.position.clone().sub(parent.position);
+  const dist = delta.length();
+  if (dist <= 0.000001) return;
+  const currentDir = delta.clone().multiplyScalar(1 / dist);
+  const baseDir = parent.baseChildDirection;
+  const angle = baseDir.angleTo(currentDir);
+  if (angle <= parent.maxAngle) return;
+  const axis = new THREE.Vector3().crossVectors(baseDir, currentDir);
+  if (axis.lengthSq() <= 0.000001) {
+    child.position.copy(parent.position).addScaledVector(baseDir, dist);
+    return;
+  }
+  axis.normalize();
+  const clampedDir = baseDir.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(axis, parent.maxAngle)).normalize();
+  child.position.copy(parent.position).addScaledVector(clampedDir, dist);
+}
+
+function applyEnemyRagdollJointLimits(state) {
+  if (!state?.entries) return;
+  for (const entry of state.entries) {
+    if (!entry.childKey) continue;
+    const child = state.entryMap.get(entry.childKey);
+    if (!child) continue;
+    clampEnemyRagdollJointLimit(entry, child);
+  }
+}
+
+function applyEnemyDeathPose() {
+  const state = enemy?.userData?.ragdollState;
+  if (!enemy || !enemyModel || !state) return;
+  if (!enemyModel.visible && enemy.userData.dissolveProgress < 0.999) enemyModel.visible = true;
+  const inverseParent = new THREE.Quaternion();
+  const targetWorld = new THREE.Quaternion();
+  const swing = new THREE.Quaternion();
+  const bodyAnchor = computeEnemyRagdollBodyAnchor(state);
+  const desiredAnchor = bodyAnchor ? bodyAnchor.clone() : null;
+  if (desiredAnchor) {
+    enemy.position.copy(desiredAnchor).add(state.rootOffset || new THREE.Vector3());
+    enemy.userData.baseY = enemy.position.y;
+  }
+  for (const entry of state.entries) {
+    entry.bone.position.copy(entry.bindLocalPosition || entry.startLocalPosition);
+  }
+  enemyModel.updateMatrixWorld(true);
+  for (const entry of state.entries) {
+    const child = entry.childKey ? state.entryMap.get(entry.childKey) : null;
+    if (!child || !entry.baseChildDirection) {
+      entry.bone.quaternion.copy(entry.startLocalQuaternion);
+      continue;
+    }
+    const currentDir = child.position.clone().sub(entry.position);
+    if (currentDir.lengthSq() <= 0.000001) {
+      entry.bone.quaternion.copy(entry.startLocalQuaternion);
+      continue;
+    }
+    currentDir.normalize();
+    swing.setFromUnitVectors(entry.baseChildDirection, currentDir);
+    targetWorld.copy(swing).multiply(entry.startWorldQuaternion);
+    const parentObject = entry.bone.parent && entry.bone.parent.isBone ? entry.bone.parent : enemyModel;
+    parentObject.getWorldQuaternion(inverseParent).invert();
+    entry.bone.quaternion.copy(inverseParent.multiply(targetWorld));
+    entry.bone.updateMatrixWorld(true);
+  }
+  enemyModel.updateMatrixWorld(true);
+  if (desiredAnchor) {
+    const posedAnchor = computeEnemyRagdollPoseAnchor(state);
+    if (posedAnchor) {
+      const correction = desiredAnchor.sub(posedAnchor);
+      enemy.position.add(correction);
+      enemy.userData.baseY = enemy.position.y;
+      enemyModel.updateMatrixWorld(true);
+    }
+  }
+}
+
+function updateEnemyRagdollDeath(dt) {
+  const state = enemy?.userData?.ragdollState;
+  if (!enemy || !state) return;
+  if (state.settled) {
+    syncEnemyDissolveToRagdollState(state);
+    applyEnemyDeathPose();
+    updateEnemyRagdollDebugVisual(state);
+    enemy.userData.ragdollDebug = {
+      ...(enemy.userData.ragdollDebug || {}),
+      dead: !!enemy.userData.dead,
+      corpseActive: !!enemy.userData.corpseActive,
+      owner: enemy.userData.physicsOwner || '-',
+      mode: enemy.userData.mode || '-',
+      attackTimer: enemy.userData.attackTimer || 0,
+      navJump: !!getEnemyNavState()?.jump,
+      currentAction: enemyCurrentAction?.getClip?.().name || '',
+      phase: state.phase || 'settled',
+      settled: true,
+      settleFrames: state.settleFrames || 0,
+      dissolveProgress: enemy.userData.dissolveProgress || 0,
+    };
+    return;
+  }
+  const substeps = Math.max(1, ENEMY_RAGDOLL_SUBSTEPS);
+  const subDt = dt / substeps;
+  const dtSq = subDt * subDt;
+  let moving = false;
+  let maxVelocitySq = 0;
+  let maxDisplacement = 0;
+  let maxStretch = 0;
+  let groundContacts = 0;
+  let torsoContacts = 0;
+  let floorHits = 0;
+  let maxImpactVelocity = 0;
+  let selfCollisionPush = 0;
+  let velocityTotal = 0;
+  let anchorDrift = 0;
+  state.elapsed = (state.elapsed || 0) + dt;
+  state.motionFade = clamp((state.elapsed - ENEMY_RAGDOLL_DECAY_DELAY) / ENEMY_RAGDOLL_DECAY_DURATION, 0, 1);
+  if (state.phase === 'flight' && state.motionFade > 0) state.phase = 'decay';
+  if (state.phase !== 'settle' && state.elapsed >= ENEMY_RAGDOLL_FORCE_SETTLE_TIME) beginEnemyRagdollSettle(state);
+  for (let step = 0; step < substeps; step += 1) {
+    for (const entry of state.entries) integrateEnemyRagdollNode(entry, dtSq, state.phase, state.motionFade);
+    for (let i = 0; i < ENEMY_RAGDOLL_ITERATIONS; i += 1) {
+      for (const constraint of state.constraints) {
+        const nodeA = state.entryMap.get(constraint.a);
+        const nodeB = state.entryMap.get(constraint.b);
+        if (!nodeA || !nodeB) continue;
+        solveEnemyRagdollConstraint(nodeA, nodeB, constraint.length, constraint.direct, constraint.brace);
+      }
+      applyEnemyRagdollJointLimits(state);
+      for (const entry of state.entries) constrainEnemyRagdollNode(entry, state.phase, state.motionFade);
+      selfCollisionPush += applyEnemyRagdollVolumeCollisions(state);
+      for (const entry of state.entries) constrainEnemyRagdollNode(entry, state.phase, state.motionFade);
+    }
+  }
+  for (const entry of state.entries) {
+    const vx = entry.position.x - entry.previous.x;
+    const vy = entry.position.y - entry.previous.y;
+    const vz = entry.position.z - entry.previous.z;
+    const velocitySq = vx * vx + vy * vy + vz * vz;
+    const velocity = Math.sqrt(velocitySq);
+    velocityTotal += velocity;
+    if (velocitySq > ENEMY_RAGDOLL_SETTLE_SPEED_SQ) moving = true;
+    if (velocitySq > maxVelocitySq) maxVelocitySq = velocitySq;
+    if (entry.justHitGround) floorHits += 1;
+    if ((entry.impactVelocity || 0) > maxImpactVelocity) maxImpactVelocity = entry.impactVelocity || 0;
+    if (entry.key === 'hips' && state.startHipsPosition) {
+      const hipsDisp = entry.position.distanceTo(state.startHipsPosition);
+      if (hipsDisp > maxDisplacement) maxDisplacement = hipsDisp;
+    }
+  }
+  for (const constraint of state.constraints) {
+    if (!constraint.direct) continue;
+    const nodeA = state.entryMap.get(constraint.a);
+    const nodeB = state.entryMap.get(constraint.b);
+    if (!nodeA || !nodeB || constraint.length <= 0.000001) continue;
+    const stretch = Math.abs(nodeA.position.distanceTo(nodeB.position) - constraint.length) / constraint.length;
+    if (stretch > maxStretch) maxStretch = stretch;
+  }
+  groundContacts = computeEnemyRagdollGroundContacts(state);
+  torsoContacts = computeEnemyRagdollTorsoContacts(state);
+  const avgVelocity = state.entries.length ? velocityTotal / state.entries.length : 0;
+  state.velocityWindow.push(avgVelocity);
+  if (state.velocityWindow.length > 6) state.velocityWindow.shift();
+  const avgWindowVelocity = state.velocityWindow.reduce((sum, value) => sum + value, 0) / Math.max(1, state.velocityWindow.length);
+  const quiet = state.phase === 'settle'
+    ? (avgWindowVelocity < 0.12 && maxVelocitySq < 0.08 && selfCollisionPush < 0.08)
+    : (state.motionFade > 0.9 && avgWindowVelocity < 0.16);
+  if (state.phase === 'settle') {
+    state.settleElapsed = Math.min(ENEMY_RAGDOLL_SETTLE_DURATION, (state.settleElapsed || 0) + dt);
+    state.settleFrames = Math.max(0, state.settleFrames || 0) + 1;
+  } else {
+    state.settleElapsed = 0;
+    state.settleFrames = 0;
+  }
+  if (state.phase === 'settle' && state.settleElapsed >= ENEMY_RAGDOLL_SETTLE_DURATION) {
+    state.settled = true;
+    for (const entry of state.entries) entry.previous.copy(entry.position);
+  }
+  syncEnemyDissolveToRagdollState(state);
+  applyEnemyDeathPose();
+  updateEnemyRagdollDebugVisual(state);
+  const hips = state.entryMap.get('hips');
+  const anchor = computeEnemyRagdollBodyAnchor(state);
+  anchorDrift = anchor && state.startAnchorPosition ? anchor.distanceTo(state.startAnchorPosition) : 0;
+  enemy.userData.ragdollDebug = {
+    entries: state.entries.length,
+    constraints: state.constraints.length,
+    collisions: state.collisionPairs?.length || 0,
+    maxVelocity: Math.sqrt(maxVelocitySq),
+    avgVelocity: avgWindowVelocity,
+    maxImpactVelocity,
+    floorHits,
+    selfCollisionPush,
+    dissolveProgress: enemy.userData.dissolveProgress || 0,
+    maxDisplacement,
+    hipsDisplacement: hips && state.startHipsPosition ? hips.position.distanceTo(state.startHipsPosition) : 0,
+    anchorDisplacement: anchorDrift,
+    maxStretch,
+    groundContacts,
+    torsoContacts,
+    settleFrames: state.settleFrames || 0,
+    settled: !!state.settled,
+    dead: !!enemy.userData.dead,
+    corpseActive: !!enemy.userData.corpseActive,
+    owner: enemy.userData.physicsOwner || '-',
+    mode: enemy.userData.mode || '-',
+    attackTimer: enemy.userData.attackTimer || 0,
+    navJump: !!getEnemyNavState()?.jump,
+    currentAction: enemyCurrentAction?.getClip?.().name || '',
+    phase: state.phase,
+    elapsed: state.elapsed || 0,
+    motionFade: state.motionFade || 0,
+  };
+}
+
+function startEnemyDeath(attackDirection, damage = 1) {
+  if (!enemy || enemy.userData.dead) return;
+  const push = attackDirection ? attackDirection.clone() : new THREE.Vector3(0, 0, -1);
+  push.y = 0;
+  if (push.lengthSq() < 0.0001) push.set(0, 0, -1);
+  push.normalize();
+  const state = captureEnemyDeathRig();
+  if (!state) {
+    const fail = enemy.userData.ragdollDebug?.failure || 'capture-null';
+    setStatus('ragdoll failed: ' + fail);
+    hintEl.textContent = 'Ragdoll failed: ' + fail;
+    hintEl.style.opacity = '1';
+    return;
+  }
+  enemy.userData.dead = true;
+  enemy.userData.corpseActive = true;
+  enemy.userData.suppressEnemyMixer = true;
+  enemy.userData.physicsOwner = 'ragdoll';
+  enemy.userData.deathTimer = ENEMY_DEATH_DESPAWN_DELAY;
+  enemy.userData.hitTimer = 0;
+  enemy.userData.attackTimer = 0;
+  enemy.userData.attackElapsed = 0;
+  enemy.userData.attackHitDone = false;
+  enemy.userData.attackName = '';
+  enemy.userData.mode = 'dead';
+  enemy.userData.modeTimer = 0;
+  enemy.userData.commitTimer = 0;
+  enemy.userData.commitElapsed = 0;
+  const sideImpulse = enemy.userData.lastHitLocalX || 0;
+  for (const entry of state.entries) {
+    const scale = entry.key === 'hips' || entry.key === 'spine' || entry.key === 'chest'
+      ? 1.0
+      : (entry.key === 'head' || entry.key.endsWith('Hand') || entry.key.endsWith('Foot') ? 0.78 : 0.88);
+    const lift = entry.key === 'hips' || entry.key === 'spine' || entry.key === 'chest' ? 1.0 : 0.58;
+    const lateral = entry.key.startsWith('l') ? -1 : (entry.key.startsWith('r') ? 1 : 0);
+    const impulse = push.clone().multiplyScalar((ENEMY_DEATH_LAUNCH_SPEED + damage * 0.32) * scale);
+    impulse.y = (ENEMY_DEATH_UPWARD_SPEED + damage * 0.18) * lift;
+    impulse.add(new THREE.Vector3(0.45 * lateral * sideImpulse, 0, 0));
+    entry.previous.copy(entry.position.clone().sub(impulse.multiplyScalar(1 / 60)));
+  }
+  if (DEBUG_RAGDOLL) console.info('enemy ragdoll start', { entries: state.entries.length, constraints: state.constraints.length, keys: state.entries.map((entry) => entry.key) });
+  if (enemyMixer) enemyMixer.stopAllAction();
+  enemyCurrentAction = null;
+  const nav = getEnemyNavState();
+  if (nav) {
+    clearEnemyRoute(nav);
+    nav.jump = null;
+  }
+  applyEnemyDeathPose();
+}
+
+function cameraAimDirection() {
+  const dir = new THREE.Vector3();
+  if (camera?.getWorldDirection) {
+    camera.getWorldDirection(dir);
+    if (dir.lengthSq() > 0.0001) return dir.normalize();
+  }
+  const yaw = player.yaw + (input.gyroYaw || 0);
+  const pitch = player.pitch + (input.gyroPitch || 0);
+  const cosPitch = Math.cos(pitch);
+  return new THREE.Vector3(-Math.sin(yaw) * cosPitch, -Math.sin(pitch), -Math.cos(yaw) * cosPitch).normalize();
+}
+
+function chooseEnemyHitReaction(attack) {
+  const aim = cameraAimDirection();
+  const targetRoot = enemyModel || enemy;
+  const hitBox = enemy?.userData?.hitBox || fallbackEnemyHitBox();
+  const horizontalAim = Math.hypot(aim.x, aim.z);
+  const centerLocal = hitBox.getCenter(new THREE.Vector3());
+  const centerWorld = targetRoot.localToWorld(centerLocal.clone());
+  const horizontalDistance = Math.hypot(centerWorld.x - player.position.x, centerWorld.z - player.position.z);
+  const travel = horizontalDistance / Math.max(0.001, horizontalAim);
+  const impact = player.position.clone().addScaledVector(aim, travel);
+  const unclampedLocalImpact = targetRoot.worldToLocal(impact.clone());
+  const clampedLocalImpact = unclampedLocalImpact.clone().clamp(hitBox.min, hitBox.max);
+  const size = hitBox.getSize(new THREE.Vector3());
+  const normalizedX = size.x > 0.001 ? (clampedLocalImpact.x - hitBox.min.x) / size.x : 0.5;
+  const normalizedY = size.y > 0.001 ? (clampedLocalImpact.y - hitBox.min.y) / size.y : 0.5;
+  const centeredX = normalizedX - 0.5;
+  const zone = normalizedY >= ENEMY_HIT_HEAD_NORMALIZED_Y ? 'head' : 'body';
+  let name = 'reactBodyCenter';
+  if (zone === 'head') name = centeredX <= -ENEMY_HIT_HEAD_SIDE_THRESHOLD ? 'reactHeadLeft' : 'reactHeadRight';
+  return {
+    name,
+    zone,
+    worldImpact: targetRoot.localToWorld(clampedLocalImpact.clone()),
+    localX: clampedLocalImpact.x,
+    localY: clampedLocalImpact.y,
+    normalizedX,
+    normalizedY,
+    centeredX,
+    aim: aim.clone(),
+    attackName: attack?.def?.name || '',
+  };
 }
 
 function clipMap(clips) {
@@ -4627,9 +6351,11 @@ function finalizePlayerFrame(dt, now, stickMagnitude) {
   if (!Number.isFinite(player.visualPosition.x) || player.visualPosition.distanceTo(player.position) > 4.0 || (!player.grounded && player.velocity.y > 0.35)) player.visualPosition.copy(player.position);
   else player.visualPosition.lerp(player.position, followBlend);
   camera.position.copy(player.visualPosition).add(new THREE.Vector3(bobX, bobY, 0));
+  const shake = currentHitShake();
+  if (shake) camera.position.add(new THREE.Vector3(shake.x, shake.y, 0));
   skyDome.position.copy(camera.position);
-  camera.rotation.y = player.yaw + input.gyroYaw;
-  camera.rotation.x = player.pitch + input.gyroPitch;
+  camera.rotation.y = player.yaw + input.gyroYaw + (shake?.yaw || 0);
+  camera.rotation.x = player.pitch + input.gyroPitch + (shake?.pitch || 0);
 }
 
 function resolveSupportHeight(x, z, feetY, velocityY) {
@@ -4756,6 +6482,60 @@ function enemyBodyBlockedAt(x, z, floorY) {
 }
 
 
+function enemyPlayerVerticalOverlap(playerPos = player.position, enemyPos = enemy?.position, enemyBaseY = enemy?.userData?.baseY) {
+  if (!playerPos || !enemyPos || !enemy) return false;
+  const playerFeetY = playerPos.y - PLAYER_EYE_HEIGHT;
+  const playerHeadY = playerPos.y;
+  const enemyFeetY = Number.isFinite(enemyBaseY) ? enemyBaseY : enemyPos.y;
+  const enemyHeadY = enemyFeetY + ORC_BERSERKER_TARGET_HEIGHT * 0.9;
+  return playerHeadY >= enemyFeetY - ENEMY_PLAYER_COLLISION_VERTICAL_GRACE && playerFeetY <= enemyHeadY + ENEMY_PLAYER_COLLISION_VERTICAL_GRACE;
+}
+
+function resolvePlayerEnemyOverlapForPlayer(position, velocity = player.velocity) {
+  if (!enemy?.visible || enemy.userData?.dead || !enemyPlayerVerticalOverlap(position, enemy.position, enemy.userData?.baseY)) return false;
+  const dx = position.x - enemy.position.x;
+  const dz = position.z - enemy.position.z;
+  const distSq = dx * dx + dz * dz;
+  if (distSq >= ENEMY_PLAYER_COLLISION_RADIUS_SQ) return false;
+  const dist = Math.sqrt(Math.max(0.000001, distSq));
+  const push = ENEMY_PLAYER_COLLISION_RADIUS - dist;
+  const nx = dist > 0.0001 ? dx / dist : (cameraForwardYaw(player.yaw).x || 1);
+  const nz = dist > 0.0001 ? dz / dist : (cameraForwardYaw(player.yaw).z || 0);
+  position.x += nx * push;
+  position.z += nz * push;
+  if (velocity) {
+    const towardEnemy = velocity.x * -nx + velocity.z * -nz;
+    if (towardEnemy > 0) {
+      velocity.x += nx * towardEnemy;
+      velocity.z += nz * towardEnemy;
+    }
+  }
+  return true;
+}
+
+function clampEnemyAgainstPlayer(next, direction = null) {
+  if (!enemy?.visible || enemy.userData?.dead || !enemyPlayerVerticalOverlap(player.position, next, enemy.userData?.baseY)) return false;
+  const dx = next.x - player.position.x;
+  const dz = next.z - player.position.z;
+  const distSq = dx * dx + dz * dz;
+  if (distSq >= ENEMY_PLAYER_COLLISION_RADIUS_SQ) return false;
+  const dist = Math.sqrt(Math.max(0.000001, distSq));
+  const push = ENEMY_PLAYER_COLLISION_RADIUS - dist;
+  let nx = dist > 0.0001 ? dx / dist : 0;
+  let nz = dist > 0.0001 ? dz / dist : 0;
+  if (dist <= 0.0001 && direction && direction.lengthSq() > 0.0001) {
+    const away = direction.clone().normalize().multiplyScalar(-1);
+    nx = away.x;
+    nz = away.z;
+  } else if (dist <= 0.0001) {
+    nx = 1;
+    nz = 0;
+  }
+  next.x += nx * push;
+  next.z += nz * push;
+  return true;
+}
+
 function resolveEnemySpawnPoint(position) {
   if (!position) return position;
   const baseY = Number.isFinite(position.y) ? position.y : 0;
@@ -4818,14 +6598,16 @@ function sampleEnemyMoveSupport(from, to) {
 }
 
 function applyEnemyMove(direction, speed, dt) {
-  if (!enemy || direction.lengthSq() <= 0.0001 || speed <= 0) return false;
-  const step = direction.clone().normalize().multiplyScalar(speed * dt);
+  if (!enemy || isEnemyCorpseActive() || direction.lengthSq() <= 0.0001 || speed <= 0) return false;
+  const moveDir = direction.clone().normalize();
+  const step = moveDir.clone().multiplyScalar(speed * dt);
   const next = enemy.position.clone().add(step);
   const bounds = roomState.levelBounds;
   if (bounds) {
     next.x = clamp(next.x, bounds.minX + ENEMY_CAPSULE_RADIUS, bounds.maxX - ENEMY_CAPSULE_RADIUS);
     next.z = clamp(next.z, bounds.minZ + ENEMY_CAPSULE_RADIUS, bounds.maxZ - ENEMY_CAPSULE_RADIUS);
   }
+  clampEnemyAgainstPlayer(next, moveDir);
   const support = sampleEnemyMoveSupport(enemy.position, next);
   if (!support) {
     enemy.userData.pursuitStall = Math.min(48, (enemy.userData.pursuitStall || 0) + 1);
@@ -5419,7 +7201,7 @@ function rebuildEnemyRoute(force = false) {
 }
 
 function startEnemyJump(target) {
-  if (!enemy) return false;
+  if (!enemy || isEnemyCorpseActive()) return false;
   const nav = getEnemyNavState();
   if (!nav) return false;
   const refY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : enemy.position.y;
@@ -5455,7 +7237,7 @@ function startEnemyJump(target) {
 }
 
 function advanceEnemyJump(dt) {
-  if (!enemy) return false;
+  if (!enemy || isEnemyCorpseActive()) return false;
   const nav = getEnemyNavState();
   const jump = nav?.jump;
   if (!jump) return false;
@@ -5499,7 +7281,7 @@ function advanceEnemyJump(dt) {
 }
 
 function setEnemyMode(mode, timer = 0) {
-  if (!enemy || enemy.userData.mode === mode) return;
+  if (!enemy || isEnemyCorpseActive() || enemy.userData.mode === mode) return;
   enemy.userData.mode = mode;
   enemy.userData.modeTimer = timer;
   if (mode === 'commit') enemy.userData.commitElapsed = 0;
@@ -5571,10 +7353,244 @@ function normalizeEnemyModelToHeight(model, targetHeight = 2.35) {
   return scale;
 }
 
+
+function createEnemyDissolveMaterial(material) {
+  if (!material) return material;
+  if (material.userData?.enemyDissolvePatched) return material;
+  const patched = material.clone();
+  patched.userData = {
+    ...(patched.userData || {}),
+    enemyDissolvePatched: true,
+    enemyDissolveUniforms: null,
+    enemyDissolveBaseOpacity: Number.isFinite(patched.opacity) ? patched.opacity : 1,
+    enemyDissolveBaseTransparent: !!patched.transparent,
+    enemyDissolveBaseEmissive: patched.emissive ? patched.emissive.clone() : new THREE.Color(0x000000),
+    enemyDissolveBaseEmissiveIntensity: Number.isFinite(patched.emissiveIntensity) ? patched.emissiveIntensity : 0,
+  };
+  patched.transparent = false;
+  patched.depthWrite = true;
+  patched.onBeforeCompile = (shader) => {
+    shader.uniforms.enemyDissolveProgress = { value: 0 };
+    shader.uniforms.enemyDissolveScale = { value: ENEMY_DISSOLVE_VORONOI_SCALE };
+    shader.uniforms.enemyDissolveEdgeWidth = { value: ENEMY_DISSOLVE_EDGE_WIDTH };
+    shader.uniforms.enemyDissolveEdgeColor = { value: ENEMY_DISSOLVE_EDGE_COLOR };
+    shader.uniforms.enemyDissolveEdgeIntensity = { value: ENEMY_DISSOLVE_EDGE_INTENSITY };
+    patched.userData.enemyDissolveUniforms = shader.uniforms;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec3 vEnemyDissolvePosition;\nvarying vec3 vEnemyDissolveNormal;'
+      )
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvEnemyDissolvePosition = transformed;'
+      )
+      .replace(
+        '#include <normal_vertex>',
+        '#include <normal_vertex>\nvEnemyDissolveNormal = normalize( transformedNormal );'
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vEnemyDissolvePosition;
+        varying vec3 vEnemyDissolveNormal;
+        uniform float enemyDissolveProgress;
+        uniform float enemyDissolveScale;
+        uniform float enemyDissolveEdgeWidth;
+        uniform vec3 enemyDissolveEdgeColor;
+        uniform float enemyDissolveEdgeIntensity;
+
+        vec2 enemyVoronoiCell(vec2 pos) {
+          vec2 cell = floor(pos);
+          vec2 fracPart = fract(pos);
+          float nearest = 8.0;
+          float nextNearest = 8.0;
+          for (int yy = -1; yy <= 1; yy++) {
+            for (int xx = -1; xx <= 1; xx++) {
+              vec2 neighbor = vec2(float(xx), float(yy));
+              vec2 point = neighbor + fract(sin(dot(cell + neighbor, vec2(127.1, 311.7))) * vec2(43758.5453, 28001.8384));
+              float dist = length(fracPart - point);
+              if (dist < nearest) {
+                nextNearest = nearest;
+                nearest = dist;
+              } else if (dist < nextNearest) {
+                nextNearest = dist;
+              }
+            }
+          }
+          return vec2(nearest, nextNearest - nearest);
+        }
+
+        float sampleEnemyDissolve(vec3 pos, vec3 normalDir) {
+          vec3 weights = pow(abs(normalize(normalDir)), vec3(4.0));
+          float weightSum = max(0.0001, weights.x + weights.y + weights.z);
+          weights /= weightSum;
+          float sampleX = enemyVoronoiCell(pos.yz * enemyDissolveScale).y;
+          float sampleY = enemyVoronoiCell(pos.xz * enemyDissolveScale).y;
+          float sampleZ = enemyVoronoiCell(pos.xy * enemyDissolveScale).y;
+          return sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
+        }`
+      )
+      .replace(
+        '#include <output_fragment>',
+        `float enemyDissolveValue = sampleEnemyDissolve(vEnemyDissolvePosition, vEnemyDissolveNormal);
+        if (enemyDissolveValue < enemyDissolveProgress) discard;
+        float enemyEdgeDistance = enemyDissolveValue - enemyDissolveProgress;
+        if (enemyEdgeDistance > 0.0 && enemyEdgeDistance < enemyDissolveEdgeWidth && enemyDissolveProgress > 0.0) {
+          float enemyEdgeGlow = (enemyDissolveEdgeWidth - enemyEdgeDistance) / enemyDissolveEdgeWidth;
+          enemyEdgeGlow = pow(enemyEdgeGlow, 2.0) * enemyDissolveEdgeIntensity;
+          totalEmissiveRadiance += enemyDissolveEdgeColor * enemyEdgeGlow;
+        }
+        #include <output_fragment>`
+      );
+  };
+  patched.customProgramCacheKey = () => 'enemy-dissolve-v1';
+  patched.needsUpdate = true;
+  return patched;
+}
+
+function applyEnemyDissolveMaterials(model) {
+  if (!model) return;
+  model.traverse((node) => {
+    if (!node.isMesh && !node.isSkinnedMesh) return;
+    if (Array.isArray(node.material)) node.material = node.material.map(createEnemyDissolveMaterial);
+    else node.material = createEnemyDissolveMaterial(node.material);
+  });
+}
+
+function ensureEnemyDissolveShards() {
+  if (!enemy) return null;
+  if (enemy.userData.dissolveShardGroup) return enemy.userData.dissolveShardGroup;
+  const group = new THREE.Group();
+  group.name = 'enemy-dissolve-shards';
+  group.visible = false;
+  enemy.add(group);
+  const shardGeo = new THREE.BoxGeometry(1, 1, 1);
+  const hitBox = enemy.userData.hitBox || fallbackEnemyHitBox();
+  const min = hitBox.min.clone();
+  const max = hitBox.max.clone();
+  const baseOffset = enemyModel ? enemyModel.position.clone() : new THREE.Vector3();
+  const shards = [];
+  const rand = (seed) => {
+    const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  for (let i = 0; i < ENEMY_DISSOLVE_SHARD_COUNT; i += 1) {
+    const rx = rand(i + 1.1);
+    const ry = rand(i + 2.7);
+    const rz = rand(i + 4.3);
+    const base = new THREE.Vector3(
+      THREE.MathUtils.lerp(min.x, max.x, rx),
+      THREE.MathUtils.lerp(min.y, max.y, ry),
+      THREE.MathUtils.lerp(min.z, max.z, rz),
+    ).add(baseOffset);
+    const drift = new THREE.Vector3(rx - 0.5, 0.35 + rand(i + 7.9) * 0.85, rz - 0.5).normalize();
+    const size = 0.08 + rand(i + 9.2) * 0.18;
+    const mat = new THREE.MeshBasicMaterial({
+      color: rand(i + 6.4) > 0.5 ? 0xff6b1a : 0xffc07a,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(shardGeo, mat);
+    mesh.visible = false;
+    mesh.position.copy(base);
+    mesh.scale.setScalar(size);
+    group.add(mesh);
+    shards.push({
+      mesh,
+      material: mat,
+      base,
+      drift,
+      threshold: rand(i + 11.3) * 0.72,
+      spin: new THREE.Vector3(rand(i + 12.1) * 4 - 2, rand(i + 13.5) * 5 - 2.5, rand(i + 14.8) * 4 - 2),
+      size,
+    });
+  }
+  enemy.userData.dissolveShardGroup = group;
+  enemy.userData.dissolveShards = shards;
+  return group;
+}
+
+function updateEnemyDissolveShards(progress) {
+  if (!enemy) return;
+  const group = ensureEnemyDissolveShards();
+  const shards = enemy.userData.dissolveShards || [];
+  if (!group) return;
+  if (progress <= 0.001 || progress >= 0.999) {
+    group.visible = false;
+    for (const shard of shards) shard.mesh.visible = false;
+    return;
+  }
+  group.visible = true;
+  for (const shard of shards) {
+    const localT = clamp((progress - shard.threshold) / Math.max(0.08, 1 - shard.threshold), 0, 1);
+    if (localT <= 0.0001) {
+      shard.mesh.visible = false;
+      continue;
+    }
+    const eased = Math.pow(localT, 0.7);
+    const fade = 1 - Math.pow(localT, 1.15);
+    shard.mesh.visible = true;
+    shard.mesh.position.copy(shard.base).addScaledVector(shard.drift, eased * ENEMY_DISSOLVE_SHARD_DRIFT);
+    shard.mesh.position.y += eased * ENEMY_DISSOLVE_SHARD_RISE;
+    shard.mesh.rotation.set(shard.spin.x * eased, shard.spin.y * eased, shard.spin.z * eased);
+    shard.mesh.scale.setScalar(shard.size * (0.9 + eased * 0.9));
+    shard.material.opacity = Math.max(0, fade * 0.95);
+  }
+}
+
+function setEnemyDissolveProgress(progress) {
+  const clamped = clamp(progress, 0, 1);
+  if (enemy) enemy.userData.dissolveProgress = clamped;
+  updateEnemyDissolveShards(clamped);
+  if (!enemyModel) return;
+  enemyModel.visible = clamped < 0.999;
+  enemyModel.traverse((node) => {
+    if (!node.isMesh && !node.isSkinnedMesh) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    for (const mat of mats) {
+      const uniforms = mat?.userData?.enemyDissolveUniforms;
+      if (uniforms) uniforms.enemyDissolveProgress.value = clamped;
+      const baseOpacity = mat?.userData?.enemyDissolveBaseOpacity ?? 1;
+      const baseTransparent = !!mat?.userData?.enemyDissolveBaseTransparent;
+      const fade = 1 - clamp(Math.max(0, clamped - 0.12) / 0.88, 0, 1);
+      mat.transparent = baseTransparent || clamped > 0.001;
+      mat.opacity = Math.max(0, baseOpacity * fade);
+      mat.depthWrite = fade > 0.02;
+      if (mat.emissive) {
+        const baseEmissive = mat.userData.enemyDissolveBaseEmissive || new THREE.Color(0x000000);
+        mat.emissive.copy(baseEmissive).lerp(ENEMY_DISSOLVE_EDGE_COLOR, Math.min(1, clamped * 0.9));
+        mat.emissiveIntensity = (mat.userData.enemyDissolveBaseEmissiveIntensity || 0) + clamped * 1.6;
+      }
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+function resetEnemyDissolve() {
+  setEnemyDissolveProgress(0);
+  if (enemyModel) enemyModel.visible = true;
+}
+
+function syncEnemyDissolveToRagdollState(state) {
+  if (!state) {
+    resetEnemyDissolve();
+    return;
+  }
+  const progress = state.settled
+    ? 1
+    : clamp((state.elapsed || 0) / ENEMY_DISSOLVE_DURATION, 0, 1);
+  setEnemyDissolveProgress(progress);
+  if (state.settled && enemyRagdollDebugGroup) enemyRagdollDebugGroup.visible = false;
+}
+
 function configureOrcBerserkerModel(model) {
   model.name = 'orc-berserker-model';
   model.rotation.y = Math.PI;
   model.position.set(0, 0, 0);
+  applyEnemyDissolveMaterials(model);
   model.traverse((node) => {
     if (!node.isMesh && !node.isSkinnedMesh) return;
     node.castShadow = USE_DYNAMIC_SHADOWS;
@@ -5595,24 +7611,40 @@ function configureOrcBerserkerModel(model) {
 
 function loadOrcBerserkerEnemy() {
   fbxLoader.load(ORC_BERSERKER_MODEL, (asset) => {
-    if (!enemy) return;
-    if (enemyModel?.parent) enemyModel.parent.remove(enemyModel);
-    enemyActions.clear();
-    enemyCurrentAction = null;
-    enemyModel = asset;
-    const scale = configureOrcBerserkerModel(enemyModel);
-    enemyMixer = asset.animations?.length ? new THREE.AnimationMixer(enemyModel) : null;
-    if (enemyMixer) {
-      registerEnemyClip('idle', asset.animations);
-      playEnemyAction('idle', 0.01);
-      loadProMeleeAxeEnemyClips();
+    try {
+      if (!enemy) return;
+      if (enemyModel?.parent) enemyModel.parent.remove(enemyModel);
+      enemyActions.clear();
+      enemyCurrentAction = null;
+      enemyModel = asset;
+      const scale = configureOrcBerserkerModel(enemyModel);
+      cacheEnemyHitBox();
+      buildEnemyRagdollProfile();
+      enemyMixer = asset.animations?.length ? new THREE.AnimationMixer(enemyModel) : null;
+      if (enemyMixer) {
+        registerEnemyClip('idle', asset.animations);
+        playEnemyAction('idle', 0.01);
+        loadProMeleeAxeEnemyClips();
+      }
+      enemy.add(enemyModel);
+      resetEnemyDissolve();
+      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
+      setStatus('standing idle orc imported' + (scale ? ' scale ' + scale.toFixed(3) : ''));
+    } catch (err) {
+      console.warn('standing idle orc setup failed; keeping primitive fallback', err);
+      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+      const summary = rememberError('Orc setup error', err);
+      setStatus(summary.toLowerCase());
+      hintEl.textContent = summary;
+      hintEl.style.opacity = '1';
     }
-    enemy.add(enemyModel);
-    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
-    setStatus('standing idle orc imported' + (scale ? ' scale ' + scale.toFixed(3) : ''));
   }, undefined, (err) => {
     console.warn('standing idle orc failed; keeping primitive fallback', err);
     if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+    const summary = rememberError('Orc load error', err);
+    setStatus(summary.toLowerCase());
+    hintEl.textContent = summary;
+    hintEl.style.opacity = '1';
   });
 }
 
@@ -5652,11 +7684,14 @@ function registerEnemyClip(name, clips, options = {}) {
   return action;
 }
 
-function playEnemyAction(name, fade = 0.16) {
+function playEnemyAction(name, fade = 0.16, options = {}) {
+  if (isEnemyCorpseActive()) return;
   const next = enemyActions.get(name) || enemyActions.get('idle');
-  if (!next || next === enemyCurrentAction) return;
+  if (!next) return;
+  const restart = !!options.restart;
+  if (next === enemyCurrentAction && !restart) return;
+  if (enemyCurrentAction && enemyCurrentAction !== next) enemyCurrentAction.fadeOut(fade);
   next.reset().fadeIn(fade).play();
-  if (enemyCurrentAction) enemyCurrentAction.fadeOut(fade);
   enemyCurrentAction = next;
 }
 
@@ -5686,33 +7721,50 @@ function loadProMeleeAxeEnemyClips() {
   loadEnemyClip('jumping', PRO_MELEE_AXE_CLIPS.jumping, { once: true, stripRootMotionXZ: true });
   loadEnemyClip('attackHorizontal', PRO_MELEE_AXE_CLIPS.attackHorizontal, { once: true });
   loadEnemyClip('react', PRO_MELEE_AXE_CLIPS.react, { once: true });
-  loadEnemyClip('dying', PRO_MELEE_AXE_CLIPS.react, { once: true, timeScale: 0.72 });
+  loadEnemyClip('reactBodyCenter', PRO_MELEE_AXE_CLIPS.reactBodyCenter, { once: true });
+  loadEnemyClip('reactHeadLeft', PRO_MELEE_AXE_CLIPS.reactHeadLeft, { once: true });
+  loadEnemyClip('reactHeadRight', PRO_MELEE_AXE_CLIPS.reactHeadRight, { once: true });
+  loadEnemyClip('dying', PRO_MELEE_AXE_CLIPS.dying, { once: true, stripRootMotionXZ: true });
 }
 
 function loadMutantOrcEnemy() {
   fbxLoader.load(MUTANT_ORC_CLIPS.idle, (asset) => {
-    enemyModel = asset;
-    configureMutantOrcModel(enemyModel);
-    enemyMixer = new THREE.AnimationMixer(enemyModel);
-    registerEnemyClip('idle', asset.animations);
-    enemy.add(enemyModel);
-    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
-    playEnemyAction('idle', 0.01);
-    loadEnemyClip('run', MUTANT_ORC_CLIPS.run);
-    loadEnemyClip('walking', MUTANT_ORC_CLIPS.walking);
-    loadEnemyClip('jumping', MUTANT_ORC_CLIPS.jumping, { once: true });
-    loadEnemyClip('punch', MUTANT_ORC_CLIPS.punch, { once: true });
-    loadEnemyClip('dying', MUTANT_ORC_CLIPS.dying, { once: true });
-    setStatus('mutant orc enemy imported');
+    try {
+      enemyModel = asset;
+      configureMutantOrcModel(enemyModel);
+      enemyMixer = new THREE.AnimationMixer(enemyModel);
+      registerEnemyClip('idle', asset.animations);
+      enemy.add(enemyModel);
+      resetEnemyDissolve();
+      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
+      playEnemyAction('idle', 0.01);
+      loadEnemyClip('run', MUTANT_ORC_CLIPS.run);
+      loadEnemyClip('walking', MUTANT_ORC_CLIPS.walking);
+      loadEnemyClip('jumping', MUTANT_ORC_CLIPS.jumping, { once: true });
+      loadEnemyClip('punch', MUTANT_ORC_CLIPS.punch, { once: true });
+      loadEnemyClip('dying', MUTANT_ORC_CLIPS.dying, { once: true });
+      setStatus('mutant orc enemy imported');
+    } catch (err) {
+      console.warn('mutant orc setup failed; keeping primitive fallback', err);
+      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+      const summary = rememberError('Mutant orc setup error', err);
+      setStatus(summary.toLowerCase());
+      hintEl.textContent = summary;
+      hintEl.style.opacity = '1';
+    }
   }, undefined, (err) => {
     console.warn('mutant orc enemy failed; keeping primitive fallback', err);
     if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+    const summary = rememberError('Mutant orc load error', err);
+    setStatus(summary.toLowerCase());
+    hintEl.textContent = summary;
+    hintEl.style.opacity = '1';
   });
 }
 
 
 function updateEnemyMixer(dt) {
-  if (!enemyMixer) return;
+  if (!enemyMixer || enemy?.userData?.dead || enemy?.userData?.suppressEnemyMixer || isEnemyCorpseActive()) return;
   enemyMixer.update(dt);
   if (!enemy?.userData?.dead && enemyCurrentAction) {
     const clipName = enemyCurrentAction.getClip().name;
@@ -6253,6 +8305,7 @@ function updatePlayer(dt) {
   player.velocity.y -= 14.4 * dt;
   player.position.addScaledVector(player.velocity, dt);
   resolvePlayerSolids(player.position, player.velocity);
+  resolvePlayerEnemyOverlapForPlayer(player.position, player.velocity);
   const feetY = player.position.y - PLAYER_EYE_HEIGHT;
   let support = player.velocity.y <= 0 ? (resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y) || resolveSolidTopSupport(player.position.x, player.position.z, feetY, player.velocity.y)) : null;
   const stepDirection = desired.lengthSq() > 0.0001 ? desired : new THREE.Vector3(player.velocity.x, 0, player.velocity.z);
@@ -6279,11 +8332,12 @@ function updatePlayer(dt) {
       return;
     }
   }
+  resolvePlayerEnemyOverlapForPlayer(player.position, player.velocity);
   finalizePlayerFrame(dt, now, stickMagnitude);
 }
 
 function startEnemyAttack() {
-  if (!enemy || enemy.userData.attackTimer > 0) return;
+  if (!enemy || isEnemyCorpseActive() || enemy.userData.attackTimer > 0) return;
   const attackName = enemyActions.has('attackHorizontal') ? 'attackHorizontal' : '';
   if (!attackName) {
     console.warn('enemy attack missing attackHorizontal; refusing fallback attack');
@@ -6299,21 +8353,23 @@ function startEnemyAttack() {
 
 function updateEnemyEngagement(dt) {
   if (!enemy) return;
-  updateEnemyMixer(dt);
   enemy.userData.hitTimer = Math.max(0, enemy.userData.hitTimer - dt);
   enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer || 0);
   const nav = getEnemyNavState();
   const baseY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : enemy.position.y;
-  enemy.position.y = baseY + Math.sin(performance.now() * 0.002) * 0.025;
-  enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
   if (!enemy.visible) return;
-  if (enemy.userData.dead) {
+  if (enemy.userData.dead || isEnemyCorpseActive()) {
+    enemy.scale.setScalar(1);
+    updateEnemyRagdollDeath(dt);
     if (enemy.userData.deathTimer > 0) {
       enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer - dt);
-      if (enemy.userData.deathTimer <= 0) enemy.visible = false;
+      if (enemy.userData.deathTimer <= 0) despawnEnemyCorpse();
     }
     return;
   }
+  updateEnemyMixer(dt);
+  enemy.position.y = baseY + Math.sin(performance.now() * 0.002) * 0.025;
+  enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
 
   const support = findEnemySupport(enemy.position.x, enemy.position.z, baseY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
   if (support) {
@@ -6575,16 +8631,26 @@ function updateAttack(dt) {
     const dist = toEnemy.length();
     const alignment = dist > 0.001 ? attack.direction.dot(toEnemy.normalize()) : 0;
     if (enemy.visible && !enemy.userData.dead && dist < def.range && alignment > 0.5) {
+      const reaction = chooseEnemyHitReaction(attack);
+      const reactionName = enemyActions.has(reaction.name) ? reaction.name : 'react';
+      const reactionAction = enemyActions.get(reactionName) || enemyActions.get('react');
       enemy.userData.health -= def.damage;
-      enemy.userData.hitTimer = 0.28;
+      enemy.userData.attackTimer = 0;
+      enemy.userData.attackElapsed = 0;
+      enemy.userData.attackHitDone = false;
+      enemy.userData.attackName = '';
+      enemy.userData.hitTimer = Math.max(0.24, Math.min(0.7, reactionAction?.getClip?.().duration || 0.32));
+      enemy.userData.lastHitReaction = reactionName;
+      enemy.userData.lastHitZone = reaction.zone;
+      enemy.userData.lastHitLocalX = reaction.localX;
+      enemy.userData.lastHitLocalY = reaction.localY;
       enemy.position.addScaledVector(attack.direction, 0.28 + def.damage * 0.12);
-      playEnemyAction('react', 0.04);
+      playEnemyAction(reactionName, 0.012, { restart: true });
+      triggerHitJuice(reaction.worldImpact, attack.direction, def.damage);
       playThud(1.05 + def.damage * 0.16);
       if (enemy.userData.health <= 0) {
-        enemy.userData.dead = true;
-        enemy.userData.deathTimer = 1.35;
-        playEnemyAction('dying', 0.04);
-        setStatus('orc berserker down. survive another room.');
+        startEnemyDeath(attack.direction, def.damage);
+        if (enemy.userData.dead) setStatus('orc berserker down. survive another room.');
       }
     }
   }
@@ -6651,7 +8717,10 @@ function resize() {
 function render() {
   requestAnimationFrame(render);
   try {
-    const dt = Math.min(0.045, clock.getDelta());
+    const realDt = Math.min(0.045, clock.getDelta());
+    updateCombatFx(realDt);
+    updateEnemyBloodParticles(realDt);
+    const dt = player.hitPause > 0 ? 0 : realDt * combatFx.timeScale;
     updatePlayer(dt);
     updateAttack(dt);
     updateEnemyEngagement(dt);
@@ -6668,18 +8737,21 @@ function render() {
     const enemyNav = getEnemyNavState();
     const navMode = enemyNav?.asleep ? 'sleep' : (enemyNav?.waypointKinds[0] || enemy.userData.mode || 'idle');
     const navText = enemyNav ? ` | nav ${navMode} w${enemyNav.waypoints.length} e${enemyNav.routePath.length}` : '';
+    const ragText = summarizeEnemyRagdollDebug();
     refreshEnemyRouteDebug(enemyNav);
-    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${navText} | ${input.gyro ? 'gyro' : 'touch'}`;
+    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${navText}${ragText} | ${input.gyro ? 'gyro' : 'touch'}`;
   } catch (err) {
     console.error(err);
-    setStatus('runtime error: ' + (err?.message || err));
-    hintEl.textContent = 'Runtime error: ' + (err?.message || err);
+    const summary = rememberError('Runtime error', err);
+    setStatus(summary.toLowerCase());
+    hintEl.textContent = summary;
     hintEl.style.opacity = '1';
   }
 }
 
 function init() {
   try {
+    applyBootNavigationTarget();
     buildLights();
     buildEnemy();
     buildRoom();
@@ -6693,8 +8765,9 @@ function init() {
     render();
   } catch (err) {
     console.error(err);
-    setStatus('boot error: ' + (err?.message || err));
-    hintEl.textContent = 'Boot error: ' + (err?.message || err);
+    const summary = rememberError('Boot error', err);
+    setStatus(summary.toLowerCase());
+    hintEl.textContent = summary;
     hintEl.style.opacity = '1';
   }
 }

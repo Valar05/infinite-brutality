@@ -1,6 +1,6 @@
 # Infinite Brutality Prop Decoration Manifest
 
-Date: 2026-06-10
+Date: 2026-06-11
 
 This note is the human-readable companion to `data/prop_decoration_manifest.json`.
 
@@ -63,6 +63,16 @@ Use generated meshes only when the primitive version fails to read at gameplay d
 - rope bridges
 - counterweight winches
 
+### Lift Court mechanical and punitive
+
+- cargo lift cages
+- cargo hook posts
+- maintenance tool benches
+- brake lever pedestals
+- execution tribunal dais
+
+These are the district-specific additions for `lift_court_hybrid`. The lift court should read as a hauling and punishment machine first, not as another market lane with recycled stalls.
+
 ## Texture Status
 
 The first Hanging Gardens prop texture family now exists as project-owned SVG assets:
@@ -92,6 +102,8 @@ Do not fake this with the current material set alone. The prop pass needs new pr
 These are listed in `docs/TEXTURE_PROMPTS_HANGING_GARDENS.md`.
 
 ## Tactical Rule
+
+Lift-court floor props must snap to actual support surfaces. Do not place mechanical or court props by elevation-band guess alone; stairs, bridge runs, and undercroft returns need support-aware anchoring or they will float.
 
 Each prop cluster must reinforce one of these:
 

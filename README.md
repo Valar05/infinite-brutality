@@ -7,12 +7,14 @@ Three.js landscape mobile prototype for a first-person melee/platformer roguelik
 From the parent `GodotProjects` workspace, serve the workspace root and open:
 
 ```sh
-python3 -m http.server 8798
+sh ./tools/start_local_server.sh
 ```
 
 ```text
 http://127.0.0.1:8798/infinite-brutality/index.html
 ```
+
+Use `sh ./tools/status_local_server.sh` to check it and `sh ./tools/stop_local_server.sh` to stop it.
 
 ## Current Build
 
