@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.67';
+const BUILD = '0.8.68';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -2801,30 +2801,30 @@ function buildHangingMarketDistrictMeta(district) {
     let z = 0;
     let y = 0;
     let role = 'market_court';
-    if (t < 0.22) {
-      const s = t / 0.22;
-      x = lerpNumber(-28, -6, s);
-      z = lerpNumber(18, 74, s);
-      y = lerpNumber(1.2, 4.1, s);
-      role = s < 0.45 ? 'support_stair' : 'market_court';
-    } else if (t < 0.5) {
-      const s = (t - 0.22) / 0.28;
-      x = lerpNumber(0, 28, s);
-      z = lerpNumber(86, 156, s);
-      y = lerpNumber(5.0, 8.6, s);
+    if (t < 0.18) {
+      const s = t / 0.18;
+      x = lerpNumber(-54, -24, s);
+      z = lerpNumber(20, 84, s);
+      y = lerpNumber(0.8, 3.2, s);
+      role = 'support_stair';
+    } else if (t < 0.48) {
+      const s = (t - 0.18) / 0.30;
+      x = lerpNumber(-18, 18, s);
+      z = lerpNumber(96, 178, s);
+      y = lerpNumber(4.4, 7.6, s);
       role = 'market_court';
-    } else if (t < 0.8) {
-      const s = (t - 0.5) / 0.3;
-      x = lerpNumber(34, 76, s);
-      z = lerpNumber(170, 256, s);
-      y = lerpNumber(10.0, 13.8, s);
-      role = s < 0.68 ? 'roof_lane' : 'bridge_landing';
+    } else if (t < 0.76) {
+      const s = (t - 0.48) / 0.28;
+      x = lerpNumber(24, 58, s);
+      z = lerpNumber(188, 252, s);
+      y = lerpNumber(9.0, 12.8, s);
+      role = s < 0.52 ? 'roof_lane' : 'bridge_landing';
     } else {
-      const s = (t - 0.8) / 0.2;
-      x = lerpNumber(84, 42, s);
-      z = lerpNumber(270, 338, s);
-      y = lerpNumber(11.0, 6.1, s);
-      role = s < 0.45 ? 'bridge_landing' : 'underdeck_pass';
+      const s = (t - 0.76) / 0.24;
+      x = lerpNumber(70, 26, s);
+      z = lerpNumber(264, 336, s);
+      y = lerpNumber(13.2, 5.8, s);
+      role = s < 0.5 ? 'bridge_landing' : 'underdeck_pass';
     }
     roomOffsets.push([x, z, y]);
     segmentRoles.push(role);
@@ -2839,16 +2839,16 @@ function buildHangingMarketDistrictMeta(district) {
     segmentRoles,
     circulationBands: [
       { id: 'market_low', y: base + 3.2, role: 'support_stair' },
-      { id: 'market_mid', y: base + 7.4, role: 'market_court' },
-      { id: 'market_high', y: base + 12.4, role: 'roof_lane' },
+      { id: 'market_mid', y: base + 7.6, role: 'market_court' },
+      { id: 'market_high', y: base + 12.8, role: 'roof_lane' },
     ],
     massAnchors: [
-      { id: 'entry_deck', role: 'entry_deck', pos: [origin.x - 58, base - 2.0, origin.z + 26], size: [22, 8, 18] },
-      { id: 'market_core', role: 'market_core', pos: [origin.x + 34, base + 2.6, origin.z + 152], size: [38, 16, 30] },
-      { id: 'underdeck_support', role: 'underdeck_support', pos: [origin.x - 10, base - 5.0, origin.z + 202], size: [24, 10, 26] },
-      { id: 'bridge_cluster', role: 'bridge_cluster', pos: [origin.x + 84, base + 9.2, origin.z + 290], size: [24, 8, 38] },
+      { id: 'retaining_gate', role: 'retaining_gate', pos: [origin.x - 50, base - 1.8, origin.z + 34], size: [32, 10, 24] },
+      { id: 'bath_court', role: 'bath_court', pos: [origin.x + 8, base + 2.8, origin.z + 156], size: [46, 15, 34] },
+      { id: 'undercroft_run', role: 'undercroft_run', pos: [origin.x - 8, base - 4.8, origin.z + 224], size: [28, 10, 32] },
+      { id: 'aqueduct_remnant', role: 'aqueduct_remnant', pos: [origin.x + 76, base + 9.6, origin.z + 286], size: [24, 10, 42] },
     ],
-    landmarkAnchor: { x: origin.x + 86, y: base + 13.6, z: origin.z + 286, role: 'market_bridge_cluster' },
+    landmarkAnchor: { x: origin.x + 78, y: base + 14.2, z: origin.z + 286, role: 'market_bridge_cluster' },
   };
 }
 
@@ -3467,45 +3467,84 @@ function addHangingMarketStall(parent, prefix, x, y, z, width, depth, yaw = 0) {
 }
 
 function addHangingMarketDistrictSkeleton(district) {
-  const masses = district.massAnchors || [];
-  for (const mass of masses) {
-    const center = mass.pos;
-    const size = mass.size;
-    const y = center[1] + size[1] * 0.5;
-    const mat = mass.role === 'bridge_cluster' ? MAT.bridge : mass.role === 'underdeck_support' ? MAT.iron : MAT.stone2;
-    addWalkableBox(roomGroup, 'district-' + district.id + '-' + mass.id, size, [center[0], y, center[2]], mat, true, 0.2);
-  }
-
+  const origin = district.origin;
   const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
-  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 7.4;
-  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 12.4;
-  for (let i = 0; i < 9; i += 1) {
-    const z = district.origin.z + 92 + i * 24;
-    const x = district.origin.x - 20 + (i % 3) * 18;
-    addGroundedCylinder(roomGroup, 'district-' + district.id + '-support-' + i, 1.2 + (i % 2) * 0.2, Math.max(8, highBand - district.baseElevation + 10), [x, district.baseElevation - 10, z], MAT.iron, 6);
-    addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-brace-' + i, [1.2, 10 + (i % 3) * 2, 1.2], [x + 5, district.baseElevation - 8, z + 5], MAT.trim, false, 0.03, 1).rotation.z = 0.42;
-    if (i < 7) addHangingChain(roomGroup, 'district-' + district.id + '-chain-' + i, x, z, highBand + 2.6, 6, MAT.iron, rngFromSeed(hashRoomKey(district.id + '-chain-' + i)), { length: 2.8 + (i % 3) * 0.45, sway: 0.02, dropStone: false });
+  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 7.6;
+  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 12.8;
+
+  const terraceLowCenter = [origin.x - 34, lowBand - 0.22, origin.z + 66];
+  const terraceMidCenter = [origin.x + 8, midBand - 0.24, origin.z + 160];
+  const terraceHighCenter = [origin.x + 42, highBand - 0.18, origin.z + 228];
+  const bridgeCenter = [origin.x + 78, highBand + 0.28, origin.z + 286];
+  const undercroftCenter = [origin.x - 6, lowBand - 0.82, origin.z + 226];
+
+  addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-low', [34, 0.52, 30], terraceLowCenter, MAT.stone2, false, 0.1);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-mid', [46, 0.58, 38], terraceMidCenter, MAT.stone2, false, 0.1);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-high', [24, 0.48, 30], terraceHighCenter, MAT.platform, false, 0.08);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-bridge-remnant', [18, 0.46, 44], bridgeCenter, MAT.bridge, true, 0.06);
+  addWalkableBox(roomGroup, 'district-' + district.id + '-undercroft-return', [28, 0.42, 32], undercroftCenter, MAT.connectorFloor, false, 0.08);
+
+  addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-a', [6.0, 10.5, 34], [origin.x - 58, district.baseElevation + 3.2, origin.z + 92], MAT.wall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-b', [6.0, 12.0, 40], [origin.x - 48, district.baseElevation + 5.0, origin.z + 166], MAT.wall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-c', [6.0, 12.5, 34], [origin.x - 40, district.baseElevation + 5.6, origin.z + 240], MAT.wall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-north', [40, 5.2, 3.4], [origin.x + 6, district.baseElevation + 5.0, origin.z + 178], MAT.connectorWall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-south', [34, 4.8, 3.2], [origin.x + 10, district.baseElevation + 4.8, origin.z + 138], MAT.connectorWall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-east', [3.4, 5.0, 24], [origin.x + 28, district.baseElevation + 4.9, origin.z + 158], MAT.connectorWall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-undercroft-back-wall', [24, 7.4, 3.2], [origin.x - 6, district.baseElevation + 0.2, origin.z + 244], MAT.connectorWall, false);
+
+  for (let i = 0; i < 5; i += 1) {
+    const z = origin.z + 178 + i * 26;
+    const x = origin.x - 20 + (i % 2) * 18;
+    addGroundedCylinder(roomGroup, 'district-' + district.id + '-support-column-' + i, 1.15, Math.max(10, highBand - district.baseElevation + 9), [x, district.baseElevation - 10.2, z], MAT.iron, 7);
+    addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-support-buttress-' + i, [1.4, 8.6 + i * 0.45, 1.4], [x + 5.8, district.baseElevation - 8.6, z + 4.4], MAT.trim, false, 0.03, 1).rotation.z = 0.38;
   }
 
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-entry-a', district.origin.x - 34, lowBand + 0.1, district.origin.z + 62, 4.2, 2.6, 0.18);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-entry-b', district.origin.x - 12, lowBand + 0.1, district.origin.z + 94, 4.8, 2.8, -0.12);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-core-a', district.origin.x + 12, midBand + 0.1, district.origin.z + 148, 5.2, 3.0, 0.1);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-core-b', district.origin.x + 36, midBand + 0.1, district.origin.z + 176, 4.4, 2.8, -0.08);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-bridge-a', district.origin.x + 58, highBand + 0.1, district.origin.z + 230, 4.6, 2.6, 0.22);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-bridge-b', district.origin.x + 78, highBand + 0.1, district.origin.z + 264, 4.0, 2.4, -0.2);
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-crate-stack-a', [1.8, 1.1, 1.4], [district.origin.x - 18, lowBand + 0.05, district.origin.z + 118], MAT.iron, false, 0.03, 1);
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-crate-stack-b', [1.6, 0.9, 1.2], [district.origin.x + 18, midBand + 0.05, district.origin.z + 198], MAT.trim, false, 0.03, 1);
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-crate-stack-c', [1.4, 0.8, 1.0], [district.origin.x + 68, highBand + 0.05, district.origin.z + 252], MAT.iron, false, 0.03, 1);
-  addBrazier(roomGroup, 'district-' + district.id + '-market-brazier-a', [district.origin.x - 8, lowBand + 0.18, district.origin.z + 88], { kind: 'flame' });
-  addBrazier(roomGroup, 'district-' + district.id + '-market-brazier-b', [district.origin.x + 28, midBand + 0.18, district.origin.z + 168], { kind: 'corpsefire' });
-  addBrazier(roomGroup, 'district-' + district.id + '-market-brazier-c', [district.origin.x + 74, highBand + 0.18, district.origin.z + 258], { kind: 'flame' });
+  for (let i = 0; i < 3; i += 1) {
+    const ax = origin.x + 60 + i * 9;
+    addGroundedCylinder(roomGroup, 'district-' + district.id + '-aqueduct-pier-' + i, 1.0, 8.8 + i * 0.6, [ax, highBand - 7.8, origin.z + 286 + (i % 2) * 3], MAT.stone2, 6);
+    addBeveledBox(roomGroup, 'district-' + district.id + '-aqueduct-arch-' + i, [8.8, 1.3, 2.0], [ax + 4.2, highBand + 1.7, origin.z + 286], MAT.trim, false, 0.03, 1);
+  }
+  addBeveledBox(roomGroup, 'district-' + district.id + '-aqueduct-crown', [28, 1.1, 3.0], [origin.x + 78, highBand + 3.0, origin.z + 286], MAT.trim, false, 0.03, 1);
 
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-roof-cross', makeVec(district.origin.x + 24, highBand, district.origin.z + 174), makeVec(district.origin.x + 86, highBand + 0.8, district.origin.z + 272), highBand + 0.18, 4.2, MAT.bridge, 1.0);
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-underdeck-cross', makeVec(district.origin.x - 20, lowBand, district.origin.z + 146), makeVec(district.origin.x + 38, lowBand - 0.4, district.origin.z + 242), lowBand + 0.18, 3.4, MAT.connectorFloor, 1.0);
-  addBatchStairRun(roomGroup, 'district-' + district.id + '-market-rise', makeVec(district.origin.x - 6, lowBand + PLAYER_EYE_HEIGHT, district.origin.z + 82), makeVec(district.origin.x + 24, midBand + PLAYER_EYE_HEIGHT, district.origin.z + 146), lowBand + 0.18, midBand + 0.18, MAT.platform);
+  addBatchStairRun(roomGroup, 'district-' + district.id + '-entry-terrace-rise', makeVec(origin.x - 52, lowBand + PLAYER_EYE_HEIGHT, origin.z + 28), makeVec(origin.x - 20, lowBand + PLAYER_EYE_HEIGHT, origin.z + 86), lowBand - 0.08, midBand - 2.8, MAT.platform);
+  addBatchStairRun(roomGroup, 'district-' + district.id + '-court-rise', makeVec(origin.x - 6, midBand + PLAYER_EYE_HEIGHT, origin.z + 122), makeVec(origin.x + 28, highBand + PLAYER_EYE_HEIGHT, origin.z + 212), midBand - 0.06, highBand - 0.16, MAT.platform);
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-upper-gallery-run', makeVec(origin.x + 20, highBand, origin.z + 204), makeVec(origin.x + 62, highBand + 0.26, origin.z + 258), highBand + 0.14, 4.0, MAT.bridge, 0.95);
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-bridge-commit', makeVec(origin.x + 60, highBand + 0.2, origin.z + 260), makeVec(origin.x + 88, highBand + 0.58, origin.z + 304), highBand + 0.3, 3.8, MAT.bridge, 0.85);
+  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-undercroft-run', makeVec(origin.x - 28, lowBand - 0.44, origin.z + 174), makeVec(origin.x + 14, lowBand - 0.78, origin.z + 246), lowBand - 0.34, 3.2, MAT.connectorFloor, 0.95);
+
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-a', origin.x - 26, lowBand + 0.08, origin.z + 84, 4.6, 2.8, 0.14);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-b', origin.x - 8, lowBand + 0.08, origin.z + 110, 4.2, 2.6, -0.08);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-a', origin.x + 4, midBand + 0.08, origin.z + 150, 5.2, 3.0, 0.06);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-b', origin.x + 24, midBand + 0.08, origin.z + 180, 4.8, 2.8, -0.12);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-a', origin.x + 48, highBand + 0.08, origin.z + 232, 4.4, 2.6, 0.18);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-b', origin.x + 74, highBand + 0.08, origin.z + 276, 4.0, 2.4, -0.18);
+
+  for (const [x, z, sizeX, sizeZ] of [
+    [origin.x - 12, lowBand + 0.02, 1.8, 0.9],
+    [origin.x + 10, midBand + 0.02, 2.2, 1.0],
+    [origin.x + 26, midBand + 0.02, 1.6, 0.8],
+    [origin.x + 58, highBand + 0.02, 1.8, 0.9],
+  ]) {
+    addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-garden-tray-' + Math.round(x + z), [sizeX, 0.22, sizeZ], [x, z > origin.z + 220 ? highBand : (z > origin.z + 130 ? midBand : lowBand), z], MAT.green, false, 0.02, 1);
+  }
+
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-cistern', [7.4, 0.14, 5.4], [origin.x + 2, district.baseElevation + 3.58, origin.z + 158], MAT.green, false, 0.02, 1);
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-shrine-niche', [1.8, 2.2, 0.9], [origin.x - 14, district.baseElevation + 1.2, origin.z + 228], MAT.trim, false, 0.03, 1);
+  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-well-head', [1.6, 0.8, 1.6], [origin.x + 16, midBand + 0.02, origin.z + 170], MAT.trim, false, 0.03, 1);
+
+  addBrazier(roomGroup, 'district-' + district.id + '-brazier-entry', [origin.x - 18, lowBand + 0.18, origin.z + 92], { kind: 'flame' });
+  addBrazier(roomGroup, 'district-' + district.id + '-brazier-court', [origin.x + 12, midBand + 0.18, origin.z + 166], { kind: 'corpsefire' });
+  addBrazier(roomGroup, 'district-' + district.id + '-brazier-bridge', [origin.x + 78, highBand + 0.18, origin.z + 282], { kind: 'flame' });
+
+  for (let i = 0; i < 4; i += 1) {
+    addHangingChain(roomGroup, 'district-' + district.id + '-bridge-chain-' + i, origin.x + 58 + i * 8, origin.z + 250 + i * 10, highBand + 3.2, 6, MAT.iron, rngFromSeed(hashRoomKey(district.id + '-ancient-chain-' + i)), { length: 2.4 + (i % 2) * 0.5, sway: 0.02, dropStone: false });
+  }
 
   const landmark = district.landmarkAnchor;
-  if (landmark) addBrazier(roomGroup, 'district-' + district.id + '-landmark', [landmark.x, landmark.y - PLAYER_EYE_HEIGHT + 0.4, landmark.z], { kind: 'corpsefire' });
+  if (landmark) {
+    addBrazier(roomGroup, 'district-' + district.id + '-landmark', [landmark.x, landmark.y - PLAYER_EYE_HEIGHT + 0.4, landmark.z], { kind: 'corpsefire' });
+    addBeveledBox(roomGroup, 'district-' + district.id + '-landmark-crown', [6.4, 0.7, 2.0], [landmark.x, landmark.y + 1.2, landmark.z], MAT.bronze, false, 0.03, 1);
+  }
 }
 
 function addDistrictSkeletonGeometry(district) {
