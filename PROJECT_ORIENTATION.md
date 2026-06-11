@@ -25,6 +25,13 @@ node --input-type=module --check < src/main.js
 python3 -m json.tool assets/asset_manifest.json >/dev/null
 ```
 
+## Current World Policy
+
+- The runtime currently defaults to one architectural family for the whole run: `hanging_gardens`.
+- There should not be a visually separate fallback biome in the same run while the proof pass is still in progress.
+- District purpose can still vary, but the visible world should stay inside the same ancient layered family until the room kit itself has been fully converted.
+- If screenshots read like mixed biomes again, treat that as a generator regression, not acceptable variation.
+
 ## Level Generation
 
 - `LEVEL_GENERATION_CONTRACT.md`: current route-grammar rules for Quake-style level generation without copied Quake layouts.

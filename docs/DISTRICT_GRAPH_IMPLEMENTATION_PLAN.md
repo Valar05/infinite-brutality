@@ -4,6 +4,13 @@ Date: 2026-06-09
 
 Status: first slice implemented in `src/main.js` as of build `0.8.30`. The runtime now builds a room-traversal graph from room sockets and route kinds, then uses that graph for district-spine route selection and enemy pursuit routing.
 
+Current runtime status as of build `0.8.69`:
+
+- `Hanging Market` proved out enough visually to become the default architectural family for the whole run.
+- The runtime now forces a single Hanging Gardens family across districts instead of mixing visibly separate biome reads in one run.
+- District purpose still varies, but the architecture should remain ancient, layered, and patched from the same family.
+- The next blocker is no longer district selection. It is room-kit conversion and tactical-space composition inside that family.
+
 ## Goal
 
 Replace the current fixed chapter/room mental model with a seeded district graph that feels like a suspended shanty settlement over an abyss.
@@ -183,6 +190,8 @@ Validation for this slice:
 - the patchwork layer reads as adaptation, not random clutter
 
 Only after this passes should the same pipeline be copied to liftworks, shrine rim, refuse underworks, intake, and furnace.
+
+Update: the runtime currently keeps the district purposes (`intake`, `liftworks`, `furnace`, `refuse`, `shrine`) but overrides their architectural family to Hanging Gardens by default. That is intentional. The project should not drift back into visibly mixed biome families until the room kit and tactical reads are strong enough to carry deliberate variation.
 
 ## Runtime Touchpoints For The First Conversion
 

@@ -605,6 +605,17 @@ Each room bundle fitted into a district should declare:
 
 If a room bundle cannot answer those fields, it is not ready to be placed into a historical district.
 
+## Current Runtime Constraint
+
+While the proof pass is still active:
+
+- one run should read as one architectural family
+- the current family is Hanging Gardens
+- purpose variation is good
+- visible biome-family drift is not
+
+If a run suddenly reads like intake fortress plus furnace biome plus shrine biome again, that is a generator/design regression, not welcome variety.
+
 ## Implementation Bias
 
 The generator should now validate in this order:

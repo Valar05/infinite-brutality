@@ -20,6 +20,12 @@ If a change crosses any of those boundaries, update this note.
 
 The district system is no longer just a room-order reshuffle.
 
+Current policy:
+
+- the runtime defaults to a single architectural family per run
+- the current family is `hanging_gardens`
+- district roles may differ, but they should not read like separate unrelated biomes while the proof pass is active
+
 The runtime now has multiple interacting geometry and navigation layers:
 
 1. district plan generation
@@ -136,6 +142,11 @@ Skeleton-first extension fields:
 - `circulationBands`
 - `massAnchors`
 - `landmarkAnchor`
+- `familyNameSet`
+
+Current expectation:
+
+- when the default family override is active, every district should inherit the same source-architecture family fields unless a deliberate later feature reintroduces controlled family changes
 
 ### `roomState.plan`
 
