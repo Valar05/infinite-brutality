@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180">
+<rect width="1600" height="1180" fill="#111722"/>
+<text x="40" y="54" fill="#e8e1d0" font-family="monospace" font-size="30">Infinite Brutality Hanging Gardens prop material sheet</text>
+<rect x="40" y="90" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-timber-20260610.svg" x="60" y="110" width="420" height="180" preserveAspectRatio="none"/>
+<text x="60" y="316" fill="#f2ead7" font-family="monospace" font-size="24">timber</text>
+<rect x="550" y="90" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-cloth-20260610.svg" x="570" y="110" width="420" height="180" preserveAspectRatio="none"/>
+<text x="570" y="316" fill="#f2ead7" font-family="monospace" font-size="24">cloth</text>
+<rect x="1060" y="90" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-plaster-20260610.svg" x="1080" y="110" width="420" height="180" preserveAspectRatio="none"/>
+<text x="1080" y="316" fill="#f2ead7" font-family="monospace" font-size="24">plaster</text>
+<rect x="40" y="430" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-ceramic-20260610.svg" x="60" y="450" width="420" height="180" preserveAspectRatio="none"/>
+<text x="60" y="656" fill="#f2ead7" font-family="monospace" font-size="24">ceramic</text>
+<rect x="550" y="430" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-garden-20260610.svg" x="570" y="450" width="420" height="180" preserveAspectRatio="none"/>
+<text x="570" y="656" fill="#f2ead7" font-family="monospace" font-size="24">garden</text>
+<rect x="1060" y="430" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-water-20260610.svg" x="1080" y="450" width="420" height="180" preserveAspectRatio="none"/>
+<text x="1080" y="656" fill="#f2ead7" font-family="monospace" font-size="24">water</text>
+<rect x="40" y="770" width="460" height="250" fill="#202735" stroke="#384555" stroke-width="4"/>
+<image href="ib-vector-rope-20260610.svg" x="60" y="790" width="420" height="180" preserveAspectRatio="none"/>
+<text x="60" y="996" fill="#f2ead7" font-family="monospace" font-size="24">rope</text>
+</svg>

@@ -396,6 +396,70 @@
       "role": "runtime enemy right sidestep idle-pressure animation",
       "asset_class": "imported FBX motion clip",
       "processing": "extracted from source archive, renamed to snake_case, loaded by Three.js FBXLoader, and registered with root/hips XZ translation stripped while preserving hip Y motion"
+    },
+    {
+      "path": "assets/textures/ib-vector-timber-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector timber material texture for stalls, scaffold decks, ladders, rails, and trellises",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG plank bands, nail marks, and split-grain shapes with flat fills and strokes; no gradients, filters, bitmap source, or photographic grain",
+      "prompt_summary": "not AI-generated; created to give Hanging Market and future district props a project-owned timber surface family"
+    },
+    {
+      "path": "assets/textures/ib-vector-cloth-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector cloth material texture for awnings, banners, drapes, and shade canopies",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG patch bands and stitched panels with flat fills and strokes; no gradients, filters, bitmap source, or photographic weave",
+      "prompt_summary": "not AI-generated; created to add a project-owned cloth family for Hanging Gardens market and habitation props"
+    },
+    {
+      "path": "assets/textures/ib-vector-plaster-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector plaster material texture for bath walls, shrine walls, patched facades, and retaining surfaces",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG stucco plates, chip fields, and crack paths with flat fills and strokes; no gradients, filters, bitmap source, or photographic grime",
+      "prompt_summary": "not AI-generated; created to extend the ancient architectural material family beyond bare stone"
+    },
+    {
+      "path": "assets/textures/ib-vector-ceramic-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector ceramic material texture for jars, basins, cistern rims, shrine bowls, and mosaic inserts",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG shard tiles and glaze fields with flat fills and strokes; no gradients, filters, bitmap source, or glossy realism",
+      "prompt_summary": "not AI-generated; created to support water infrastructure and market storage props"
+    },
+    {
+      "path": "assets/textures/ib-vector-garden-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector foliage material texture for planter trays, vines, hanging greenery, and garden beds",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG leaf clusters and vine marks with flat fills and strokes; no gradients, filters, bitmap source, or photoreal plants",
+      "prompt_summary": "not AI-generated; created to make the Hanging Gardens read literal in the prop layer"
+    },
+    {
+      "path": "assets/textures/ib-vector-water-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector dark water material texture for cisterns, baths, runnels, and shallow basins",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG wave bands with flat fills only; no gradients, filters, bitmap source, or ocean foam language",
+      "prompt_summary": "not AI-generated; created to support ancient waterworks and cistern props"
+    },
+    {
+      "path": "assets/textures/ib-vector-rope-20260610.svg",
+      "source": "locally authored deterministic SVG generator",
+      "role": "flat vector rope material texture for lashings, pulley lines, rope bridges, and tethered bundles",
+      "tool": "Python local SVG generation",
+      "processing": "authored as SVG rope bands with flat fills and shadows; no gradients, filters, bitmap source, or macro-fiber realism",
+      "prompt_summary": "not AI-generated; created to support bridge, ladder, and hanging prop families"
+    },
+    {
+      "path": "assets/textures/ib-vector-hanging-gardens-material-sheet-20260610.svg",
+      "source": "assets/textures/ib-vector-timber-20260610.svg + assets/textures/ib-vector-cloth-20260610.svg + assets/textures/ib-vector-plaster-20260610.svg + assets/textures/ib-vector-ceramic-20260610.svg + assets/textures/ib-vector-garden-20260610.svg + assets/textures/ib-vector-water-20260610.svg + assets/textures/ib-vector-rope-20260610.svg",
+      "role": "review sheet for the Hanging Gardens prop texture family",
+      "tool": "Python local SVG generation",
+      "processing": "SVG review sheet referencing the new project-owned prop material assets for quick inspection",
+      "prompt_summary": "not AI-generated; review sheet for timber, cloth, plaster, ceramic, garden, water, and rope materials"
     }
   ]
 }

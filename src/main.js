@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.69';
+const BUILD = '0.8.70';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -287,6 +287,13 @@ const MAT = {
   hazardPool: makeLightPoolMat(0xb85a22, 0.0),
   flesh: makeMat(0xc7a183, 0.84, 0.02),
   iron: makeMat(0x2b2f34, 0.62, 0.06, 0.045),
+  timber: makeMat(0x71533b, 0.82, 0.02, 0.05),
+  cloth: makeMat(0x9d5f43, 0.88, 0.01, 0.05),
+  plaster: makeMat(0xd2c0a8, 0.9, 0.01, 0.045),
+  ceramic: makeMat(0xb7baa8, 0.76, 0.03, 0.05),
+  foliage: makeMat(0x6b8448, 0.82, 0.01, 0.06),
+  water: makeMat(0x32545d, 0.52, 0.02, 0.03),
+  rope: makeMat(0x9e7d52, 0.84, 0.01, 0.045),
 };
 
 function setMaterialUvScale(mat, scale) {
@@ -294,11 +301,15 @@ function setMaterialUvScale(mat, scale) {
   return mat;
 }
 
-for (const mat of [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2]) setMaterialUvScale(mat, 0.125);
-for (const mat of [MAT.bridge, MAT.trim, MAT.bronze]) setMaterialUvScale(mat, 0.105);
-for (const mat of [MAT.bone, MAT.bonePlain]) setMaterialUvScale(mat, 0.112);
+for (const mat of [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2, MAT.plaster]) setMaterialUvScale(mat, 0.125);
+for (const mat of [MAT.bridge, MAT.trim, MAT.bronze, MAT.timber]) setMaterialUvScale(mat, 0.105);
+for (const mat of [MAT.bone, MAT.bonePlain, MAT.ceramic]) setMaterialUvScale(mat, 0.112);
 setMaterialUvScale(MAT.iron, 0.075);
 setMaterialUvScale(MAT.blood, 0.055);
+setMaterialUvScale(MAT.cloth, 0.092);
+setMaterialUvScale(MAT.foliage, 0.09);
+setMaterialUvScale(MAT.water, 0.08);
+setMaterialUvScale(MAT.rope, 0.065);
 
 function makeVoronoiTexture(seed, options = {}) {
   const size = options.size ?? 96;
@@ -377,6 +388,20 @@ function applyProceduralSurfaceTextures() {
   MAT.bone.needsUpdate = true;
   MAT.iron.map = ironNoise;
   MAT.iron.needsUpdate = true;
+  MAT.timber.map = bronzeNoise;
+  MAT.timber.needsUpdate = true;
+  MAT.cloth.map = bronzeNoise;
+  MAT.cloth.needsUpdate = true;
+  MAT.plaster.map = wallNoise;
+  MAT.plaster.needsUpdate = true;
+  MAT.ceramic.map = bronzeNoise;
+  MAT.ceramic.needsUpdate = true;
+  MAT.foliage.map = floorNoise;
+  MAT.foliage.needsUpdate = true;
+  MAT.water.map = floorNoise;
+  MAT.water.needsUpdate = true;
+  MAT.rope.map = bronzeNoise;
+  MAT.rope.needsUpdate = true;
 }
 
 function loadWrappedTexture(path, repeatX, repeatY, onTexture) {
@@ -425,6 +450,27 @@ function applyGeneratedSurfaceTextures() {
   });
   loadWrappedTexture('../assets/textures/ib-vector-hazard-20260609.svg', 1, 1, (texture) => {
     applyTextureToMaterials(texture, [MAT.hazard, MAT.orange], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-timber-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.timber], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-cloth-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.cloth], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-plaster-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.plaster], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-ceramic-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.ceramic], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-garden-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.foliage, MAT.green], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-water-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.water], 0xffffff);
+  });
+  loadWrappedTexture('../assets/textures/ib-vector-rope-20260610.svg', 1, 1, (texture) => {
+    applyTextureToMaterials(texture, [MAT.rope], 0xffffff);
   });
 }
 
@@ -3473,20 +3519,154 @@ function canEnemyTraverseBetween(room, fromAnchor, toAnchor) {
   return cursor.distanceToSquared(to) < 0.04 || canEnemyTraverseSegment(cursor, to);
 }
 
+function addHangingJarCluster(parent, prefix, x, y, z, count = 4, spread = 0.9) {
+  const rng = rngFromSeed(hashRoomKey(prefix));
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  for (let i = 0; i < count; i += 1) {
+    const radius = 0.12 + rng() * 0.08;
+    const height = 0.24 + rng() * 0.18;
+    const jx = (rng() - 0.5) * spread;
+    const jz = (rng() - 0.5) * spread;
+    addGroundedCylinder(group, prefix + '-jar-' + i, radius, height, [jx, y, jz], MAT.ceramic, 7);
+    addGroundedBeveledBox(group, prefix + '-lid-' + i, [radius * 1.1, 0.05, radius * 1.1], [jx, y + height + 0.02, jz], i % 2 ? MAT.rope : MAT.trim, false, 0.01, 1);
+  }
+  parent.add(group);
+  return group;
+}
+
+function addPlanterBed(parent, prefix, x, y, z, width, depth, leafCount = 4) {
+  const rng = rngFromSeed(hashRoomKey(prefix));
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  addGroundedBeveledBox(group, prefix + '-trough', [width, 0.3, depth], [0, y, 0], MAT.plaster, false, 0.02, 1);
+  addGroundedBeveledBox(group, prefix + '-soil', [width * 0.82, 0.08, depth * 0.72], [0, y + 0.24, 0], MAT.wall, false, 0.01, 1);
+  for (let i = 0; i < leafCount; i += 1) {
+    const lx = (rng() - 0.5) * width * 0.55;
+    const lz = (rng() - 0.5) * depth * 0.48;
+    const leaf = addGroundedBeveledBox(group, prefix + '-leaf-' + i, [0.24 + rng() * 0.24, 0.18 + rng() * 0.16, 0.14 + rng() * 0.18], [lx, y + 0.26, lz], MAT.foliage, false, 0.01, 1);
+    leaf.rotation.set((rng() - 0.5) * 0.35, rng() * Math.PI, (rng() - 0.5) * 0.35);
+  }
+  const spill = addGroundedBeveledBox(group, prefix + '-spill', [width * 0.42, 0.08, 0.16], [width * 0.12, y + 0.16, depth * 0.54], MAT.foliage, false, 0.01, 1);
+  spill.rotation.z = -0.24;
+  parent.add(group);
+  return group;
+}
+
+function addHangingPlanter(parent, prefix, x, z, topY, bowlY) {
+  const drop = Math.max(0.6, topY - bowlY);
+  for (const [sx, sz] of [[-0.14, -0.1], [0.14, -0.1], [0, 0.14]]) {
+    addBeveledBox(parent, prefix + '-rope-' + sx + '-' + sz, [0.04, drop, 0.04], [x + sx, bowlY + drop * 0.5, z + sz], MAT.rope, false, 0.008, 1);
+  }
+  addGroundedBeveledBox(parent, prefix + '-bowl', [0.86, 0.24, 0.86], [x, bowlY, z], MAT.ceramic, false, 0.02, 1);
+  addGroundedBeveledBox(parent, prefix + '-soil', [0.62, 0.08, 0.62], [x, bowlY + 0.18, z], MAT.wall, false, 0.01, 1);
+  for (const [ox, oz, sy] of [[-0.12, -0.08, 0.22], [0.16, 0.06, 0.28], [-0.04, 0.18, 0.26]]) {
+    const leaf = addGroundedBeveledBox(parent, prefix + '-leaf-' + ox + '-' + oz, [0.22, 0.16 + sy * 0.2, 0.14], [x + ox, bowlY + sy, z + oz], MAT.foliage, false, 0.01, 1);
+    leaf.rotation.y = ox * 4.0;
+    leaf.rotation.z = oz * -1.8;
+  }
+}
+
+function addCisternPool(parent, prefix, x, y, z, width, depth) {
+  addGroundedBeveledBox(parent, prefix + '-rim', [width, 0.34, depth], [x, y, z], MAT.plaster, false, 0.02, 1);
+  addGroundedBeveledBox(parent, prefix + '-water', [width * 0.78, 0.06, depth * 0.72], [x, y + 0.18, z], MAT.water, false, 0.01, 1);
+  addGroundedBeveledBox(parent, prefix + '-spout-a', [0.34, 0.18, 0.64], [x - width * 0.22, y + 0.22, z - depth * 0.5], MAT.ceramic, false, 0.01, 1);
+  addGroundedBeveledBox(parent, prefix + '-spout-b', [0.34, 0.18, 0.64], [x + width * 0.18, y + 0.22, z + depth * 0.5], MAT.ceramic, false, 0.01, 1);
+}
+
+function addWellSet(parent, prefix, x, y, z) {
+  addGroundedCylinder(parent, prefix + '-ring', 0.9, 0.64, [x, y, z], MAT.plaster, 8);
+  addGroundedBeveledBox(parent, prefix + '-water', [1.18, 0.06, 1.18], [x, y + 0.38, z], MAT.water, false, 0.01, 1);
+  addBeveledBox(parent, prefix + '-post-left', [0.12, 1.6, 0.12], [x - 0.76, y + 1.0, z], MAT.timber, false, 0.01, 1);
+  addBeveledBox(parent, prefix + '-post-right', [0.12, 1.6, 0.12], [x + 0.76, y + 1.0, z], MAT.timber, false, 0.01, 1);
+  addBeveledBox(parent, prefix + '-beam', [1.82, 0.12, 0.12], [x, y + 1.76, z], MAT.timber, false, 0.01, 1);
+  addBeveledBox(parent, prefix + '-rope', [0.04, 0.92, 0.04], [x, y + 1.2, z], MAT.rope, false, 0.008, 1);
+  addGroundedCylinder(parent, prefix + '-bucket', 0.18, 0.24, [x, y + 0.62, z], MAT.ceramic, 6);
+}
+
+function addShrineNicheSet(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-back', [2.4, 2.6, 0.4], [0, y + 1.3, 0], MAT.plaster, false, 0.03, 1);
+  addGroundedBeveledBox(group, prefix + '-sill', [1.6, 0.18, 0.58], [0, y + 0.42, 0.22], MAT.stone2, false, 0.02, 1);
+  addGroundedBeveledBox(group, prefix + '-icon', [0.54, 0.9, 0.14], [0, y + 1.2, 0.26], MAT.bronze, false, 0.02, 1);
+  addGroundedBeveledBox(group, prefix + '-bowl', [0.42, 0.12, 0.42], [0, y + 0.62, 0.3], MAT.ceramic, false, 0.01, 1);
+  const drape = addGroundedBeveledBox(group, prefix + '-drape', [1.1, 1.2, 0.05], [0, y + 1.56, 0.18], MAT.cloth, false, 0.01, 1);
+  drape.rotation.x = -0.1;
+  parent.add(group);
+  return group;
+}
+
+function addClothLineCluster(parent, prefix, x, y, z, width, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addBeveledBox(group, prefix + '-line', [width, 0.04, 0.04], [0, y + 1.6, 0], MAT.rope, false, 0.008, 1);
+  for (let i = 0; i < 3; i += 1) {
+    const cloth = addBeveledBox(group, prefix + '-cloth-' + i, [width * 0.18, 0.64 + i * 0.08, 0.03], [(-width * 0.26) + i * width * 0.26, y + 1.18, 0], MAT.cloth, false, 0.01, 1);
+    cloth.rotation.z = (i - 1) * 0.08;
+  }
+  parent.add(group);
+  return group;
+}
+
+function addWatchPost(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-deck', [3.2, 0.22, 2.8], [0, y, 0], MAT.timber, false, 0.02, 1);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    addBeveledBox(group, prefix + '-post-' + sx + '-' + sz, [0.12, 1.34, 0.12], [sx * 1.36, y + 0.74, sz * 1.14], MAT.timber, false, 0.01, 1);
+  }
+  addBeveledBox(group, prefix + '-rail-front', [2.88, 0.12, 0.1], [0, y + 1.18, 1.18], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-rail-back', [2.88, 0.12, 0.1], [0, y + 1.18, -1.18], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-rail-left', [0.1, 0.12, 2.3], [-1.46, y + 1.18, 0], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-rail-right', [0.1, 0.12, 2.3], [1.46, y + 1.18, 0], MAT.timber, false, 0.01, 1);
+  addBrazier(group, prefix + '-signal', [0, y + 0.22, 0], { kind: 'flame' });
+  const banner = addBeveledBox(group, prefix + '-banner', [0.7, 1.0, 0.04], [1.18, y + 1.6, 0], MAT.cloth, false, 0.01, 1);
+  banner.rotation.z = -0.08;
+  parent.add(group);
+  return group;
+}
+
+function addTrellisWall(parent, prefix, x, y, z, width, height, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-frame-a', [width, 0.08, 0.08], [0, y + height * 0.05, 0], MAT.timber, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-frame-b', [width, 0.08, 0.08], [0, y + height, 0], MAT.timber, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-side-left', [0.08, height, 0.08], [-width * 0.5, y + height * 0.5, 0], MAT.timber, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-side-right', [0.08, height, 0.08], [width * 0.5, y + height * 0.5, 0], MAT.timber, false, 0.01, 1);
+  for (let i = 0; i < 4; i += 1) {
+    const sx = -width * 0.36 + i * width * 0.24;
+    const slat = addGroundedBeveledBox(group, prefix + '-slat-' + i, [0.06, height * 0.82, 0.04], [sx, y + height * 0.52, 0], MAT.timber, false, 0.01, 1);
+    slat.rotation.z = 0.22;
+  }
+  for (let i = 0; i < 3; i += 1) {
+    const leaf = addGroundedBeveledBox(group, prefix + '-leaf-panel-' + i, [width * 0.24, height * 0.26, 0.03], [-width * 0.24 + i * width * 0.26, y + 0.48 + i * 0.26, 0.03], MAT.foliage, false, 0.01, 1);
+    leaf.rotation.z = (i - 1) * 0.12;
+  }
+  parent.add(group);
+  return group;
+}
+
 function addHangingMarketStall(parent, prefix, x, y, z, width, depth, yaw = 0) {
   const postHeight = 1.9;
   const roofY = y + postHeight + 0.16;
   const stall = new THREE.Group();
   stall.position.set(x, 0, z);
   stall.rotation.y = yaw;
-  addGroundedBeveledBox(stall, prefix + '-counter', [width * 0.82, 0.42, depth * 0.78], [0, y, 0], MAT.bridge, true, 0.03, 1);
-  addGroundedBeveledBox(stall, prefix + '-crate-a', [0.52, 0.34, 0.48], [-width * 0.22, y + 0.42, -depth * 0.12], MAT.trim, false, 0.02, 1);
-  addGroundedBeveledBox(stall, prefix + '-crate-b', [0.48, 0.28, 0.42], [width * 0.18, y + 0.42, depth * 0.08], MAT.iron, false, 0.02, 1);
+  addGroundedBeveledBox(stall, prefix + '-counter', [width * 0.82, 0.42, depth * 0.78], [0, y, 0], MAT.timber, true, 0.03, 1);
+  addGroundedBeveledBox(stall, prefix + '-cloth-back', [width * 0.7, 0.12, depth * 0.14], [0, y + 0.46, -depth * 0.2], MAT.cloth, false, 0.01, 1);
+  addGroundedBeveledBox(stall, prefix + '-crate-a', [0.52, 0.34, 0.48], [-width * 0.22, y + 0.42, -depth * 0.12], MAT.timber, false, 0.02, 1);
+  addGroundedBeveledBox(stall, prefix + '-crate-b', [0.48, 0.28, 0.42], [width * 0.18, y + 0.42, depth * 0.08], MAT.timber, false, 0.02, 1);
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    addBeveledBox(stall, prefix + '-post-' + sx + '-' + sz, [0.16, postHeight, 0.16], [sx * (width * 0.42), y + postHeight * 0.5, sz * (depth * 0.42)], MAT.iron, false, 0.02, 1);
+    addBeveledBox(stall, prefix + '-post-' + sx + '-' + sz, [0.16, postHeight, 0.16], [sx * (width * 0.42), y + postHeight * 0.5, sz * (depth * 0.42)], MAT.timber, false, 0.02, 1);
   }
-  addBeveledBox(stall, prefix + '-roof', [width, 0.14, depth], [0, roofY, 0], MAT.trim, false, 0.02, 1);
-  addBeveledBox(stall, prefix + '-awning', [width * 0.78, 0.08, depth * 0.34], [0, roofY - 0.12, depth * 0.34], MAT.bronze, false, 0.01, 1).rotation.x = -0.18;
+  addBeveledBox(stall, prefix + '-roof', [width, 0.14, depth], [0, roofY, 0], MAT.timber, false, 0.02, 1);
+  addBeveledBox(stall, prefix + '-awning', [width * 0.78, 0.08, depth * 0.34], [0, roofY - 0.12, depth * 0.34], MAT.cloth, false, 0.01, 1).rotation.x = -0.18;
+  addHangingJarCluster(stall, prefix + '-jars', 0, y + 0.44, depth * 0.06, 3, width * 0.32);
   parent.add(stall);
   return stall;
 }
@@ -3512,9 +3692,9 @@ function addHangingMarketDistrictSkeleton(district) {
   addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-a', [6.0, 10.5, 34], [origin.x - 58, district.baseElevation + 3.2, origin.z + 92], MAT.wall, false);
   addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-b', [6.0, 12.0, 40], [origin.x - 48, district.baseElevation + 5.0, origin.z + 166], MAT.wall, false);
   addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-c', [6.0, 12.5, 34], [origin.x - 40, district.baseElevation + 5.6, origin.z + 240], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-north', [40, 5.2, 3.4], [origin.x + 6, district.baseElevation + 5.0, origin.z + 178], MAT.connectorWall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-south', [34, 4.8, 3.2], [origin.x + 10, district.baseElevation + 4.8, origin.z + 138], MAT.connectorWall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-east', [3.4, 5.0, 24], [origin.x + 28, district.baseElevation + 4.9, origin.z + 158], MAT.connectorWall, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-north', [40, 5.2, 3.4], [origin.x + 6, district.baseElevation + 5.0, origin.z + 178], MAT.plaster, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-south', [34, 4.8, 3.2], [origin.x + 10, district.baseElevation + 4.8, origin.z + 138], MAT.plaster, false);
+  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-east', [3.4, 5.0, 24], [origin.x + 28, district.baseElevation + 4.9, origin.z + 158], MAT.plaster, false);
   addWallBox(roomGroup, 'district-' + district.id + '-undercroft-back-wall', [24, 7.4, 3.2], [origin.x - 6, district.baseElevation + 0.2, origin.z + 244], MAT.connectorWall, false);
 
   for (let i = 0; i < 5; i += 1) {
@@ -3544,18 +3724,24 @@ function addHangingMarketDistrictSkeleton(district) {
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-a', origin.x + 48, highBand + 0.08, origin.z + 232, 4.4, 2.6, 0.18);
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-b', origin.x + 74, highBand + 0.08, origin.z + 276, 4.0, 2.4, -0.18);
 
-  for (const [x, z, sizeX, sizeZ] of [
-    [origin.x - 12, lowBand + 0.02, 1.8, 0.9],
-    [origin.x + 10, midBand + 0.02, 2.2, 1.0],
-    [origin.x + 26, midBand + 0.02, 1.6, 0.8],
-    [origin.x + 58, highBand + 0.02, 1.8, 0.9],
-  ]) {
-    addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-garden-tray-' + Math.round(x + z), [sizeX, 0.22, sizeZ], [x, z > origin.z + 220 ? highBand : (z > origin.z + 130 ? midBand : lowBand), z], MAT.green, false, 0.02, 1);
-  }
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-a', origin.x - 18, lowBand + 0.02, origin.z + 74, 3.0, 1.1, 5);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-b', origin.x - 2, lowBand + 0.02, origin.z + 118, 2.6, 1.0, 4);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-a', origin.x + 8, midBand + 0.02, origin.z + 142, 3.4, 1.2, 5);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-b', origin.x + 30, midBand + 0.02, origin.z + 188, 2.8, 1.0, 4);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-high-a', origin.x + 54, highBand + 0.02, origin.z + 238, 2.4, 0.94, 4);
+  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-a', origin.x + 40, origin.z + 214, highBand + 2.6, highBand + 0.62);
+  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-b', origin.x + 74, origin.z + 270, highBand + 3.0, highBand + 0.74);
+  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-a', origin.x + 26, midBand + 0.04, origin.z + 134, 4.6, 2.4, 0.02);
+  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-b', origin.x - 10, lowBand - 0.18, origin.z + 214, 3.8, 2.2, -0.3);
 
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-cistern', [7.4, 0.14, 5.4], [origin.x + 2, district.baseElevation + 3.58, origin.z + 158], MAT.green, false, 0.02, 1);
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-shrine-niche', [1.8, 2.2, 0.9], [origin.x - 14, district.baseElevation + 1.2, origin.z + 228], MAT.trim, false, 0.03, 1);
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-well-head', [1.6, 0.8, 1.6], [origin.x + 16, midBand + 0.02, origin.z + 170], MAT.trim, false, 0.03, 1);
+  addCisternPool(roomGroup, 'district-' + district.id + '-cistern', origin.x + 2, district.baseElevation + 3.42, origin.z + 158, 7.4, 5.4);
+  addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine-niche', origin.x - 14, district.baseElevation + 0.12, origin.z + 228, 0.18);
+  addWellSet(roomGroup, 'district-' + district.id + '-well', origin.x + 16, midBand + 0.02, origin.z + 170);
+  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-low', origin.x - 4, lowBand + 0.02, origin.z + 126, 5, 1.4);
+  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-mid', origin.x + 18, midBand + 0.02, origin.z + 194, 6, 1.6);
+  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-a', origin.x - 2, lowBand + 0.02, origin.z + 102, 4.6, 0.08);
+  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-b', origin.x + 36, highBand + 0.02, origin.z + 248, 4.2, -0.12);
+  addWatchPost(roomGroup, 'district-' + district.id + '-watch-post', origin.x + 88, highBand + 0.02, origin.z + 294, -0.18);
 
   addBrazier(roomGroup, 'district-' + district.id + '-brazier-entry', [origin.x - 18, lowBand + 0.18, origin.z + 92], { kind: 'flame' });
   addBrazier(roomGroup, 'district-' + district.id + '-brazier-court', [origin.x + 12, midBand + 0.18, origin.z + 166], { kind: 'corpsefire' });

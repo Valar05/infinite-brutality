@@ -63,6 +63,20 @@ Use generated meshes only when the primitive version fails to read at gameplay d
 - rope bridges
 - counterweight winches
 
+## Texture Status
+
+The first Hanging Gardens prop texture family now exists as project-owned SVG assets:
+
+- `ib-vector-timber-20260610.svg`
+- `ib-vector-cloth-20260610.svg`
+- `ib-vector-plaster-20260610.svg`
+- `ib-vector-ceramic-20260610.svg`
+- `ib-vector-garden-20260610.svg`
+- `ib-vector-water-20260610.svg`
+- `ib-vector-rope-20260610.svg`
+
+They are tracked in `assets/asset_manifest.json` and previewed in `assets/textures/ib-vector-hanging-gardens-material-sheet-20260610.svg`.
+
 ## Texture Policy
 
 Do not fake this with the current material set alone. The prop pass needs new project-owned vector textures for:

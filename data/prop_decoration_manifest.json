@@ -24,7 +24,7 @@
   "new_texture_requirements": [
     {
       "id": "ib-vector-timber-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "timber planks, scaffold decks, ladders, rails, trellises, and stall framing",
       "target_materials": [
         "wood_dark",
@@ -34,7 +34,7 @@
     },
     {
       "id": "ib-vector-cloth-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "awnings, prayer banners, market canopies, shade cloth, and hanging drapes",
       "target_materials": [
         "cloth_faded_red",
@@ -45,7 +45,7 @@
     },
     {
       "id": "ib-vector-plaster-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "washed stucco, patched render, bath walls, shrine surfaces, and repaired retaining walls",
       "target_materials": [
         "plaster_warm",
@@ -55,7 +55,7 @@
     },
     {
       "id": "ib-vector-ceramic-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "basin linings, cistern rims, amphorae, tiled inserts, and shrine bowls",
       "target_materials": [
         "ceramic_turquoise",
@@ -66,7 +66,7 @@
     },
     {
       "id": "ib-vector-garden-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "planter trays, vine mats, hanging greenery, root bundles, and terrace beds",
       "target_materials": [
         "leaf_dark",
@@ -77,7 +77,7 @@
     },
     {
       "id": "ib-vector-water-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "cistern water, runnels, bath pools, damp channels, and reflective basin surfaces",
       "target_materials": [
         "water_dark",
@@ -87,7 +87,7 @@
     },
     {
       "id": "ib-vector-rope-20260610.svg",
-      "status": "needed",
+      "status": "generated",
       "role": "rope bridges, lash bindings, hanging baskets, pulley lines, and tethered bundles",
       "target_materials": [
         "rope_hemp",
