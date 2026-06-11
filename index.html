@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Infinite Brutality</title>
-  <link rel="stylesheet" href="./src/styles.css?v=0.2.6">
+  <link rel="stylesheet" href="./src/styles.css?v=0.2.8">
   <script type="importmap">
   {
     "imports": {
@@ -28,6 +28,17 @@
       </div>
     </div>
     <div id="hint">Touch left side for movement. Touch right side to look. Strike and Jump are on the right. Gyro is optional.</div>
+    <div id="healthHud" aria-label="Player health">
+      <div class="health-header">
+        <span class="health-label">Vital</span>
+        <span id="healthValue">10 / 10</span>
+      </div>
+      <div id="healthBar">
+        <div id="healthBarFill"></div>
+      </div>
+    </div>
+    <div id="damageFlash"></div>
+    <div id="attackDebugHud" hidden><pre id="attackDebugText"></pre></div>
     <div id="readout"></div>
     <div id="leftStick" class="stick"><div></div></div>
     <div id="actionPad">
@@ -35,6 +46,6 @@
       <button id="attackButton" type="button">Strike</button>
     </div>
   </div>
-  <script type="module" src="./src/main.js?v=0.8.103"></script>
+  <script type="module" src="./src/main.js?v=0.8.117"></script>
 </body>
 </html>
