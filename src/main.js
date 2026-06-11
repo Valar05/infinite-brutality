@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.66';
+const BUILD = '0.8.67';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -3029,15 +3029,121 @@ function buildHangingMarketLandmarkSchemas(district) {
   ];
 }
 
+function cloneDistrictLandmarkSchemas(landmarkSchemas) {
+  return landmarkSchemas.map((landmark) => ({
+    ...landmark,
+    wonderTags: [...(landmark.wonderTags || [])],
+    tacticalFeatures: [...(landmark.tacticalFeatures || [])],
+    climbRoutes: (landmark.climbRoutes || []).map((route) => ({ ...route })),
+    visibilityTargets: (landmark.visibilityTargets || []).map((target) => ({ ...target })),
+    habitationProof: [...(landmark.habitationProof || [])],
+    landmarkAnchors: (landmark.landmarkAnchors || []).map((anchor) => ({ ...anchor })),
+    acceptanceChecks: (landmark.acceptanceChecks || []).map((check) => ({ ...check })),
+  }));
+}
+
+function addUniqueValues(target, values) {
+  for (const value of values) {
+    if (!target.includes(value)) target.push(value);
+  }
+}
+
+function applyHangingMarketDesignRepairs(district, initialLandmarkSchemas, initialValidation) {
+  const landmarkSchemas = cloneDistrictLandmarkSchemas(initialLandmarkSchemas);
+  const repairsApplied = [];
+  let budget = 6;
+  const noteRepair = (id, detail) => {
+    if (budget <= 0) return false;
+    repairsApplied.push({ id, detail });
+    budget -= 1;
+    return true;
+  };
+  const bridge = landmarkSchemas.find((landmark) => /bridge-cluster$/.test(landmark.id)) || landmarkSchemas[0];
+  const court = landmarkSchemas.find((landmark) => /core-court$/.test(landmark.id)) || landmarkSchemas[1] || bridge;
+  const underdeck = landmarkSchemas.find((landmark) => /underdeck-return$/.test(landmark.id)) || landmarkSchemas[2] || bridge;
+
+  if ((!district.realSourceA || !district.skeletonType || !district.patchStyle || !district.silhouetteRule) && noteRepair('historical_defaults', 'restored missing Hanging Market historical skeleton fields')) {
+    district.realSourceA = district.realSourceA || 'medina_kasbah';
+    district.realSourceB = district.realSourceB || 'stilt_wharf_settlement';
+    district.skeletonType = district.skeletonType || 'hanging_market_hybrid';
+    district.patchStyle = district.patchStyle || 'scaffold_chain_infill';
+    district.silhouetteRule = district.silhouetteRule || 'lateral stacked market over a visible support forest';
+  }
+
+  if ((district.circulationBands?.length || 0) < 3 && noteRepair('circulation_band_fallback', 'forced three circulation bands for over-under readability')) {
+    district.circulationBands = [
+      { id: 'market_low', y: district.baseElevation + 3.2, role: 'support_stair' },
+      { id: 'market_mid', y: district.baseElevation + 7.4, role: 'market_court' },
+      { id: 'market_high', y: district.baseElevation + 12.4, role: 'roof_lane' },
+    ];
+  }
+
+  let validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.hangingGardensLandmark || !validation.categories.hangingGardensWonderRead) && noteRepair('wonder_boost', 'reinforced Hanging Gardens wonder tags and anchor visibility')) {
+    addUniqueValues(bridge.wonderTags, ['bridges', 'terraces', 'sky_exposure', 'lanterns', 'hanging_structures']);
+    addUniqueValues(court.wonderTags, ['gardens', 'architecture', 'terraces']);
+    district.landmarkAnchor = district.landmarkAnchor || { x: district.origin.x + 86, y: district.baseElevation + 13.6, z: district.origin.z + 286, role: 'market_bridge_cluster' };
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.chokepoint || !validation.requiredOutputs.strongpoint || !validation.requiredOutputs.killZone || !validation.requiredOutputs.escapeRoute || !validation.categories.tacticalRead) && noteRepair('tactical_sentence_boost', 'completed tactical feature coverage across bridge, court, and underdeck')) {
+    addUniqueValues(bridge.tacticalFeatures, ['chokepoint', 'strongpoint', 'escape_route']);
+    addUniqueValues(court.tacticalFeatures, ['kill_zone', 'strongpoint']);
+    addUniqueValues(underdeck.tacticalFeatures, ['escape_route', 'chokepoint']);
+    bridge.combatSentence = bridge.combatSentence || 'push across the bridge or drop to the underdeck return';
+    court.combatSentence = court.combatSentence || 'circle through the court or climb out to the roof lane';
+    underdeck.combatSentence = underdeck.combatSentence || 'drop to recover or hold the narrow return against pursuit';
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.climbRecoveryPath || !validation.categories.climbValue) && noteRepair('climb_recovery_boost', 'added explicit recovery climb routes between underdeck, court, and roof')) {
+    underdeck.climbRoutes = underdeck.climbRoutes || [];
+    court.climbRoutes = court.climbRoutes || [];
+    underdeck.climbRoutes.push({ id: 'repair-service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'market_low', toBand: 'market_mid' });
+    court.climbRoutes.push({ id: 'repair-court-scramble', kind: 'awning_climb', value: 'alternate_route', fromBand: 'market_mid', toBand: 'market_high' });
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.visibleFutureDestination || !validation.categories.visibilityAndPull) && noteRepair('visibility_pull_boost', 'added future landmark and shortcut targets to pull the player forward')) {
+    bridge.visibilityTargets = bridge.visibilityTargets || [];
+    underdeck.visibilityTargets = underdeck.visibilityTargets || [];
+    bridge.visibilityTargets.push({ id: 'repair-shrine-rim', kind: 'future_landmark', prompt: 'how do i get there' });
+    underdeck.visibilityTargets.push({ id: 'repair-market-return', kind: 'future_shortcut', prompt: 'this can save a missed jump' });
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+
+  if ((!validation.requiredOutputs.habitationProof || !validation.categories.historicalRead) && noteRepair('habitation_proof_boost', 'added survivor habitation evidence across market, bridge, and underdeck')) {
+    addUniqueValues(bridge.habitationProof, ['bridge toll fires', 'lanterns', 'watch posts']);
+    addUniqueValues(court.habitationProof, ['stalls', 'garden trays', 'work benches']);
+    addUniqueValues(underdeck.habitationProof, ['maintenance lamps', 'wells', 'hidden shrines']);
+    bridge.currentOccupant = bridge.currentOccupant || 'toll keepers and scavenger stalls';
+    court.currentOccupant = court.currentOccupant || 'stall keepers and roaming scavengers';
+    underdeck.currentOccupant = underdeck.currentOccupant || 'maintenance scavengers and hidden survivors';
+  }
+
+  validation = buildDistrictValidationSummary(district, landmarkSchemas);
+  return { landmarkSchemas, validation, repairsApplied };
+}
+
 function buildDistrictDesignContract(district) {
   if (district.skeletonType === 'hanging_market_hybrid') {
-    const landmarkSchemas = buildHangingMarketLandmarkSchemas(district);
-    const validation = buildDistrictValidationSummary(district, landmarkSchemas);
-    return { landmarkSchemas, validation };
+    let landmarkSchemas = buildHangingMarketLandmarkSchemas(district);
+    let validation = buildDistrictValidationSummary(district, landmarkSchemas);
+    let repairsApplied = [];
+    if (!validation.passes) {
+      ({ landmarkSchemas, validation, repairsApplied } = applyHangingMarketDesignRepairs(district, landmarkSchemas, validation));
+    }
+    return { landmarkSchemas, validation, repairsApplied };
   }
   return {
     landmarkSchemas: [],
     validation: buildDistrictValidationSummary(district, []),
+    repairsApplied: [],
   };
 }
 
@@ -3549,6 +3655,10 @@ function buildGeneratedGauntlet(startIndex = 0) {
     addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
   }
   for (const district of districtPlan.districts) addDistrictSkeletonGeometry(district);
+  const designRepairs = districtPlan.districts
+    .filter((district) => district.repairsApplied?.length)
+    .map((district) => ({ id: district.id, repairsApplied: district.repairsApplied }));
+  if (designRepairs.length) console.info('district design repairs', designRepairs);
   const designFailures = districtPlan.districts
     .filter((district) => district.validation?.implemented && !district.validation.passes)
     .map((district) => ({ id: district.id, failedChecks: district.validation.failedChecks }));
@@ -3663,6 +3773,7 @@ function buildRoom(movePlayer = true) {
       silhouetteRule: district.silhouetteRule,
       segmentRoles: [...(district.segmentRoles || [])],
       landmarkSchemas: (district.landmarkSchemas || []).map((landmark) => ({ ...landmark })),
+      repairsApplied: (district.repairsApplied || []).map((repair) => ({ ...repair })),
       validation: district.validation ? {
         implemented: district.validation.implemented,
         passes: district.validation.passes,
@@ -3696,6 +3807,7 @@ function buildRoom(movePlayer = true) {
         districtValidationImplemented: info.district.validation?.implemented || false,
         districtValidationPasses: info.district.validation?.passes ?? null,
         districtValidationFailedChecks: [...(info.district.validation?.failedChecks || [])],
+        districtRepairsApplied: (info.district.repairsApplied || []).map((repair) => ({ ...repair })),
       };
     }),
   };
@@ -3728,6 +3840,7 @@ function buildRoom(movePlayer = true) {
     districtValidationImplemented: districtInfo.district.validation?.implemented || false,
     districtValidationPasses: districtInfo.district.validation?.passes ?? null,
     districtValidationFailedChecks: [...(districtInfo.district.validation?.failedChecks || [])],
+    districtRepairsApplied: (districtInfo.district.repairsApplied || []).map((repair) => ({ ...repair })),
     districtLandmarks: (districtInfo.district.landmarkSchemas || []).map((landmark) => ({ ...landmark })),
   };
   roomState.seed = hashRoomKey(spec.id || String(startIndex));
