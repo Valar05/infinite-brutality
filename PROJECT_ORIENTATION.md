@@ -58,6 +58,9 @@ Level-design workflow is split in two places:
 - realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
 - district graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
 - runtime contract: `docs/DISTRICT_RUNTIME_CONTRACT.md`
+- prop decoration manifest: `data/prop_decoration_manifest.json`
+- prop decoration guide: `docs/PROP_DECORATION_MANIFEST.md`
+- hanging gardens texture prompts: `docs/TEXTURE_PROMPTS_HANGING_GARDENS.md`
 - Pose Lab clip-gradient tool concept: `docs/POSE_LAB_CLIP_GRADIENT_EDITOR.md`
 
 When a level-design pass produces a durable critique/fix pattern, update the general Thunder note if it generalizes and this project-local note if it is Infinite Brutality-specific.

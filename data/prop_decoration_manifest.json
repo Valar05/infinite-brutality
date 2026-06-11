@@ -1,0 +1,678 @@
+{
+  "version": "2026-06-10",
+  "scope": "Hanging Gardens decoration and prop pass",
+  "family": "hanging_gardens",
+  "policy": {
+    "goal": "Fill the world with ancient layered habitation and tactical props using primitive combinations first.",
+    "rules": [
+      "Prefer combinations of boxes, cylinders, rails, chains, and cloth planes before unique generated meshes.",
+      "Every prop cluster must reinforce former use, current occupation, or tactical play.",
+      "Decorative pieces must not block the reserved route envelope unless they are deliberate chokepoint structure.",
+      "Generated texture work should extend the project-owned vector material family, not drift into painted biome swaps."
+    ]
+  },
+  "materials_in_runtime": [
+    "stone",
+    "bronze",
+    "bone",
+    "iron",
+    "blood",
+    "flesh",
+    "hazard",
+    "green"
+  ],
+  "new_texture_requirements": [
+    {
+      "id": "ib-vector-timber-20260610.svg",
+      "status": "needed",
+      "role": "timber planks, scaffold decks, ladders, rails, trellises, and stall framing",
+      "target_materials": [
+        "wood_dark",
+        "wood_pale"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "ib-vector-cloth-20260610.svg",
+      "status": "needed",
+      "role": "awnings, prayer banners, market canopies, shade cloth, and hanging drapes",
+      "target_materials": [
+        "cloth_faded_red",
+        "cloth_ochre",
+        "cloth_indigo"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "ib-vector-plaster-20260610.svg",
+      "status": "needed",
+      "role": "washed stucco, patched render, bath walls, shrine surfaces, and repaired retaining walls",
+      "target_materials": [
+        "plaster_warm",
+        "plaster_aged"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "ib-vector-ceramic-20260610.svg",
+      "status": "needed",
+      "role": "basin linings, cistern rims, amphorae, tiled inserts, and shrine bowls",
+      "target_materials": [
+        "ceramic_turquoise",
+        "ceramic_whiteblue",
+        "ceramic_earth"
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "ib-vector-garden-20260610.svg",
+      "status": "needed",
+      "role": "planter trays, vine mats, hanging greenery, root bundles, and terrace beds",
+      "target_materials": [
+        "leaf_dark",
+        "leaf_sunburnt",
+        "vine_shadow"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "ib-vector-water-20260610.svg",
+      "status": "needed",
+      "role": "cistern water, runnels, bath pools, damp channels, and reflective basin surfaces",
+      "target_materials": [
+        "water_dark",
+        "water_greenblue"
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "ib-vector-rope-20260610.svg",
+      "status": "needed",
+      "role": "rope bridges, lash bindings, hanging baskets, pulley lines, and tethered bundles",
+      "target_materials": [
+        "rope_hemp",
+        "rope_tarred"
+      ],
+      "priority": "medium"
+    }
+  ],
+  "prop_kits": [
+    {
+      "id": "market_stall_open",
+      "class": "habitation_trade",
+      "primitive_recipe": [
+        "4 timber posts",
+        "1 canopy plane",
+        "2 counter boxes",
+        "1 rear shelf rail"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-cloth-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "bronze",
+        "stone"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "market_court",
+        "roof_lane",
+        "bridge_landing"
+      ],
+      "tactical_effect": [
+        "soft cover",
+        "lane narrowing",
+        "readable market identity"
+      ]
+    },
+    {
+      "id": "market_stall_closed",
+      "class": "habitation_trade",
+      "primitive_recipe": [
+        "4 timber posts",
+        "1 folded awning wedge",
+        "2 shutter slabs",
+        "1 crate pair"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-cloth-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "market_court",
+        "underdeck_pass"
+      ],
+      "tactical_effect": [
+        "hard cover",
+        "corner concealment"
+      ]
+    },
+    {
+      "id": "planter_terrace_bed",
+      "class": "garden",
+      "primitive_recipe": [
+        "1 low stone trough",
+        "1 soil slab",
+        "2 to 5 leaf clusters",
+        "1 optional vine spill"
+      ],
+      "texture_dependencies": [
+        "ib-vector-garden-20260610.svg",
+        "ib-vector-plaster-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone",
+        "green"
+      ],
+      "generator_mode": "primitive_plus_billboard_optional",
+      "placement": [
+        "terrace_run",
+        "market_court",
+        "strongpoint_edges"
+      ],
+      "tactical_effect": [
+        "visual depth",
+        "soft route shaping",
+        "Hanging Gardens wonder read"
+      ]
+    },
+    {
+      "id": "hanging_planter_chain",
+      "class": "garden",
+      "primitive_recipe": [
+        "1 bowl or box planter",
+        "3 chain or rope drops",
+        "1 foliage mass"
+      ],
+      "texture_dependencies": [
+        "ib-vector-garden-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "bridge_span",
+        "roof_lane",
+        "landmark_anchor"
+      ],
+      "tactical_effect": [
+        "overhead clutter",
+        "vertical read"
+      ]
+    },
+    {
+      "id": "cistern_pool",
+      "class": "infrastructure_water",
+      "primitive_recipe": [
+        "1 recessed stone basin",
+        "1 ceramic rim",
+        "1 water plane",
+        "2 spout blocks"
+      ],
+      "texture_dependencies": [
+        "ib-vector-ceramic-20260610.svg",
+        "ib-vector-water-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "market_court",
+        "former_bath",
+        "recovery_pocket"
+      ],
+      "tactical_effect": [
+        "centerpiece",
+        "circling pressure",
+        "historic function read"
+      ]
+    },
+    {
+      "id": "well_and_bucket",
+      "class": "infrastructure_water",
+      "primitive_recipe": [
+        "1 well ring cylinder",
+        "2 posts",
+        "1 crossbeam",
+        "1 rope line",
+        "1 bucket cylinder"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone",
+        "iron"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "court_edge",
+        "habitation_cluster"
+      ],
+      "tactical_effect": [
+        "micro cover",
+        "historic function read"
+      ]
+    },
+    {
+      "id": "shrine_niche",
+      "class": "ritual_habitation",
+      "primitive_recipe": [
+        "1 inset arch frame",
+        "1 icon slab",
+        "2 candle shelves",
+        "1 bowl pedestal"
+      ],
+      "texture_dependencies": [
+        "ib-vector-plaster-20260610.svg",
+        "ib-vector-ceramic-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "bronze",
+        "bone"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "retaining_wall",
+        "stair_landing",
+        "escape_route_node"
+      ],
+      "tactical_effect": [
+        "orientation",
+        "micro strongpoint"
+      ]
+    },
+    {
+      "id": "watch_post",
+      "class": "defensive",
+      "primitive_recipe": [
+        "1 timber platform",
+        "2 rail segments",
+        "1 brazier",
+        "1 banner pole"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-cloth-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "upper_layer",
+        "bridge_landing",
+        "overlook"
+      ],
+      "tactical_effect": [
+        "strongpoint",
+        "future destination read"
+      ]
+    },
+    {
+      "id": "gate_chokepoint_set",
+      "class": "defensive",
+      "primitive_recipe": [
+        "2 heavy posts",
+        "1 crossbeam",
+        "1 chain or portcullis slab",
+        "2 side braziers"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "stone",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "chokepoint",
+        "bridge_entry",
+        "stair_throat"
+      ],
+      "tactical_effect": [
+        "hard chokepoint",
+        "commit line"
+      ]
+    },
+    {
+      "id": "bridge_railing_cluster",
+      "class": "circulation",
+      "primitive_recipe": [
+        "repeating posts",
+        "top rail",
+        "lower rail or rope",
+        "hanging lantern or planter optional"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "bridge_span",
+        "upper_gallery",
+        "cliff_edge"
+      ],
+      "tactical_effect": [
+        "edge read",
+        "cover cadence",
+        "route safety read"
+      ]
+    },
+    {
+      "id": "ladder_and_landing",
+      "class": "climb_support",
+      "primitive_recipe": [
+        "2 side rails",
+        "6 to 10 rungs",
+        "1 top landing lip",
+        "1 wall bracket pair"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "stone"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "escape_route",
+        "alternate_route",
+        "undercroft_return"
+      ],
+      "tactical_effect": [
+        "climb recovery",
+        "vertical shortcut"
+      ]
+    },
+    {
+      "id": "rope_bridge_light",
+      "class": "circulation",
+      "primitive_recipe": [
+        "2 side rope lines",
+        "plank deck segments",
+        "hanging brace ropes"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "bridge_span",
+        "exposed_crossing",
+        "escape_route"
+      ],
+      "tactical_effect": [
+        "commit path",
+        "exposure",
+        "wonder read"
+      ]
+    },
+    {
+      "id": "jar_cluster",
+      "class": "habitation_storage",
+      "primitive_recipe": [
+        "3 to 7 cylinders",
+        "1 tray slab",
+        "1 cloth drape optional"
+      ],
+      "texture_dependencies": [
+        "ib-vector-ceramic-20260610.svg",
+        "ib-vector-cloth-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "market_edge",
+        "shrine_niche",
+        "undercroft"
+      ],
+      "tactical_effect": [
+        "micro clutter",
+        "historic storage read"
+      ]
+    },
+    {
+      "id": "crate_bundle",
+      "class": "habitation_storage",
+      "primitive_recipe": [
+        "2 to 5 boxes",
+        "1 rope lash",
+        "1 cover cloth optional"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "cloth"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "market_stall_back",
+        "underdeck_pass",
+        "bridge_landing"
+      ],
+      "tactical_effect": [
+        "cover",
+        "path shaping"
+      ]
+    },
+    {
+      "id": "bench_and_table",
+      "class": "habitation_social",
+      "primitive_recipe": [
+        "1 table slab",
+        "4 legs",
+        "1 to 2 bench bars"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "market_court",
+        "rest_pocket",
+        "habitation_cluster"
+      ],
+      "tactical_effect": [
+        "human scale",
+        "soft obstruction"
+      ]
+    },
+    {
+      "id": "cloth_line_cluster",
+      "class": "habitation_soft",
+      "primitive_recipe": [
+        "2 anchors",
+        "1 to 3 line spans",
+        "hanging cloth strips"
+      ],
+      "texture_dependencies": [
+        "ib-vector-cloth-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "wood"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "upper_lane",
+        "court_edge",
+        "bridge_entry"
+      ],
+      "tactical_effect": [
+        "layering",
+        "sight breakup"
+      ]
+    },
+    {
+      "id": "trellis_wall",
+      "class": "garden",
+      "primitive_recipe": [
+        "1 lattice panel",
+        "2 braces",
+        "vine planes or clusters"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-garden-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone",
+        "iron"
+      ],
+      "generator_mode": "primitive_plus_billboard_optional",
+      "placement": [
+        "retaining_wall",
+        "courtyard_edge",
+        "upper_gallery"
+      ],
+      "tactical_effect": [
+        "fa\u00e7ade relief",
+        "former garden read"
+      ]
+    },
+    {
+      "id": "arch_fragment",
+      "class": "historic_ruin",
+      "primitive_recipe": [
+        "2 broken piers",
+        "1 partial arch span",
+        "1 fallen block pile"
+      ],
+      "texture_dependencies": [
+        "ib-vector-plaster-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "landmark_anchor",
+        "court_edge",
+        "bridge_approach"
+      ],
+      "tactical_effect": [
+        "historic silhouette",
+        "cover",
+        "framed vista"
+      ]
+    },
+    {
+      "id": "bath_screen_wall",
+      "class": "historic_ruin",
+      "primitive_recipe": [
+        "3 low wall runs",
+        "1 screen pier pair",
+        "1 basin edge"
+      ],
+      "texture_dependencies": [
+        "ib-vector-plaster-20260610.svg",
+        "ib-vector-ceramic-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "stone",
+        "water"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "kill_zone",
+        "court_basin",
+        "mid_layer"
+      ],
+      "tactical_effect": [
+        "partial cover",
+        "flanking channels",
+        "former bath read"
+      ]
+    },
+    {
+      "id": "lantern_cluster",
+      "class": "lighting",
+      "primitive_recipe": [
+        "1 pole or wall arm",
+        "1 to 3 lantern cages",
+        "1 chain drop optional"
+      ],
+      "texture_dependencies": [
+        "ib-vector-cloth-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "bronze",
+        "iron"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "route_marker",
+        "bridge_span",
+        "market_court",
+        "shrine"
+      ],
+      "tactical_effect": [
+        "path read",
+        "wonder read at night"
+      ]
+    },
+    {
+      "id": "counterweight_winch",
+      "class": "mechanical",
+      "primitive_recipe": [
+        "1 drum cylinder",
+        "2 side frames",
+        "1 hanging weight",
+        "1 guide rail"
+      ],
+      "texture_dependencies": [
+        "ib-vector-timber-20260610.svg",
+        "ib-vector-rope-20260610.svg"
+      ],
+      "uses_existing_materials": [
+        "iron",
+        "bronze"
+      ],
+      "generator_mode": "primitive_only",
+      "placement": [
+        "liftworks_role",
+        "bridge_anchor",
+        "upper_layer"
+      ],
+      "tactical_effect": [
+        "purpose read",
+        "strong silhouette"
+      ]
+    }
+  ]
+}

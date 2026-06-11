@@ -1,0 +1,106 @@
+# Infinite Brutality Prop Decoration Manifest
+
+Date: 2026-06-10
+
+This note is the human-readable companion to `data/prop_decoration_manifest.json`.
+
+## Purpose
+
+The current world now reads as one Hanging Gardens family. The next pass is not another macro-biome rewrite. It is prop density, habitation, and tactical-space reinforcement.
+
+The props in this manifest are designed to satisfy three needs at once:
+
+- make the settlement look inhabited and historically layered
+- create readable tactical pressure, cover, and chokepoints
+- stay buildable from primitives before demanding bespoke generated meshes
+
+## Primitive-First Rule
+
+Default to combinations of:
+
+- boxes
+- beveled boxes
+- cylinders
+- rails
+- chains
+- rope lines
+- cloth planes
+- shallow inset basins
+
+Use generated meshes only when the primitive version fails to read at gameplay distance.
+
+## Prop Families
+
+### Trade and habitation
+
+- open market stalls
+- shuttered stalls
+- bench and table sets
+- jar clusters
+- crate bundles
+- cloth lines
+
+### Garden and water
+
+- terrace planter beds
+- hanging planters
+- cistern pools
+- well and bucket sets
+- trellis walls
+
+### Ritual and history
+
+- shrine niches
+- arch fragments
+- bath screen walls
+
+### Defense and circulation
+
+- watch posts
+- gate chokepoint sets
+- bridge railing clusters
+- ladders and landings
+- rope bridges
+- counterweight winches
+
+## Texture Policy
+
+Do not fake this with the current material set alone. The prop pass needs new project-owned vector textures for:
+
+- timber
+- cloth
+- plaster
+- ceramic
+- garden foliage
+- water
+- rope
+
+These are listed in `docs/TEXTURE_PROMPTS_HANGING_GARDENS.md`.
+
+## Tactical Rule
+
+Each prop cluster must reinforce one of these:
+
+- soft cover
+- hard cover
+- lane narrowing
+- strongpoint
+- escape route support
+- climb recovery
+- route framing
+- wonder read
+
+If a prop only adds clutter and weakens traversal readability, it does not belong in the first pass.
+
+## Historical Rule
+
+Each prop cluster must answer one of these:
+
+- how people traded here
+- how people stored water here
+- how people sheltered here
+- how people prayed here
+- how people watched or defended this route
+- how the old structure was repurposed
+
+If it cannot answer one, it is filler.
