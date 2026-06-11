@@ -3,10 +3,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.102';
+const BUILD = '0.8.103';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const DEBUG_RAGDOLL = new URLSearchParams(window.location.search).get('ragdebug') === '1';
+const DEBUG_ATTACK_SWEEP = new URLSearchParams(window.location.search).get('attackdebug') === '1';
 const canvas = document.getElementById('game');
 const statusEl = document.getElementById('status');
 const readoutEl = document.getElementById('readout');
@@ -1527,6 +1528,12 @@ function positionEnemy(position) {
   enemy.userData.attackCooldown = 0.75;
   enemy.userData.attackHitDone = false;
   enemy.userData.attackName = '';
+  enemy.userData.attackDefKey = '';
+  enemy.userData.attackDef = null;
+  enemy.userData.attackPrevHand = null;
+  enemy.userData.attackCurrentHand = null;
+  enemy.userData.attackContactPoint = null;
+  enemy.userData.attackBones = {};
   enemy.userData.mode = 'approach';
   enemy.userData.modeTimer = 0;
   enemy.userData.commitTimer = ENEMY_COMMIT_INTERVAL * 0.55;
@@ -1929,6 +1936,7 @@ const ENEMY_ATTACK_WINDUP = 0.24;
 const ENEMY_ATTACK_ACTIVE_END = 0.46;
 const ENEMY_ATTACK_RECOVERY = 0.78;
 const ENEMY_ATTACK_COOLDOWN = 1.15;
+const ENEMY_ATTACK_SWEEP_PLAYER_SAMPLES = 7;
 const ENEMY_COMMIT_INTERVAL = 1.25;
 const ENEMY_COMMIT_TIMEOUT = 1.3;
 const ENEMY_RETREAT_DURATION = 0.72;
@@ -1961,6 +1969,19 @@ const ENEMY_AI_SLEEP_DISTANCE = 44;
 const ENEMY_AI_WAKE_DISTANCE = 30;
 const ENEMY_AI_SLEEP_ROOM_DELTA = 2;
 const ENEMY_AI_WAKE_ROOM_DELTA = 1;
+const ENEMY_ATTACK_DEFS = {
+  attackHorizontal: {
+    handAliases: ['mixamorig:RightHand', 'RightHand', 'mixamorig:RightForeArm', 'RightForeArm'],
+    activeStartNorm: 0.7,
+    activeDuration: 0.065,
+    lungeLead: 0.08,
+    sweepHalfExtents: new THREE.Vector3(0.2, 0.18, 0.16),
+    sweepRangePadding: 0.3,
+    damage: 1,
+    knockback: 1.65,
+    fallbackOffset: new THREE.Vector3(0.78, 1.22, 0.1),
+  },
+};
 let enemy = null;
 let enemyPrimitiveVisual = null;
 let enemyModel = null;
@@ -4988,6 +5009,12 @@ function buildEnemy() {
   enemy.userData.attackCooldown = 0.75;
   enemy.userData.attackHitDone = false;
   enemy.userData.attackName = '';
+  enemy.userData.attackDefKey = '';
+  enemy.userData.attackDef = null;
+  enemy.userData.attackPrevHand = null;
+  enemy.userData.attackCurrentHand = null;
+  enemy.userData.attackContactPoint = null;
+  enemy.userData.attackBones = {};
   enemy.userData.mode = 'approach';
   enemy.userData.modeTimer = 0;
   enemy.userData.commitTimer = ENEMY_COMMIT_INTERVAL * 0.55;
@@ -5923,6 +5950,11 @@ function startEnemyDeath(attackDirection, damage = 1) {
   enemy.userData.attackElapsed = 0;
   enemy.userData.attackHitDone = false;
   enemy.userData.attackName = '';
+  enemy.userData.attackDefKey = '';
+  enemy.userData.attackDef = null;
+  enemy.userData.attackPrevHand = null;
+  enemy.userData.attackCurrentHand = null;
+  enemy.userData.attackContactPoint = null;
   enemy.userData.mode = 'dead';
   enemy.userData.modeTimer = 0;
   enemy.userData.commitTimer = 0;
@@ -7627,6 +7659,7 @@ function loadOrcBerserkerEnemy() {
         loadProMeleeAxeEnemyClips();
       }
       enemy.add(enemyModel);
+      enemy.userData.attackBones = {};
       resetEnemyDissolve();
       if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
       setStatus('standing idle orc imported' + (scale ? ' scale ' + scale.toFixed(3) : ''));
@@ -8336,6 +8369,132 @@ function updatePlayer(dt) {
   finalizePlayerFrame(dt, now, stickMagnitude);
 }
 
+function getEnemyAttackDefinition(name, clipDuration = ENEMY_ATTACK_RECOVERY) {
+  const source = ENEMY_ATTACK_DEFS[name];
+  if (!source) {
+    return {
+      name,
+      handAliases: [],
+      activeStart: ENEMY_ATTACK_WINDUP,
+      activeEnd: ENEMY_ATTACK_ACTIVE_END,
+      lungeStart: ENEMY_ATTACK_WINDUP,
+      lungeEnd: ENEMY_ATTACK_ACTIVE_END,
+      sweepHalfExtents: new THREE.Vector3(0.16, 0.16, 0.12),
+      sweepRangePadding: 0.3,
+      damage: 1,
+      knockback: 1.65,
+      fallbackOffset: new THREE.Vector3(0.72, 1.18, 0),
+      clipDuration: clipDuration,
+    };
+  }
+  const duration = Math.max(0.001, clipDuration || ENEMY_ATTACK_RECOVERY);
+  const activeStart = clamp(duration * source.activeStartNorm, 0, duration);
+  const activeEnd = clamp(activeStart + source.activeDuration, activeStart, duration);
+  return {
+    name,
+    handAliases: [...(source.handAliases || [])],
+    activeStart,
+    activeEnd,
+    lungeStart: Math.max(0, activeStart - (source.lungeLead || 0)),
+    lungeEnd: activeEnd,
+    sweepHalfExtents: source.sweepHalfExtents ? source.sweepHalfExtents.clone() : new THREE.Vector3(0.16, 0.16, 0.12),
+    sweepRangePadding: source.sweepRangePadding ?? 0.3,
+    damage: source.damage ?? 1,
+    knockback: source.knockback ?? 1.65,
+    fallbackOffset: source.fallbackOffset ? source.fallbackOffset.clone() : new THREE.Vector3(0.72, 1.18, 0),
+    clipDuration: duration,
+  };
+}
+
+function resolveEnemyAttackHandBone(attackDef) {
+  if (!enemy || !attackDef) return null;
+  enemy.userData.attackBones = enemy.userData.attackBones || {};
+  const cached = enemy.userData.attackBones[attackDef.name];
+  if (cached?.parent) return cached;
+  const bone = findBoneByAliases(enemyModel || enemy, attackDef.handAliases || []);
+  if (bone) enemy.userData.attackBones[attackDef.name] = bone;
+  return bone;
+}
+
+function sampleEnemyAttackHandWorld(attackDef, target = new THREE.Vector3()) {
+  const bone = resolveEnemyAttackHandBone(attackDef);
+  if (bone) return bone.getWorldPosition(target);
+  target.copy(attackDef?.fallbackOffset || new THREE.Vector3(0.72, 1.18, 0));
+  return enemy.localToWorld(target);
+}
+
+function getPlayerDamageCapsule(targetA, targetB) {
+  const feetY = player.position.y - PLAYER_EYE_HEIGHT;
+  targetA.set(player.position.x, feetY + PLAYER_SOLID_RADIUS, player.position.z);
+  targetB.set(player.position.x, player.position.y + 0.06, player.position.z);
+  return PLAYER_SOLID_RADIUS;
+}
+
+function pointAabbDistanceSq(point, halfExtents) {
+  const dx = Math.max(Math.abs(point.x) - halfExtents.x, 0);
+  const dy = Math.max(Math.abs(point.y) - halfExtents.y, 0);
+  const dz = Math.max(Math.abs(point.z) - halfExtents.z, 0);
+  return dx * dx + dy * dy + dz * dz;
+}
+
+function segmentAabbDistanceSq(from, to, halfExtents) {
+  const sample = new THREE.Vector3();
+  let minDistanceSq = Infinity;
+  const steps = Math.max(2, ENEMY_ATTACK_SWEEP_PLAYER_SAMPLES);
+  for (let i = 0; i < steps; i += 1) {
+    const t = steps <= 1 ? 0 : i / (steps - 1);
+    sample.lerpVectors(from, to, t);
+    const distanceSq = pointAabbDistanceSq(sample, halfExtents);
+    if (distanceSq < minDistanceSq) minDistanceSq = distanceSq;
+    if (minDistanceSq <= 0.000001) return 0;
+  }
+  return minDistanceSq;
+}
+
+function sweepEnemyAttackHitsPlayer(previousHand, currentHand, attackDef) {
+  if (!previousHand || !currentHand || !attackDef) return null;
+  const center = previousHand.clone().add(currentHand).multiplyScalar(0.5);
+  const horizontalDistance = Math.hypot(center.x - player.position.x, center.z - player.position.z);
+  if (horizontalDistance > ENEMY_ATTACK_RANGE + (attackDef.sweepRangePadding || 0.3)) return null;
+  const travel = currentHand.clone().sub(previousHand);
+  const travelLength = travel.length();
+  if (travelLength > 0.0001) travel.multiplyScalar(1 / travelLength);
+  else {
+    travel.set(player.position.x - center.x, 0, player.position.z - center.z);
+    if (travel.lengthSq() < 0.0001) travel.set(0, 0, -1);
+    travel.normalize();
+  }
+  const upSeed = Math.abs(travel.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(upSeed, travel).normalize();
+  const up = new THREE.Vector3().crossVectors(travel, right).normalize();
+  const halfExtents = attackDef.sweepHalfExtents.clone();
+  halfExtents.z += travelLength * 0.5;
+  const capsuleStart = new THREE.Vector3();
+  const capsuleEnd = new THREE.Vector3();
+  const playerRadius = getPlayerDamageCapsule(capsuleStart, capsuleEnd);
+  const localStart = capsuleStart.sub(center);
+  const localEnd = capsuleEnd.sub(center);
+  localStart.set(localStart.dot(right), localStart.dot(up), localStart.dot(travel));
+  localEnd.set(localEnd.dot(right), localEnd.dot(up), localEnd.dot(travel));
+  const distanceSq = segmentAabbDistanceSq(localStart, localEnd, halfExtents);
+  if (distanceSq > playerRadius * playerRadius) return null;
+  return {
+    center,
+    distanceSq,
+    direction: new THREE.Vector3(player.position.x - center.x, 0, player.position.z - center.z).normalize(),
+  };
+}
+
+function applyEnemyAttackHit(attackDef, toPlayerDir, hit) {
+  const direction = hit?.direction?.lengthSq() ? hit.direction.clone() : toPlayerDir.clone();
+  direction.y = 0;
+  if (direction.lengthSq() < 0.0001) direction.set(0, 0, -1);
+  direction.normalize();
+  player.healthPulse = 0.45;
+  player.velocity.addScaledVector(direction, attackDef?.knockback || 1.65);
+  playThud(1.05);
+}
+
 function startEnemyAttack() {
   if (!enemy || isEnemyCorpseActive() || enemy.userData.attackTimer > 0) return;
   const attackName = enemyActions.has('attackHorizontal') ? 'attackHorizontal' : '';
@@ -8344,11 +8503,17 @@ function startEnemyAttack() {
     return;
   }
   const clipDuration = enemyActions.get(attackName)?.getClip?.().duration || ENEMY_ATTACK_RECOVERY;
+  const attackDef = getEnemyAttackDefinition(attackName, clipDuration);
   enemy.userData.attackName = attackName;
+  enemy.userData.attackDefKey = attackName;
+  enemy.userData.attackDef = attackDef;
   enemy.userData.attackTimer = Math.max(clipDuration, ENEMY_ATTACK_RECOVERY);
   enemy.userData.attackElapsed = 0;
   enemy.userData.attackHitDone = false;
-  playEnemyAction(attackName, 0.055);
+  enemy.userData.attackCurrentHand = sampleEnemyAttackHandWorld(attackDef);
+  enemy.userData.attackPrevHand = enemy.userData.attackCurrentHand.clone();
+  enemy.userData.attackContactPoint = null;
+  playEnemyAction(attackName, 0.055, { restart: true });
 }
 
 function updateEnemyEngagement(dt) {
@@ -8414,6 +8579,11 @@ function updateEnemyEngagement(dt) {
       enemy.userData.attackElapsed = 0;
       enemy.userData.attackHitDone = false;
       enemy.userData.attackName = '';
+      enemy.userData.attackDefKey = '';
+      enemy.userData.attackDef = null;
+      enemy.userData.attackPrevHand = null;
+      enemy.userData.attackCurrentHand = null;
+      enemy.userData.attackContactPoint = null;
       enemy.userData.mode = 'hold';
       enemy.userData.modeTimer = 0;
       playEnemyAction('idle', 0.16);
@@ -8441,22 +8611,43 @@ function updateEnemyEngagement(dt) {
   if (enemy.userData.hitTimer > 0) return;
 
   if (enemy.userData.attackTimer > 0) {
+    const attackDef = enemy.userData.attackDef || getEnemyAttackDefinition(enemy.userData.attackDefKey || enemy.userData.attackName || 'attackHorizontal', enemy.userData.attackTimer);
+    enemy.userData.attackDef = attackDef;
     enemy.userData.attackElapsed += dt;
     enemy.userData.attackTimer = Math.max(0, enemy.userData.attackTimer - dt);
-    if (enemy.userData.attackElapsed >= ENEMY_ATTACK_WINDUP && enemy.userData.attackElapsed <= ENEMY_ATTACK_ACTIVE_END) {
+    const previousHand = enemy.userData.attackPrevHand ? enemy.userData.attackPrevHand.clone() : null;
+    const currentHand = sampleEnemyAttackHandWorld(attackDef);
+    enemy.userData.attackCurrentHand = currentHand.clone();
+    if (enemy.userData.attackElapsed >= attackDef.lungeStart && enemy.userData.attackElapsed <= attackDef.lungeEnd) {
       applyEnemyMove(toPlayerDir, ENEMY_LUNGE_SPEED, dt);
     }
-    if (!enemy.userData.attackHitDone && enemy.userData.attackElapsed >= ENEMY_ATTACK_WINDUP) {
-      enemy.userData.attackHitDone = true;
-      if (dist <= ENEMY_ATTACK_RANGE + 0.3) {
-        player.healthPulse = 0.45;
-        player.velocity.addScaledVector(toPlayerDir, 1.65);
-        playThud(1.05);
+    const attackActive = enemy.userData.attackElapsed >= attackDef.activeStart && enemy.userData.attackElapsed <= attackDef.activeEnd;
+    if (!enemy.userData.attackHitDone && attackActive && previousHand) {
+      const hit = sweepEnemyAttackHitsPlayer(previousHand, currentHand, attackDef);
+      if (hit) {
+        enemy.userData.attackHitDone = true;
+        enemy.userData.attackContactPoint = hit.center.clone();
+        applyEnemyAttackHit(attackDef, toPlayerDir, hit);
       }
     }
+    if (DEBUG_ATTACK_SWEEP) {
+      enemy.userData.attackDebug = {
+        active: attackActive,
+        hitDone: !!enemy.userData.attackHitDone,
+        prev: previousHand ? previousHand.clone() : null,
+        curr: currentHand.clone(),
+      };
+    }
+    if (!enemy.userData.attackPrevHand) enemy.userData.attackPrevHand = currentHand.clone();
+    else enemy.userData.attackPrevHand.copy(currentHand);
     if (enemy.userData.attackTimer <= 0) {
       enemy.userData.attackCooldown = ENEMY_ATTACK_COOLDOWN;
       enemy.userData.attackName = '';
+      enemy.userData.attackDefKey = '';
+      enemy.userData.attackDef = null;
+      enemy.userData.attackPrevHand = null;
+      enemy.userData.attackCurrentHand = null;
+      enemy.userData.attackContactPoint = null;
       setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
       playEnemyAction('idle', 0.12);
     }
