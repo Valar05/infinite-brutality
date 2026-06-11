@@ -47,9 +47,11 @@ Level-design workflow is split in two places:
 
 - general workflow: `../thunder-brainstorm/generated/skills/level_design_environment_grammar.md`
 - project-specific workflow: `docs/LEVEL_DESIGN_WORKFLOW.md`
+- level-design bible: `docs/LEVEL_DESIGN_BIBLE.md`
 - realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
 - district graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
 - runtime contract: `docs/DISTRICT_RUNTIME_CONTRACT.md`
+- Pose Lab clip-gradient tool concept: `docs/POSE_LAB_CLIP_GRADIENT_EDITOR.md`
 
 When a level-design pass produces a durable critique/fix pattern, update the general Thunder note if it generalizes and this project-local note if it is Infinite Brutality-specific.
 

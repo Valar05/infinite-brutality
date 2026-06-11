@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.63';
+const BUILD = '0.8.65';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -2118,11 +2118,11 @@ function addBatchRouteSegment(parent, name, a, b, topY, width = 3.4, mat = MAT.b
   if (lenX >= lenZ) {
     const center = makeVec((startX + endX) * 0.5, topY, (startZ + endZ) * 0.5);
     addBrokenRouteRails(parent, name, a, b, topY, routeWidth);
-    return addWalkableTopBox(parent, name, [Math.max(0.4, lenX + 0.64), routeWidth], center, topY, mat, 0.42, 0.045);
+    return addWalkableTopBox(parent, name, [Math.max(0.4, lenX + 0.64), routeWidth], center, topY, mat, 0.12, 0.045);
   }
   const center = makeVec((startX + endX) * 0.5, topY, (startZ + endZ) * 0.5);
   addBrokenRouteRails(parent, name, a, b, topY, routeWidth);
-  return addWalkableTopBox(parent, name, [routeWidth, Math.max(0.4, lenZ + 0.64)], center, topY, mat, 0.42, 0.045);
+  return addWalkableTopBox(parent, name, [routeWidth, Math.max(0.4, lenZ + 0.64)], center, topY, mat, 0.12, 0.045);
 }
 
 function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.platform) {
@@ -2142,7 +2142,7 @@ function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.plat
     const z = a.z + dz * t;
     const topY = startTop + (endTop - startTop) * ((i + 1) / steps) + i * 0.008;
     const size = alongX ? [treadLength, stairWidth] : [stairWidth, treadLength];
-    addWalkableTopBox(parent, prefix + '-tread-' + i, size, makeVec(x, topY, z), topY, mat, 0.24, 0.045);
+    addWalkableTopBox(parent, prefix + '-tread-' + i, size, makeVec(x, topY, z), topY, mat, 0.1, 0.045);
     if (i > 0) {
       const prevT = (i - 0.5) / steps;
       const prevY = startTop + (endTop - startTop) * (i / steps) + (i - 1) * 0.008;
@@ -2153,7 +2153,6 @@ function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.plat
       const riserSize = alongX ? [0.24, riserH, stairWidth] : [stairWidth, riserH, 0.24];
       const riserPos = [riserX - ux * 0.08, riserY, riserZ - uz * 0.08];
       addBeveledBox(parent, prefix + '-riser-' + i, riserSize, riserPos, MAT.connectorWall, false, 0.015, 1);
-      registerSolid(riserSize, riserPos, 0.01);
     }
   }
   addBatchRouteSegment(parent, prefix + '-base-join', a, b, Math.min(startTop, endTop) + 0.025, 4.2, MAT.connectorFloor, 1.65);
@@ -2433,8 +2432,8 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
 
   // Build a carved chamber footprint first; pads and route pieces sit on top of this outline.
   addBatchCarvedChamberFloor(roomGroup, spec, width, depth, height, shellConnectors, { index, wantsCorner, wantsHub });
-  addWalkableTopBox(roomGroup, 'batch-entry-pad', [7.2, 5.4], start, start.y, MAT.platform, 0.18, 0.06, { source: 'batch-entry-pad', traversalCritical: true });
-  addWalkableTopBox(roomGroup, 'batch-exit-pad', [7.4, 5.4], exit, exit.y, MAT.platform, 0.18, 0.06, { source: 'batch-exit-pad', traversalCritical: true });
+  addWalkableTopBox(roomGroup, 'batch-entry-pad', [7.2, 5.4], start, start.y, MAT.platform, 0.08, 0.06, { source: 'batch-entry-pad', traversalCritical: true });
+  addWalkableTopBox(roomGroup, 'batch-exit-pad', [7.4, 5.4], exit, exit.y, MAT.platform, 0.08, 0.06, { source: 'batch-exit-pad', traversalCritical: true });
 
   // A narrow visual gutter gives movement focus without creating the giant side void from build 0.8.1.
   if (wantsRiskLine) {
@@ -2449,7 +2448,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
   if (wantsCorner) {
     const bendSide = terminalExitConnector === 'E' || spawnConnector === 'E' ? 1 : -1;
     const bend = makeVec(bendSide * width * 0.26, Math.max(0.36, (start.y + exit.y) * 0.5 + 0.08), (start.z + exit.z) * 0.18);
-    addWalkableTopBox(roomGroup, 'batch-corner-route-a', [5.2, 4.0], bend, bend.y, MAT.platform, 0.16, 0.04, { source: 'batch-corner-route-a', traversalCritical: true });
+    addWalkableTopBox(roomGroup, 'batch-corner-route-a', [5.2, 4.0], bend, bend.y, MAT.platform, 0.08, 0.04, { source: 'batch-corner-route-a', traversalCritical: true });
     addBatchRouteSegment(roomGroup, 'batch-corner-entry-link', start, bend, bend.y + 0.035, 2.7, MAT.platform, 2.65);
     addBatchRouteSegment(roomGroup, 'batch-corner-exit-link', bend, exit, Math.max(bend.y + 0.09, exit.y + 0.08), 2.7, MAT.bridge, 2.65);
   } else if (isDescentRoom) {
@@ -2474,13 +2473,11 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
       ? [Math.max(5.4, Math.abs(lowerTerrace.x - dropLip.x) * 0.95), 6.0]
       : [6.0, Math.max(5.4, Math.abs(lowerTerrace.z - dropLip.z) * 0.95)];
 
-    addWalkableTopBox(roomGroup, 'batch-descent-upper-run', routeAlongX ? [Math.max(6.2, width * 0.26), 4.2] : [4.2, Math.max(6.2, depth * 0.26)], upperRun, upperRun.y, MAT.bridge, 0.16, 0.04, { source: 'batch-descent-upper-run', traversalCritical: true });
-    addWalkableTopBox(roomGroup, 'batch-descent-drop-lip', routeAlongX ? [4.6, 3.6] : [3.6, 4.6], dropLip, dropLip.y, MAT.bridge, 0.14, 0.04, { source: 'batch-descent-drop-lip', traversalCritical: true });
-    addWalkableTopBox(roomGroup, 'batch-descent-lower-terrace', routeAlongX ? [Math.max(6.6, width * 0.32), 5.0] : [5.0, Math.max(6.6, depth * 0.32)], lowerTerrace, lowerTerrace.y, MAT.platform, 0.18, 0.05, { source: 'batch-descent-lower-terrace', traversalCritical: true });
+    addWalkableTopBox(roomGroup, 'batch-descent-upper-run', routeAlongX ? [Math.max(6.2, width * 0.26), 4.2] : [4.2, Math.max(6.2, depth * 0.26)], upperRun, upperRun.y, MAT.bridge, 0.08, 0.04, { source: 'batch-descent-upper-run', traversalCritical: true });
+    addWalkableTopBox(roomGroup, 'batch-descent-lower-terrace', routeAlongX ? [Math.max(6.6, width * 0.32), 5.0] : [5.0, Math.max(6.6, depth * 0.32)], lowerTerrace, lowerTerrace.y, MAT.platform, 0.08, 0.05, { source: 'batch-descent-lower-terrace', traversalCritical: true });
     addBeveledBox(roomGroup, 'batch-descent-void-cut', [voidSize[0], 0.18, voidSize[1]], [voidCenter.x, 0.08, voidCenter.z], MAT.void, false, 0.01, 1);
 
     addBatchRouteSegment(roomGroup, 'batch-descent-entry-link', start, upperRun, upperRun.y + 0.04, 2.6, MAT.platform, 2.65);
-    addBatchRouteSegment(roomGroup, 'batch-descent-fast-line', upperRun, dropLip, dropLip.y + 0.04, 2.3, MAT.bridge, 2.65);
     addBatchStairRun(roomGroup, 'batch-descent-stair-a', upperRun, stairMid, upperRun.y, stairMid.y, MAT.platform);
     addBatchStairRun(roomGroup, 'batch-descent-stair-b', stairMid, lowerTerrace, stairMid.y, lowerTerrace.y, MAT.platform);
     addBatchRouteSegment(roomGroup, 'batch-descent-exit-link', lowerTerrace, exit, Math.max(lowerTerrace.y + 0.05, exit.y + 0.06), 2.6, MAT.platform, 2.65);
@@ -2494,12 +2491,10 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
     addBeveledBox(roomGroup, 'batch-descent-stair-tower', routeAlongX ? [1.4, 3.2, 3.8] : [3.8, 3.2, 1.4], [stairMid.x, 1.6, stairMid.z], MAT.connectorWall, true, 0.04, 1);
     addBrazier(roomGroup, 'batch-descent-lower-signal', [lowerTerrace.x, lowerTerrace.y, lowerTerrace.z], { kind: 'corpsefire' });
   } else if (hasUpper) {
-    addWalkableTopBox(roomGroup, 'batch-lip-landing', [4.8, 3.8], midA, midA.y, MAT.platform, 0.16, 0.04, { source: 'batch-lip-landing', traversalCritical: true });
+    addBatchRouteSegment(roomGroup, 'batch-upper-entry-link', start, midA, midA.y + 0.035, 2.8, MAT.platform, 2.65);
     addBatchStairRun(roomGroup, 'batch-measured-rise', midA, midB, midA.y, Math.max(midA.y + 0.38, exit.y + 0.04), MAT.platform);
     addBatchRouteSegment(roomGroup, 'batch-upper-exit-link', midB, exit, Math.max(0.46, exit.y + 0.08), 2.8, MAT.bridge, 2.65);
   } else {
-    addWalkableTopBox(roomGroup, 'batch-route-lip-marker', [4.6, 3.4], midA, midA.y, wantsRiskLine ? MAT.bridge : MAT.platform, 0.14, 0.04, { source: 'batch-route-lip-marker', traversalCritical: true });
-    addWalkableTopBox(roomGroup, 'batch-route-landing-marker', [4.2, 3.6], midB, midB.y, MAT.platform, 0.14, 0.04, { source: 'batch-route-landing-marker', traversalCritical: true });
     addBatchRouteSegment(roomGroup, 'batch-low-route-link-a', start, midA, midA.y + 0.035, 2.6, MAT.platform, 2.65);
     addBatchRouteSegment(roomGroup, 'batch-low-route-link-b', midB, exit, Math.max(midB.y + 0.06, exit.y + 0.08), 2.6, MAT.platform, 2.65);
   }
@@ -2507,7 +2502,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
   if (!isDescentRoom && (hasLower || role.includes('recovery') || role.includes('secret'))) {
     const side = Math.abs(start.x) < 1 ? (index % 2 ? 1 : -1) : -Math.sign(start.x);
     const low = makeVec(side * width * 0.30, 0.24, 0);
-    addWalkableTopBox(roomGroup, 'batch-side-recovery-floor', [4.6, Math.max(7.0, depth * 0.34)], low, low.y, MAT.connectorFloor, 0.16, 0.05, { source: 'batch-side-recovery-floor', traversalCritical: true });
+    addWalkableTopBox(roomGroup, 'batch-side-recovery-floor', [4.6, Math.max(7.0, depth * 0.34)], low, low.y, MAT.connectorFloor, 0.08, 0.05, { source: 'batch-side-recovery-floor', traversalCritical: true });
     addBatchStairRun(roomGroup, 'batch-side-recovery-rise', low, exit, low.y + 0.03, Math.max(0.5, exit.y + 0.04), MAT.platform);
     addBrazier(roomGroup, 'batch-recovery-corpsefire', [low.x, 0, low.z], { kind: 'corpsefire' });
   }
@@ -2540,7 +2535,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
       const branchTop = hasUpper && i % 2 ? 0.95 : 0.26;
       const point = connectorPoint(c, width, depth, branchTop, 4.6);
       socketPoints.set(c, point);
-      addWalkableTopBox(roomGroup, 'batch-side-branch-' + i, [5.2, 4.2], point, point.y, i % 2 ? MAT.bridge : MAT.connectorFloor, 0.16, 0.05, { source: 'batch-side-branch-' + i, traversalCritical: true });
+      addWalkableTopBox(roomGroup, 'batch-side-branch-' + i, [5.2, 4.2], point, point.y, i % 2 ? MAT.bridge : MAT.connectorFloor, 0.08, 0.05, { source: 'batch-side-branch-' + i, traversalCritical: true });
       addBatchRouteSegment(roomGroup, 'batch-side-branch-link-' + i, center, point, Math.max(0.34, branchTop + 0.09), 2.4, MAT.connectorFloor, 2.65);
       addBatchConnectorLandmark(roomGroup, 'batch-side-connector-' + i, point, c, 'side', branchTop);
     }
@@ -2548,13 +2543,11 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
 
   if (klass.startsWith('4c')) {
     addBeveledBox(roomGroup, 'batch-hub-central-landmark', [2.1, 2.6, 1.8], [0, 1.3, 0], MAT.connectorWall, true, 0.04, 1);
-    addWalkableTopBox(roomGroup, 'batch-hub-west-footwork', [3.6, 7.8], makeVec(-4.9, 0.3, 0), 0.3, MAT.platform, 0.14, 0.04, { source: 'batch-hub-west-footwork', traversalCritical: true });
-    addWalkableTopBox(roomGroup, 'batch-hub-east-footwork', [3.6, 7.8], makeVec(4.9, 0.3, 0), 0.3, MAT.platform, 0.14, 0.04, { source: 'batch-hub-east-footwork', traversalCritical: true });
   }
 
   if (wantsCombat && !wantsCorner) {
     addBeveledBox(roomGroup, 'batch-combat-route-mass', [1.8, 2.1, 1.3], [center.x, 1.05, center.z], MAT.connectorWall, true, 0.04, 1);
-    addWalkableTopBox(roomGroup, 'batch-combat-route-mass-top', [1.5, 1.02], center, 2.1, MAT.connectorFloor, 0.18, 0.04);
+    addWalkableTopBox(roomGroup, 'batch-combat-route-mass-top', [1.5, 1.02], center, 2.1, MAT.connectorFloor, 0.08, 0.04);
   } else {
     addBeveledBox(roomGroup, 'batch-route-buttress-left', [0.8, 2.4, 1.0], [-width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
     addBeveledBox(roomGroup, 'batch-route-buttress-right', [0.8, 2.4, 1.0], [width * 0.28, 1.2, center.z], MAT.connectorWall, true, 0.035, 1);
@@ -5620,8 +5613,9 @@ function updatePlayer(dt) {
   resolvePlayerSolids(player.position, player.velocity);
   const feetY = player.position.y - PLAYER_EYE_HEIGHT;
   let support = player.velocity.y <= 0 ? (resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y) || resolveSolidTopSupport(player.position.x, player.position.z, feetY, player.velocity.y)) : null;
-  if (!support && player.velocity.y <= 0 && desired.lengthSq() > 0.0001) {
-    const stepSurface = findWalkableStepSurface(player.position, desired, feetY);
+  const stepDirection = desired.lengthSq() > 0.0001 ? desired : new THREE.Vector3(player.velocity.x, 0, player.velocity.z);
+  if (!support && player.velocity.y <= 0 && stepDirection.lengthSq() > 0.0001) {
+    const stepSurface = findWalkableStepSurface(player.position, stepDirection, feetY);
     if (stepSurface) {
       player.position.x = stepSurface.targetX;
       player.position.z = stepSurface.targetZ;

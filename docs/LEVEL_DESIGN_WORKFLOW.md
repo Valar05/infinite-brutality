@@ -2,6 +2,8 @@
 
 Use this note for level-design, generator, and screenshot-critique work specific to Infinite Brutality.
 
+Current qualitative source of truth: `docs/LEVEL_DESIGN_BIBLE.md`.
+
 Current authoritative realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`.
 
 General workflow lives in Thunder at `../thunder-brainstorm/generated/skills/level_design_environment_grammar.md`. This local note is the tailored version for the suspended shanty-settlement over the abyss.
