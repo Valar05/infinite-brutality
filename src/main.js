@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 
-const BUILD = '0.8.70';
+const BUILD = '0.8.71';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const canvas = document.getElementById('game');
@@ -3630,6 +3630,66 @@ function addWatchPost(parent, prefix, x, y, z, yaw = 0) {
   return group;
 }
 
+function addCrateBundle(parent, prefix, x, y, z, yaw = 0, count = 4) {
+  const rng = rngFromSeed(hashRoomKey(prefix));
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  for (let i = 0; i < count; i += 1) {
+    const w = 0.42 + rng() * 0.28;
+    const h = 0.26 + rng() * 0.18;
+    const d = 0.36 + rng() * 0.24;
+    const cx = (rng() - 0.5) * 1.2;
+    const cz = (rng() - 0.5) * 0.9;
+    addGroundedBeveledBox(group, prefix + '-crate-' + i, [w, h, d], [cx, y, cz], MAT.timber, false, 0.015, 1);
+    if (rng() > 0.55) addBeveledBox(group, prefix + '-lash-' + i, [w * 0.92, 0.03, 0.03], [cx, y + h * 0.66, cz], MAT.rope, false, 0.008, 1);
+  }
+  parent.add(group);
+  return group;
+}
+
+function addBenchTableSet(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-table-top', [2.2, 0.14, 1.0], [0, y + 0.52, 0], MAT.timber, false, 0.01, 1);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    addGroundedBeveledBox(group, prefix + '-leg-' + sx + '-' + sz, [0.1, 0.52, 0.1], [sx * 0.88, y, sz * 0.32], MAT.timber, false, 0.01, 1);
+  }
+  addGroundedBeveledBox(group, prefix + '-bench-a', [1.9, 0.16, 0.36], [0, y + 0.22, -0.86], MAT.timber, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-bench-b', [1.9, 0.16, 0.36], [0, y + 0.22, 0.86], MAT.timber, false, 0.01, 1);
+  addHangingJarCluster(group, prefix + '-tableware', 0, y + 0.68, 0, 3, 0.8);
+  parent.add(group);
+  return group;
+}
+
+function addArchFragment(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-pier-left', [0.9, 2.6, 0.9], [-1.4, y, 0], MAT.plaster, false, 0.02, 1);
+  addGroundedBeveledBox(group, prefix + '-pier-right', [1.0, 3.0, 1.0], [1.3, y, 0], MAT.plaster, false, 0.02, 1);
+  addBeveledBox(group, prefix + '-arch-top', [2.6, 0.34, 0.8], [0.0, y + 2.88, 0], MAT.plaster, false, 0.02, 1);
+  addGroundedBeveledBox(group, prefix + '-fallen-a', [0.86, 0.34, 0.68], [-0.24, y, 0.96], MAT.stone2, false, 0.02, 1).rotation.y = 0.42;
+  addGroundedBeveledBox(group, prefix + '-fallen-b', [0.72, 0.28, 0.54], [0.72, y, -0.74], MAT.stone2, false, 0.02, 1).rotation.y = -0.36;
+  parent.add(group);
+  return group;
+}
+
+function addGateChokeSet(parent, prefix, x, y, z, yaw = 0) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
+  addGroundedBeveledBox(group, prefix + '-post-left', [0.4, 2.6, 0.4], [-1.5, y, 0], MAT.timber, false, 0.01, 1);
+  addGroundedBeveledBox(group, prefix + '-post-right', [0.4, 2.6, 0.4], [1.5, y, 0], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-beam', [3.4, 0.24, 0.24], [0, y + 2.58, 0], MAT.timber, false, 0.01, 1);
+  addBeveledBox(group, prefix + '-cross-chain', [2.8, 0.06, 0.06], [0, y + 1.24, 0], MAT.rope, false, 0.008, 1);
+  addBrazier(group, prefix + '-brazier-left', [-2.1, y, -0.4], { kind: 'flame' });
+  addBrazier(group, prefix + '-brazier-right', [2.1, y, 0.4], { kind: 'flame' });
+  parent.add(group);
+  return group;
+}
+
 function addTrellisWall(parent, prefix, x, y, z, width, height, yaw = 0) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
@@ -3719,29 +3779,51 @@ function addHangingMarketDistrictSkeleton(district) {
 
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-a', origin.x - 26, lowBand + 0.08, origin.z + 84, 4.6, 2.8, 0.14);
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-b', origin.x - 8, lowBand + 0.08, origin.z + 110, 4.2, 2.6, -0.08);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-c', origin.x - 20, lowBand + 0.08, origin.z + 138, 4.0, 2.4, 0.24);
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-a', origin.x + 4, midBand + 0.08, origin.z + 150, 5.2, 3.0, 0.06);
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-b', origin.x + 24, midBand + 0.08, origin.z + 180, 4.8, 2.8, -0.12);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-c', origin.x - 10, midBand + 0.08, origin.z + 176, 4.4, 2.6, 0.18);
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-a', origin.x + 48, highBand + 0.08, origin.z + 232, 4.4, 2.6, 0.18);
   addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-b', origin.x + 74, highBand + 0.08, origin.z + 276, 4.0, 2.4, -0.18);
+  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-c', origin.x + 58, highBand + 0.08, origin.z + 258, 3.8, 2.2, 0.08);
 
   addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-a', origin.x - 18, lowBand + 0.02, origin.z + 74, 3.0, 1.1, 5);
   addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-b', origin.x - 2, lowBand + 0.02, origin.z + 118, 2.6, 1.0, 4);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-c', origin.x - 30, lowBand + 0.02, origin.z + 96, 2.8, 1.0, 4);
   addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-a', origin.x + 8, midBand + 0.02, origin.z + 142, 3.4, 1.2, 5);
   addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-b', origin.x + 30, midBand + 0.02, origin.z + 188, 2.8, 1.0, 4);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-c', origin.x - 12, midBand + 0.02, origin.z + 160, 2.6, 0.94, 4);
   addPlanterBed(roomGroup, 'district-' + district.id + '-planter-high-a', origin.x + 54, highBand + 0.02, origin.z + 238, 2.4, 0.94, 4);
+  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-high-b', origin.x + 68, highBand + 0.02, origin.z + 298, 2.2, 0.88, 4);
   addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-a', origin.x + 40, origin.z + 214, highBand + 2.6, highBand + 0.62);
   addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-b', origin.x + 74, origin.z + 270, highBand + 3.0, highBand + 0.74);
+  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-c', origin.x - 6, origin.z + 154, midBand + 2.2, midBand + 0.58);
+  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-d', origin.x + 24, origin.z + 202, highBand + 2.0, highBand + 0.54);
   addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-a', origin.x + 26, midBand + 0.04, origin.z + 134, 4.6, 2.4, 0.02);
   addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-b', origin.x - 10, lowBand - 0.18, origin.z + 214, 3.8, 2.2, -0.3);
+  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-c', origin.x + 62, highBand + 0.04, origin.z + 246, 3.4, 2.0, -0.12);
 
   addCisternPool(roomGroup, 'district-' + district.id + '-cistern', origin.x + 2, district.baseElevation + 3.42, origin.z + 158, 7.4, 5.4);
   addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine-niche', origin.x - 14, district.baseElevation + 0.12, origin.z + 228, 0.18);
+  addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine-small', origin.x + 34, highBand + 0.02, origin.z + 222, -0.22);
   addWellSet(roomGroup, 'district-' + district.id + '-well', origin.x + 16, midBand + 0.02, origin.z + 170);
   addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-low', origin.x - 4, lowBand + 0.02, origin.z + 126, 5, 1.4);
   addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-mid', origin.x + 18, midBand + 0.02, origin.z + 194, 6, 1.6);
+  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-high', origin.x + 70, highBand + 0.02, origin.z + 288, 5, 1.2);
   addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-a', origin.x - 2, lowBand + 0.02, origin.z + 102, 4.6, 0.08);
   addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-b', origin.x + 36, highBand + 0.02, origin.z + 248, 4.2, -0.12);
+  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-c', origin.x + 12, midBand + 0.02, origin.z + 156, 5.0, 0.18);
   addWatchPost(roomGroup, 'district-' + district.id + '-watch-post', origin.x + 88, highBand + 0.02, origin.z + 294, -0.18);
+  addWatchPost(roomGroup, 'district-' + district.id + '-watch-post-mid', origin.x - 28, midBand + 0.02, origin.z + 196, 0.22);
+  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-low-a', origin.x - 30, lowBand + 0.02, origin.z + 146, 0.12, 5);
+  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-mid-a', origin.x + 30, midBand + 0.02, origin.z + 206, -0.18, 6);
+  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-under-a', origin.x - 2, lowBand - 0.42, origin.z + 236, 0.28, 5);
+  addBenchTableSet(roomGroup, 'district-' + district.id + '-bench-set-a', origin.x - 14, lowBand + 0.02, origin.z + 96, 0.08);
+  addBenchTableSet(roomGroup, 'district-' + district.id + '-bench-set-b', origin.x + 20, midBand + 0.02, origin.z + 174, -0.14);
+  addArchFragment(roomGroup, 'district-' + district.id + '-arch-a', origin.x + 42, midBand + 0.02, origin.z + 144, 0.18);
+  addArchFragment(roomGroup, 'district-' + district.id + '-arch-b', origin.x + 82, highBand + 0.02, origin.z + 306, -0.12);
+  addGateChokeSet(roomGroup, 'district-' + district.id + '-gate-a', origin.x - 16, lowBand + 0.02, origin.z + 86, 0.02);
+  addGateChokeSet(roomGroup, 'district-' + district.id + '-gate-b', origin.x + 56, highBand + 0.02, origin.z + 260, -0.16);
 
   addBrazier(roomGroup, 'district-' + district.id + '-brazier-entry', [origin.x - 18, lowBand + 0.18, origin.z + 92], { kind: 'flame' });
   addBrazier(roomGroup, 'district-' + district.id + '-brazier-court', [origin.x + 12, midBand + 0.18, origin.z + 166], { kind: 'corpsefire' });

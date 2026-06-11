@@ -124,7 +124,8 @@
         "soft cover",
         "lane narrowing",
         "readable market identity"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "market_stall_closed",
@@ -179,7 +180,8 @@
         "visual depth",
         "soft route shaping",
         "Hanging Gardens wonder read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "hanging_planter_chain",
@@ -206,7 +208,8 @@
       "tactical_effect": [
         "overhead clutter",
         "vertical read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "cistern_pool",
@@ -235,7 +238,8 @@
         "centerpiece",
         "circling pressure",
         "historic function read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "well_and_bucket",
@@ -263,7 +267,8 @@
       "tactical_effect": [
         "micro cover",
         "historic function read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "shrine_niche",
@@ -291,7 +296,8 @@
       "tactical_effect": [
         "orientation",
         "micro strongpoint"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "watch_post",
@@ -319,7 +325,8 @@
       "tactical_effect": [
         "strongpoint",
         "future destination read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "gate_chokepoint_set",
@@ -348,7 +355,8 @@
       "tactical_effect": [
         "hard chokepoint",
         "commit line"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "bridge_railing_cluster",
@@ -457,7 +465,8 @@
       "tactical_effect": [
         "micro clutter",
         "historic storage read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "crate_bundle",
@@ -483,7 +492,8 @@
       "tactical_effect": [
         "cover",
         "path shaping"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "bench_and_table",
@@ -508,7 +518,8 @@
       "tactical_effect": [
         "human scale",
         "soft obstruction"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "cloth_line_cluster",
@@ -535,7 +546,8 @@
       "tactical_effect": [
         "layering",
         "sight breakup"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "trellis_wall",
@@ -562,7 +574,8 @@
       "tactical_effect": [
         "fa\u00e7ade relief",
         "former garden read"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "arch_fragment",
@@ -589,7 +602,8 @@
         "historic silhouette",
         "cover",
         "framed vista"
-      ]
+      ],
+      "implementation_status": "runtime_first_pass"
     },
     {
       "id": "bath_screen_wall",
