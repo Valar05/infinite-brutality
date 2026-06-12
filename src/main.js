@@ -2,8 +2,29 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
+import { createDistrictGeometryApi } from './district-geometry.js';
+import { createMaterialResources } from './materials.js';
+import { createEnemyCombatApi } from './enemy-combat.js';
+import { createPlayerClimbApi } from './player-climb.js';
+import { createNookTtsApi } from './nook-tts.js';
+import {
+  DISTRICT_ARCHETYPES,
+  DISTRICT_ROOM_COUNT_PROFILES,
+  DISTRICT_LOCAL_LAYOUTS,
+  DISTRICT_MACRO_TEMPLATES,
+  DISTRICT_ARCHETYPE_TEMPLATES,
+  DISTRICT_STORY_PACKET_FAMILY,
+  DISTRICT_STORY_PLACEMENT_RUNTIME_SETS,
+  applyDefaultArchitecturalFamily,
+  buildDistrictSkeletonMeta,
+  classifySpineRoute,
+  buildDistrictMacroOrigins,
+  pickDistrictLayout,
+  sampleRange,
+  createDistrictStoryApi,
+} from './district-plan.js';
 
-const BUILD = '0.8.117';
+const BUILD = '0.8.125';
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const DEBUG_RAGDOLL = new URLSearchParams(window.location.search).get('ragdebug') === '1';
@@ -159,6 +180,7 @@ const player = {
 
 const walkableSurfaces = [];
 const solidColliders = [];
+const climbSurfaces = [];
 const diegeticLights = [];
 const bootParams = new URLSearchParams(window.location.search);
 const bootDistrictTarget = (bootParams.get('district') || '').trim();
@@ -210,6 +232,22 @@ const combatFx = {
   shakeDuration: 0,
   shakeStrength: 0,
 };
+const NOOK_TTS_TRIGGER_DISTANCE = 2.6;
+const NOOK_TTS_VERTICAL_DISTANCE = 2.4;
+const NOOK_TTS_COOLDOWN = 2.8;
+const NOOK_TTS_HINT_TIME = 4.2;
+const nookTtsState = {
+  manifest: null,
+  byPacketId: new Map(),
+  heardPlacementIds: new Set(),
+  heardLevelIndex: -1,
+  cooldown: 0,
+  hintTimer: 0,
+  audio: null,
+  currentPlacementId: '',
+  currentText: '',
+  manifestPromise: null,
+};
 let enemyBloodGroup = null;
 const enemyBloodParticles = [];
 
@@ -232,6 +270,51 @@ const input = {
   jumpHoldStart: 0,
   jumpCharging: false,
 };
+
+
+const playerClimb = createPlayerClimbApi({
+  player,
+  input,
+  solidColliders,
+  climbSurfaces,
+  cameraForwardYaw,
+  faceYawFromNormal,
+  canStandOnClimbSurfaceTop,
+  canStandOnSolidTop,
+  clamp,
+  makeVec,
+  constants: {
+    PLAYER_EYE_HEIGHT,
+    PLAYER_SOLID_RADIUS,
+    CLIMB_MIN_HEIGHT,
+    CLIMB_MIN_TOP_SIZE,
+    CLIMB_ATTACH_DISTANCE,
+    CLIMB_TOP_OUT_THRESHOLD,
+    CLIMB_FACE_OFFSET,
+    CLIMB_MANTLE_DURATION,
+    CLIMB_MANTLE_FORWARD,
+    CLIMB_SPEED_HORIZONTAL,
+    CLIMB_SPEED_VERTICAL,
+  },
+});
+const { tryBeginClimb, startMantleFromClimb, updatePlayerClimb, updatePlayerMantle } = playerClimb;
+
+const nookTts = createNookTtsApi({
+  state: nookTtsState,
+  roomState,
+  player,
+  hintEl,
+  buildVersion: BUILD,
+  AudioCtor: Audio,
+  constants: {
+    NOOK_TTS_TRIGGER_DISTANCE,
+    NOOK_TTS_VERTICAL_DISTANCE,
+    NOOK_TTS_COOLDOWN,
+    NOOK_TTS_HINT_TIME,
+  },
+});
+const { stopNookTtsPlayback, ensureNookTtsLevelState, loadNookTtsManifest, allStoryNookPlacements, playNookTtsPlacement, updateNookTts } = nookTts;
+
 
 let audioCtx = null;
 let armsModel = null;
@@ -401,35 +484,6 @@ function cameraRightYaw(yaw) {
   return new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 }
 
-function makeMat(color, roughness = 0.86, metalness = 0.04, lift = 0.055) {
-  return new THREE.MeshLambertMaterial({
-    color,
-    fog: true,
-    emissive: new THREE.Color(color).multiplyScalar(lift),
-    flatShading: true,
-  });
-}
-
-function makeGlowMat(color, intensity = 1.8) {
-  return new THREE.MeshBasicMaterial({ color, toneMapped: false });
-}
-
-function makeLightPoolMat(color, opacity = 0.22) {
-  return new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    depthWrite: false,
-    depthTest: true,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    toneMapped: false,
-  });
-}
-
 function ensureEnemyBloodGroup() {
   if (enemyBloodGroup) return enemyBloodGroup;
   enemyBloodGroup = new THREE.Group();
@@ -538,261 +592,14 @@ function currentHitShake() {
   };
 }
 
-const MAT = {
-  floor: makeMat(0x657382, 0.86, 0.04, 0.07),
-  wall: makeMat(0x2b3542, 0.9, 0.02, 0.045),
-  platform: makeMat(0x83909b, 0.82, 0.04, 0.065),
-  connectorFloor: makeMat(0x70818a, 0.84, 0.04, 0.07),
-  connectorWall: makeMat(0x2b3542, 0.9, 0.02, 0.045),
-  bridge: makeMat(0x9a7937, 0.74, 0.12, 0.06),
-  trim: makeMat(0xcbbd91, 0.78, 0.04, 0.07),
-  void: makeMat(0x202735, 0.95, 0.0, 0.035),
-  hazard: makeMat(0xc24d27, 0.66, 0.02, 0.08),
-  exit: makeMat(0x8de2b5, 0.66, 0.04, 0.08),
-  stone: makeMat(0x657382, 0.86, 0.04, 0.07),
-  stone2: makeMat(0x83909b, 0.82, 0.04, 0.065),
-  bronze: makeMat(0x9a7937, 0.74, 0.12, 0.06),
-  blood: makeMat(0x8a2020, 0.8, 0.02, 0.055),
-  bloodDark: makeMat(0x3c0b0e, 0.88, 0.01, 0.035),
-  bone: makeMat(0xd4c8ab, 0.8, 0.02, 0.07),
-  bonePlain: makeMat(0xb9aa88, 0.84, 0.02, 0.055),
-  green: makeMat(0x79d49a, 0.66, 0.05, 0.07),
-  orange: makeMat(0xc24d27, 0.5, 0.02, 0.08),
-  flame: makeGlowMat(0xffb04a, 2.4),
-  corpsefire: makeGlowMat(0x8ee8df, 2.0),
-  flamePool: makeLightPoolMat(0xff9a2f, 0.0),
-  corpsefirePool: makeLightPoolMat(0x7df4e9, 0.0),
-  hazardPool: makeLightPoolMat(0xb85a22, 0.0),
-  flesh: makeMat(0xc7a183, 0.84, 0.02),
-  iron: makeMat(0x2b2f34, 0.62, 0.06, 0.045),
-  timber: makeMat(0x71533b, 0.82, 0.02, 0.05),
-  cloth: makeMat(0x9d5f43, 0.88, 0.01, 0.05),
-  plaster: makeMat(0xd2c0a8, 0.9, 0.01, 0.045),
-  ceramic: makeMat(0xb7baa8, 0.76, 0.03, 0.05),
-  foliage: makeMat(0x6b8448, 0.82, 0.01, 0.06),
-  water: makeMat(0x32545d, 0.52, 0.02, 0.03),
-  rope: makeMat(0x9e7d52, 0.84, 0.01, 0.045),
-};
-
-function setMaterialUvScale(mat, scale) {
-  mat.userData.uvScale = scale;
-  return mat;
-}
-
-for (const mat of [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2, MAT.plaster]) setMaterialUvScale(mat, 0.125);
-for (const mat of [MAT.bridge, MAT.trim, MAT.bronze, MAT.timber]) setMaterialUvScale(mat, 0.105);
-for (const mat of [MAT.bone, MAT.bonePlain, MAT.ceramic]) setMaterialUvScale(mat, 0.112);
-setMaterialUvScale(MAT.iron, 0.075);
-setMaterialUvScale(MAT.blood, 0.055);
-setMaterialUvScale(MAT.cloth, 0.092);
-setMaterialUvScale(MAT.foliage, 0.09);
-setMaterialUvScale(MAT.water, 0.08);
-setMaterialUvScale(MAT.rope, 0.065);
-
-function makeVoronoiTexture(seed, options = {}) {
-  const size = options.size ?? 96;
-  const cells = options.cells ?? 18;
-  const base = options.base ?? 0.76;
-  const contrast = options.contrast ?? 0.18;
-  const edgeDarken = options.edgeDarken ?? 0.28;
-  const edgeScale = options.edgeScale ?? 0.038;
-  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-  ctx.canvas.width = size;
-  ctx.canvas.height = size;
-  const rng = rngFromSeed(seed);
-  const sites = [];
-  for (let i = 0; i < cells; i += 1) {
-    sites.push({ x: rng() * size, y: rng() * size, tint: 0.92 + rng() * 0.16 });
-  }
-  const image = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      let d1 = Infinity;
-      let d2 = Infinity;
-      let tint = 1;
-      for (const site of sites) {
-        const dx = x - site.x;
-        const dy = y - site.y;
-        const d = dx * dx + dy * dy;
-        if (d < d1) {
-          d2 = d1;
-          d1 = d;
-          tint = site.tint;
-        } else if (d < d2) {
-          d2 = d;
-        }
-      }
-      const cell = Math.min(1, Math.sqrt(d1) / (size * 0.34));
-      const border = Math.max(0, Math.min(1, 1 - (Math.sqrt(d2) - Math.sqrt(d1)) / (size * edgeScale)));
-      const grain = ((x * 13 + y * 7 + seed) % 11) / 10 - 0.5;
-      const value = Math.max(0.08, Math.min(0.98, (base - cell * contrast - border * edgeDarken) * tint + grain * 0.022));
-      const idx = (y * size + x) * 4;
-      const c = Math.floor(value * 255);
-      image.data[idx] = c;
-      image.data[idx + 1] = c;
-      image.data[idx + 2] = c;
-      image.data[idx + 3] = 255;
-    }
-  }
-  ctx.putImageData(image, 0, 0);
-  const texture = new THREE.CanvasTexture(ctx.canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(options.repeatX ?? 1, options.repeatY ?? 1);
-  texture.anisotropy = 2;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function applyProceduralSurfaceTextures() {
-  const floorNoise = makeVoronoiTexture(0x11a2d3, { size: 96, cells: 22, base: 0.82, contrast: 0.12, edgeDarken: 0.16, edgeScale: 0.032, repeatX: 4, repeatY: 4 });
-  const wallNoise = makeVoronoiTexture(0x334455, { size: 96, cells: 24, base: 0.74, contrast: 0.16, edgeDarken: 0.22, edgeScale: 0.032, repeatX: 5, repeatY: 4 });
-  const bronzeNoise = makeVoronoiTexture(0x7b5a26, { size: 96, cells: 16, base: 0.92, contrast: 0.07, edgeDarken: 0.1, edgeScale: 0.04, repeatX: 3, repeatY: 3 });
-  const boneNoise = makeVoronoiTexture(0xd4c8ab, { size: 96, cells: 18, base: 0.88, contrast: 0.1, edgeDarken: 0.12, edgeScale: 0.036, repeatX: 3, repeatY: 3 });
-  const ironNoise = makeVoronoiTexture(0x444746, { size: 96, cells: 20, base: 0.72, contrast: 0.12, edgeDarken: 0.18, edgeScale: 0.036, repeatX: 3, repeatY: 3 });
-  for (const mat of [MAT.floor, MAT.stone, MAT.connectorFloor]) {
-    mat.map = floorNoise;
-    mat.needsUpdate = true;
-  }
-  for (const mat of [MAT.wall, MAT.connectorWall, MAT.platform, MAT.stone2]) {
-    mat.map = mat === MAT.wall || mat === MAT.connectorWall ? wallNoise : floorNoise;
-    mat.needsUpdate = true;
-  }
-  for (const mat of [MAT.bronze, MAT.bridge, MAT.trim]) {
-    mat.map = bronzeNoise;
-    mat.needsUpdate = true;
-  }
-  MAT.bone.map = boneNoise;
-  MAT.bone.needsUpdate = true;
-  MAT.iron.map = ironNoise;
-  MAT.iron.needsUpdate = true;
-  MAT.timber.map = bronzeNoise;
-  MAT.timber.needsUpdate = true;
-  MAT.cloth.map = bronzeNoise;
-  MAT.cloth.needsUpdate = true;
-  MAT.plaster.map = wallNoise;
-  MAT.plaster.needsUpdate = true;
-  MAT.ceramic.map = bronzeNoise;
-  MAT.ceramic.needsUpdate = true;
-  MAT.foliage.map = floorNoise;
-  MAT.foliage.needsUpdate = true;
-  MAT.water.map = floorNoise;
-  MAT.water.needsUpdate = true;
-  MAT.rope.map = bronzeNoise;
-  MAT.rope.needsUpdate = true;
-}
-
-function loadWrappedTexture(path, repeatX, repeatY, onTexture) {
-  const url = new URL(path, import.meta.url).href;
-  textureLoader.load(url, (texture) => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(repeatX, repeatY);
-    texture.magFilter = THREE.LinearFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.anisotropy = Math.min(2, renderer.capabilities.getMaxAnisotropy?.() || 1);
-    texture.needsUpdate = true;
-    onTexture(texture);
-  }, undefined, (error) => {
-    console.warn('surface texture failed; procedural fallback remains', path, error);
-  });
-}
-
-function applyTextureToMaterials(texture, materials, tint = 0xffffff) {
-  for (const mat of materials) {
-    mat.map = texture;
-    mat.color.setHex(tint);
-    mat.needsUpdate = true;
-  }
-}
-
-function applyGeneratedSurfaceTextures() {
-  loadWrappedTexture('../assets/textures/ib-vector-stone-20260608.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-bronze-20260608.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.bridge, MAT.trim, MAT.bronze], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-bone-20260608.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.bone, MAT.bonePlain], 0xd4c39f);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-iron-20260609.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.iron], 0xc7d0d6);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-blood-20260609.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.blood, MAT.bloodDark], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-flesh-20260609.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.flesh], 0xe3c3ae);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-hazard-20260609.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.hazard, MAT.orange], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-timber-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.timber], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-cloth-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.cloth], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-plaster-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.plaster], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-ceramic-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.ceramic], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-garden-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.foliage, MAT.green], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-water-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.water], 0xffffff);
-  });
-  loadWrappedTexture('../assets/textures/ib-vector-rope-20260610.svg', 1, 1, (texture) => {
-    applyTextureToMaterials(texture, [MAT.rope], 0xffffff);
-  });
-}
-
-applyProceduralSurfaceTextures();
-applyGeneratedSurfaceTextures();
-
-function loadSkyDomeTexture(material) {
-  const url = new URL('../assets/textures/ib-real-limbo-skybox-20260609.png', import.meta.url).href;
-  textureLoader.load(url, (texture) => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.magFilter = THREE.LinearFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.needsUpdate = true;
-    material.map = texture;
-    material.color.setHex(0xffffff);
-    material.needsUpdate = true;
-  }, undefined, (error) => {
-    console.warn('vector sky texture failed; flat fallback remains', error);
-  });
-}
-
-function buildLimboSkyDome() {
-  const geometry = new THREE.SphereGeometry(145, 36, 18);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x182133,
-    side: THREE.BackSide,
-    depthWrite: false,
-    depthTest: false,
-    fog: false,
-    toneMapped: false,
-  });
-  loadSkyDomeTexture(material);
-  const dome = new THREE.Mesh(geometry, material);
-  dome.name = 'limbo-sky-dome';
-  dome.renderOrder = -1000;
-  dome.frustumCulled = false;
-  return dome;
-}
+const { MAT, buildLimboSkyDome } = createMaterialResources({
+  textureLoader,
+  renderer,
+  rngFromSeed,
+});
 
 const skyDome = buildLimboSkyDome();
 scene.add(skyDome);
-
 
 function applyWorldProjectedUvs(geometry, scale) {
   const geo = geometry.index ? geometry.toNonIndexed() : geometry;
@@ -980,6 +787,21 @@ function addGroundedCylinder(parent, name, radius, depth, basePos, mat, radial =
   return mesh;
 }
 
+function addGroundedGeometry(parent, name, geometry, basePos, mat, cast = true) {
+  const geo = anchorGeometryBottomCenter(applyWorldProjectedUvs(geometry, materialUvScale(mat)));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = name;
+  mesh.position.set(basePos[0] + batchBuildOffset.x, basePos[1] + batchBuildOffset.y, basePos[2] + batchBuildOffset.z);
+  mesh.castShadow = USE_DYNAMIC_SHADOWS && cast;
+  mesh.receiveShadow = USE_DYNAMIC_SHADOWS;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addGroundedTaperedCylinder(parent, name, topRadius, bottomRadius, depth, basePos, mat, radial = 6, cast = true) {
+  return addGroundedGeometry(parent, name, new THREE.CylinderGeometry(topRadius, bottomRadius, depth, radial, 1, false), basePos, mat, cast);
+}
+
 function worldOffset() {
   const base = roomGroup?.position || new THREE.Vector3();
   return makeVec(base.x + batchBuildOffset.x, base.y + batchBuildOffset.y, base.z + batchBuildOffset.z);
@@ -1027,6 +849,49 @@ function registerSolid(size, pos, margin = 0.0, options = {}) {
     maxZ: centerZ + size[2] / 2 + margin,
     stepHeight: Number.isFinite(options.stepHeight) ? options.stepHeight : 0,
   });
+}
+
+function registerClimbSurface(options) {
+  if (!options?.center || !options?.normal) return null;
+  const normal = options.normal.clone();
+  normal.y = 0;
+  if (normal.lengthSq() < 0.0001) return null;
+  normal.normalize();
+  const right = new THREE.Vector3(-normal.z, 0, normal.x);
+  const center = options.center.clone ? options.center.clone() : makeVec(options.center.x, options.center.y || 0, options.center.z);
+  const width = Math.max(CLIMB_MIN_TOP_SIZE, options.width || 1.2);
+  const baseY = Number.isFinite(options.baseY) ? options.baseY : center.y;
+  const topY = Math.max(baseY + CLIMB_MIN_HEIGHT, Number.isFinite(options.topY) ? options.topY : baseY + 2.2);
+  const shelfDepth = Math.max(CLIMB_MIN_TOP_SIZE, options.topDepth || 1.18);
+  const topCenter = options.topCenter?.clone ? options.topCenter.clone() : makeVec(center.x - normal.x * shelfDepth * 0.28, topY, center.z - normal.z * shelfDepth * 0.28);
+  const surface = {
+    center,
+    normal,
+    right,
+    width,
+    baseY,
+    topY,
+    topCenter,
+    topWidth: Math.max(CLIMB_MIN_TOP_SIZE, options.topWidth || width * 0.92),
+    topDepth: shelfDepth,
+    attachDistance: Math.max(CLIMB_ATTACH_DISTANCE, options.attachDistance || CLIMB_ATTACH_DISTANCE),
+    source: options.source || '',
+  };
+  climbSurfaces.push(surface);
+  return surface;
+}
+
+function canStandOnClimbSurfaceTop(surface, x, z) {
+  if (!surface) return false;
+  const relX = x - surface.topCenter.x;
+  const relZ = z - surface.topCenter.z;
+  const across = relX * surface.right.x + relZ * surface.right.z;
+  const inwardX = -surface.normal.x;
+  const inwardZ = -surface.normal.z;
+  const along = relX * inwardX + relZ * inwardZ;
+  const halfWidth = Math.max(0.14, surface.topWidth * 0.5 - PLAYER_SOLID_RADIUS);
+  const halfDepth = Math.max(0.14, surface.topDepth * 0.5 - PLAYER_SOLID_RADIUS);
+  return Math.abs(across) <= halfWidth && Math.abs(along) <= halfDepth;
 }
 
 function addWallBox(parent, name, size, pos, mat, cast = false) {
@@ -1129,6 +994,7 @@ function clearGroup(group) {
 function resetWalkableBounds() {
   walkableSurfaces.length = 0;
   solidColliders.length = 0;
+  climbSurfaces.length = 0;
   diegeticLights.length = 0;
 }
 
@@ -2045,14 +1911,100 @@ const ENEMY_ATTACK_DEFS = {
   },
 };
 let enemy = null;
-let enemyPrimitiveVisual = null;
-let enemyModel = null;
-let enemyMixer = null;
-let enemyCurrentAction = null;
-const enemyActions = new Map();
+const enemyRuntime = {
+  primitiveVisual: null,
+  model: null,
+  mixer: null,
+  currentAction: null,
+  actions: new Map(),
+};
 let enemyRagdollDebugGroup = null;
 let enemyRagdollDebugPoints = [];
 let enemyRagdollDebugLines = [];
+
+const enemyCombat = createEnemyCombatApi({
+  runtime: enemyRuntime,
+  getEnemy: () => enemy,
+  player,
+  input,
+  attackDebug,
+  getHurtAction: () => hurtAction,
+  cameraAimDirection,
+  fallbackEnemyHitBox,
+  findBoneByAliases,
+  clamp,
+  makeVec,
+  isEnemyCorpseActive,
+  getEnemyNavState,
+  enemyCombatGoalPoint,
+  findNearestGauntletRoomIndex,
+  clearEnemyRoute,
+  rebuildEnemyRoute,
+  advanceEnemyJump,
+  findEnemySupport,
+  enemyHasDirectCombatPath,
+  shiftEnemyRouteWaypoint,
+  sampleEnemyMoveSupport,
+  enemyCanJumpBetween,
+  startEnemyJump,
+  applyEnemyMove,
+  setEnemyMode,
+  spawnEnemyAttackSweepDebug,
+  updateEnemyRagdollDeath,
+  despawnEnemyCorpse,
+  startEnemyDeath,
+  triggerHitJuice,
+  setStatus,
+  playArmAction,
+  playThud,
+  constants: {
+    ENEMY_ATTACK_DEFS,
+    ENEMY_ATTACK_RECOVERY,
+    ENEMY_ATTACK_WINDUP,
+    ENEMY_ATTACK_ACTIVE_END,
+    ENEMY_ATTACK_COOLDOWN,
+    ENEMY_ATTACK_RANGE,
+    ENEMY_ATTACK_SWEEP_PLAYER_SAMPLES,
+    ENEMY_LUNGE_SPEED,
+    ENEMY_RETREAT_DURATION,
+    ENEMY_RETREAT_SPEED,
+    ENEMY_RUN_SPEED,
+    ENEMY_WALK_SPEED,
+    ENEMY_SIDESTEP_SPEED,
+    ENEMY_RING_RADIUS,
+    ENEMY_RING_TOLERANCE,
+    ENEMY_COMMIT_TIMEOUT,
+    ENEMY_NAV_REPATH_INTERVAL,
+    ENEMY_NAV_STALL_LIMIT,
+    ENEMY_STEP_UP,
+    ENEMY_STEP_DOWN,
+    ENEMY_AI_SLEEP_DISTANCE,
+    ENEMY_AI_WAKE_DISTANCE,
+    ENEMY_AI_SLEEP_ROOM_DELTA,
+    ENEMY_AI_WAKE_ROOM_DELTA,
+    ENEMY_HIT_HEAD_SIDE_THRESHOLD,
+    ENEMY_HIT_HEAD_NORMALIZED_Y,
+    PLAYER_EYE_HEIGHT,
+    PLAYER_SOLID_RADIUS,
+    PLAYER_MAX_HEALTH,
+    ATTACK_LAB,
+  },
+});
+const {
+  chooseEnemyHitReaction,
+  playEnemyAction,
+  updateEnemyMixer,
+  getEnemyAttackDefinition,
+  resolveEnemyAttackHandBone,
+  sampleEnemyAttackHandWorld,
+  getPlayerDamageCapsule,
+  segmentSegmentDistanceSq,
+  sweepEnemyAttackHitsPlayer,
+  applyEnemyAttackHit,
+  startEnemyAttack,
+  updateEnemyEngagement,
+  updateAttack,
+} = enemyCombat;
 
 function getNodeLayoutOrigin(nodeOrIndex) {
   if (typeof nodeOrIndex === 'number') return makeVec(0, 0, nodeOrIndex * ROOM_LAYOUT_STEP);
@@ -3044,885 +2996,19 @@ function currentBatchSpec() {
   return GENERATED_ROOM_BATCH[index];
 }
 
-const DISTRICT_ARCHETYPES = {
-  intake: {
-    id: 'intake',
-    names: ['Toll Intake', 'Arrival Bridges', 'Chain Customs'],
-    purpose: 'sort arrivals and choke the safest approach into the settlement',
-    signal: 'flame',
-    preferredRoles: ['start', 'choice', 'ambush', 'corner', 'recovery_line'],
-  },
-  scaffolds: {
-    id: 'scaffolds',
-    names: ['Hanging Market', 'Scaffold Ward', 'Ropewalk Stalls'],
-    purpose: 'pack trade, ambush, and foot traffic onto hanging walkways',
-    signal: 'corpsefire',
-    preferredRoles: ['choice_t', 'fork', 'combat_choice', 'loop_node', 'combat'],
-  },
-  liftworks: {
-    id: 'liftworks',
-    names: ['Liftworks', 'Winch Towers', 'Counterweight Racks'],
-    purpose: 'haul salvage and bodies between tiers with lifts, cranes, and stairs',
-    signal: 'flame',
-    preferredRoles: ['vertical_transition', 'stairwell', 'switch', 'vertical_choice', 'climb'],
-  },
-  furnace: {
-    id: 'furnace',
-    names: ['Corpsefire Kilns', 'Furnace Tier', 'Ash Engines'],
-    purpose: 'burn refuse and feed the fire chain that keeps the town alive',
-    signal: 'hazard',
-    preferredRoles: ['hazard_crossing', 'timing', 'combat', 'locked_hub', 'descent'],
-  },
-  refuse: {
-    id: 'refuse',
-    names: ['Refuse Underworks', 'Sump Gutters', 'Waste Chutes'],
-    purpose: 'dump runoff below the homes and hide maintenance returns',
-    signal: 'corpsefire',
-    preferredRoles: ['secret', 'recovery_t', 'secret_tease', 'descent_corner', 'shortcut_receiver'],
-  },
-  shrine: {
-    id: 'shrine',
-    names: ['Shrine Rim', 'Skull Gate Ward', 'Abyss Chapel'],
-    purpose: 'guard the ritual rim and the settlement exit above the void',
-    signal: 'exit',
-    preferredRoles: ['vista', 'reward', 'hub', 'layered_hub', 'exit'],
-  },
-};
+const districtStory = createDistrictStoryApi({
+  makeVec,
+  rngFromSeed,
+  hashRoomKey,
+  snapEnemyPointToSupport,
+});
 
-const DISTRICT_MIDDLE_ARCHETYPES = [
-  DISTRICT_ARCHETYPES.scaffolds,
-  DISTRICT_ARCHETYPES.liftworks,
-  DISTRICT_ARCHETYPES.furnace,
-  DISTRICT_ARCHETYPES.refuse,
-];
-
-const DISTRICT_ROOM_COUNT_PROFILES = [
-  [10, 12, 14, 12],
-  [12, 10, 12, 14],
-  [11, 13, 10, 14],
-  [9, 13, 12, 14],
-  [12, 11, 14, 11],
-];
-
-const DISTRICT_LOCAL_LAYOUTS = [
-  {
-    id: 'switchback-racks',
-    points: [
-      [0, 0, 0], [0, 42, 0], [32, 76, 1.1], [70, 76, 1.2], [106, 112, 2.7], [106, 154, 3.1], [70, 188, 1.9],
-      [30, 188, 1.8], [-6, 220, 0.6], [-6, 262, 0.6], [36, 300, 2.9], [78, 300, 3.0], [114, 338, 1.4], [78, 376, 1.4],
-    ],
-    branchPairs: [[2, 7], [5, 9], [8, 11]],
-  },
-  {
-    id: 'hanging-spine',
-    points: [
-      [0, 0, 0], [36, 32, 0.7], [74, 60, 1.6], [112, 92, 2.8], [112, 136, 2.6], [74, 174, 1.3], [32, 202, 0.3],
-      [-8, 238, 0.2], [-8, 280, 1.0], [30, 318, 2.1], [72, 348, 3.6], [118, 378, 3.8], [82, 414, 2.4], [40, 444, 2.4],
-    ],
-    branchPairs: [[1, 6], [4, 8], [7, 11]],
-  },
-  {
-    id: 'lift-fan',
-    points: [
-      [0, 0, 0], [0, 44, 0.4], [-36, 80, 1.5], [-72, 118, 2.7], [-36, 154, 3.2], [6, 190, 3.0], [48, 226, 1.6],
-      [88, 226, 1.5], [126, 264, 2.8], [126, 306, 4.2], [86, 340, 3.2], [44, 374, 1.4], [6, 408, 1.0], [-34, 438, 2.5],
-    ],
-    branchPairs: [[2, 5], [6, 10], [9, 12]],
-  },
-];
-
-const DISTRICT_LOCAL_LAYOUT_MAP = Object.fromEntries(DISTRICT_LOCAL_LAYOUTS.map((layout) => [layout.id, layout]));
-
-const DISTRICT_MACRO_TEMPLATES = {
-  intake: {
-    id: 'entry_toll',
-    elevationBand: 'mid',
-    layoutIds: ['switchback-racks'],
-    baseRange: [0.4, 3.4],
-    topRange: [6.0, 9.0],
-    xRange: [0, 18],
-    zRange: [0, 0],
-    supportStyle: 'chain_hangs',
-    landmarkRole: 'toll_gate',
-    approachType: 'arrival',
-    departureType: 'stair_climb',
-    routeType: 'traverse',
-    requiresVisibleBelow: false,
-    requiresVisibleAbove: true,
-  },
-  scaffolds: {
-    id: 'market_lattice',
-    elevationBand: 'climb_transition',
-    layoutIds: ['hanging-spine', 'switchback-racks'],
-    baseRange: [8.2, 12.4],
-    topRange: [16.0, 21.0],
-    xRange: [96, 154],
-    zRange: [176, 244],
-    supportStyle: 'scaffold_forest',
-    landmarkRole: 'market_core',
-    approachType: 'stair_ascent',
-    departureType: 'bridge_crossing',
-    routeType: 'climb',
-    requiresVisibleBelow: true,
-    requiresVisibleAbove: true,
-    realSourceA: 'medina_kasbah',
-    realSourceB: 'stilt_wharf_settlement',
-    skeletonType: 'hanging_market_hybrid',
-    patchStyle: 'scaffold_chain_infill',
-    silhouetteRule: 'lateral stacked market over a visible support forest',
-  },
-  liftworks: {
-    id: 'liftworks_spire',
-    elevationBand: 'high',
-    layoutIds: ['lift-fan'],
-    baseRange: [12.0, 17.4],
-    topRange: [21.0, 29.5],
-    xRange: [64, 120],
-    zRange: [188, 260],
-    supportStyle: 'lift_cage',
-    landmarkRole: 'lift_core',
-    approachType: 'winch_climb',
-    departureType: 'suspended_crossing',
-    routeType: 'climb',
-    requiresVisibleBelow: true,
-    requiresVisibleAbove: true,
-    realSourceA: 'fortified_hoist_yard',
-    realSourceB: 'cliff_granary_terraces',
-    skeletonType: 'lift_court_hybrid',
-    patchStyle: 'counterweight_chain_retrofit',
-    silhouetteRule: 'a hoist court stacked around a visible counterweight tower and upper winch gallery',
-  },
-  furnace: {
-    id: 'furnace_drop',
-    elevationBand: 'descent_transition',
-    layoutIds: ['switchback-racks', 'hanging-spine'],
-    baseRange: [-6.8, -3.6],
-    topRange: [0.6, 4.8],
-    xRange: [-116, -52],
-    zRange: [184, 252],
-    supportStyle: 'buttress_stack',
-    landmarkRole: 'furnace_glow',
-    approachType: 'drop_to_lower_terrace',
-    departureType: 'maintenance_return',
-    routeType: 'descent',
-    requiresVisibleBelow: true,
-    requiresVisibleAbove: false,
-  },
-  refuse: {
-    id: 'refuse_underworks',
-    elevationBand: 'low',
-    layoutIds: ['switchback-racks'],
-    baseRange: [-5.6, -2.8],
-    topRange: [0.0, 3.2],
-    xRange: [-92, -36],
-    zRange: [136, 208],
-    supportStyle: 'counterweight_rig',
-    landmarkRole: 'waste_chute',
-    approachType: 'underpath_entry',
-    departureType: 'climb_return',
-    routeType: 'descent',
-    requiresVisibleBelow: true,
-    requiresVisibleAbove: true,
-  },
-  shrine: {
-    id: 'shrine_rim',
-    elevationBand: 'rim',
-    layoutIds: ['hanging-spine', 'lift-fan'],
-    baseRange: [16.0, 23.0],
-    topRange: [28.0, 36.0],
-    xRange: [112, 186],
-    zRange: [220, 312],
-    supportStyle: 'tower_legs',
-    landmarkRole: 'abyss_crown',
-    approachType: 'rim_climb',
-    departureType: 'exit_crown',
-    routeType: 'climb',
-    requiresVisibleBelow: true,
-    requiresVisibleAbove: false,
-  },
-};
-
-const DISTRICT_ARCHETYPE_TEMPLATES = {
-  intake: DISTRICT_MACRO_TEMPLATES.intake,
-  scaffolds: DISTRICT_MACRO_TEMPLATES.scaffolds,
-  liftworks: DISTRICT_MACRO_TEMPLATES.liftworks,
-  furnace: DISTRICT_MACRO_TEMPLATES.furnace,
-  refuse: DISTRICT_MACRO_TEMPLATES.refuse,
-  shrine: DISTRICT_MACRO_TEMPLATES.shrine,
-};
-
-const DEFAULT_ARCHITECTURAL_FAMILY = 'hanging_gardens';
-
-const HANGING_GARDENS_DISTRICT_NAMES = {
-  intake: ['Arrival Terraces', 'Cistern Gate', 'Garden Customs'],
-  scaffolds: ['Hanging Market', 'Ropewalk Court', 'Lantern Bazaar'],
-  liftworks: ['Winch Gardens', 'Counterweight Galleries', 'Lift Court'],
-  furnace: ['Ash Gardens', 'Kiln Terraces', 'Fire Court'],
-  refuse: ['Undercroft Gardens', 'Rooted Gutters', 'Drain Court'],
-  shrine: ['Shrine Arches', 'Crown Terrace', 'Garden Rim'],
-};
-
-function applyDefaultArchitecturalFamily(archetype, template) {
-  if (DEFAULT_ARCHITECTURAL_FAMILY !== 'hanging_gardens') return template;
-  const family = DISTRICT_MACRO_TEMPLATES.scaffolds;
-  return {
-    ...template,
-    realSourceA: template.realSourceA || family.realSourceA,
-    realSourceB: template.realSourceB || family.realSourceB,
-    skeletonType: template.skeletonType || family.skeletonType,
-    patchStyle: template.patchStyle || family.patchStyle,
-    silhouetteRule: template.silhouetteRule || family.silhouetteRule,
-    familyNameSet: HANGING_GARDENS_DISTRICT_NAMES[archetype.id] || family.names || archetype.names,
-  };
-}
-
-function lerpNumber(a, b, t) {
-  return a + (b - a) * t;
-}
-
-function buildHangingMarketDistrictMeta(district) {
-  const base = district.baseElevation;
-  const origin = district.origin;
-  const roomCount = Math.max(1, district.roomCount);
-  const roomOffsets = [];
-  const segmentRoles = [];
-  for (let i = 0; i < roomCount; i += 1) {
-    const t = roomCount <= 1 ? 0 : i / (roomCount - 1);
-    let x = 0;
-    let z = 0;
-    let y = 0;
-    let role = 'market_court';
-    if (t < 0.18) {
-      const s = t / 0.18;
-      x = lerpNumber(-54, -24, s);
-      z = lerpNumber(20, 84, s);
-      y = lerpNumber(0.8, 3.2, s);
-      role = 'support_stair';
-    } else if (t < 0.48) {
-      const s = (t - 0.18) / 0.30;
-      x = lerpNumber(-18, 18, s);
-      z = lerpNumber(96, 178, s);
-      y = lerpNumber(4.4, 7.6, s);
-      role = 'market_court';
-    } else if (t < 0.76) {
-      const s = (t - 0.48) / 0.28;
-      x = lerpNumber(24, 58, s);
-      z = lerpNumber(188, 252, s);
-      y = lerpNumber(9.0, 12.8, s);
-      role = s < 0.52 ? 'roof_lane' : 'bridge_landing';
-    } else {
-      const s = (t - 0.76) / 0.24;
-      x = lerpNumber(70, 26, s);
-      z = lerpNumber(264, 336, s);
-      y = lerpNumber(13.2, 5.8, s);
-      role = s < 0.5 ? 'bridge_landing' : 'underdeck_pass';
-    }
-    roomOffsets.push([x, z, y]);
-    segmentRoles.push(role);
-  }
-  return {
-    realSourceA: district.realSourceA,
-    realSourceB: district.realSourceB,
-    skeletonType: district.skeletonType,
-    patchStyle: district.patchStyle,
-    silhouetteRule: district.silhouetteRule,
-    roomOffsets,
-    segmentRoles,
-    circulationBands: [
-      { id: 'market_low', y: base + 3.2, role: 'support_stair' },
-      { id: 'market_mid', y: base + 7.6, role: 'market_court' },
-      { id: 'market_high', y: base + 12.8, role: 'roof_lane' },
-    ],
-    massAnchors: [
-      { id: 'retaining_gate', role: 'retaining_gate', pos: [origin.x - 50, base - 1.8, origin.z + 34], size: [32, 10, 24] },
-      { id: 'bath_court', role: 'bath_court', pos: [origin.x + 8, base + 2.8, origin.z + 156], size: [46, 15, 34] },
-      { id: 'undercroft_run', role: 'undercroft_run', pos: [origin.x - 8, base - 4.8, origin.z + 224], size: [28, 10, 32] },
-      { id: 'aqueduct_remnant', role: 'aqueduct_remnant', pos: [origin.x + 76, base + 9.6, origin.z + 286], size: [24, 10, 42] },
-    ],
-    landmarkAnchor: { x: origin.x + 78, y: base + 14.2, z: origin.z + 286, role: 'market_bridge_cluster' },
-  };
-}
-
-
-function buildLiftCourtDistrictMeta(district) {
-  const base = district.baseElevation;
-  const origin = district.origin;
-  const roomOffsets = [];
-  const segmentRoles = [];
-  const total = Math.max(1, district.roomCount);
-  for (let i = 0; i < total; i += 1) {
-    const t = total <= 1 ? 0 : i / (total - 1);
-    let x = 0;
-    let z = 0;
-    let y = 0;
-    let role = 'gate_step';
-    if (t < 0.18) {
-      const s = t / 0.18;
-      x = lerpNumber(-30, -10, s);
-      z = lerpNumber(24, 82, s);
-      y = lerpNumber(3.0, 6.0, s);
-      role = s < 0.55 ? 'gate_step' : 'court_edge';
-    } else if (t < 0.48) {
-      const s = (t - 0.18) / 0.30;
-      x = lerpNumber(-8, 18, s);
-      z = lerpNumber(98, 156, s);
-      y = lerpNumber(7.0, 9.2, s);
-      role = s < 0.45 ? 'kill_court' : 'cargo_stage';
-    } else if (t < 0.72) {
-      const s = (t - 0.48) / 0.24;
-      x = lerpNumber(18, 58, s);
-      z = lerpNumber(160, 214, s);
-      y = lerpNumber(10.2, 15.4, s);
-      role = s < 0.55 ? 'tower_core' : 'winch_gallery';
-    } else if (t < 0.86) {
-      const s = (t - 0.72) / 0.14;
-      x = lerpNumber(58, 92, s);
-      z = lerpNumber(216, 266, s);
-      y = lerpNumber(15.6, 18.8, s);
-      role = s < 0.5 ? 'bridge_landing' : 'strongpoint_gallery';
-    } else {
-      const s = (t - 0.86) / 0.14;
-      x = lerpNumber(8, -12, s);
-      z = lerpNumber(190, 248, s);
-      y = lerpNumber(2.4, 4.4, s);
-      role = s < 0.5 ? 'undercroft_pass' : 'recovery_return';
-    }
-    roomOffsets.push([x, z, y]);
-    segmentRoles.push(role);
-  }
-  return {
-    realSourceA: district.realSourceA,
-    realSourceB: district.realSourceB,
-    skeletonType: district.skeletonType,
-    patchStyle: district.patchStyle,
-    silhouetteRule: district.silhouetteRule,
-    roomOffsets,
-    segmentRoles,
-    circulationBands: [
-      { id: 'lift_low', y: base + 3.2, role: 'undercroft_pass' },
-      { id: 'lift_mid', y: base + 9.0, role: 'kill_court' },
-      { id: 'lift_high', y: base + 16.2, role: 'winch_gallery' },
-    ],
-    massAnchors: [
-      { id: 'gate_terrace', role: 'gate_terrace', pos: [origin.x - 22, base + 2.2, origin.z + 54], size: [30, 10, 22] },
-      { id: 'execution_court', role: 'execution_court', pos: [origin.x + 8, base + 6.4, origin.z + 142], size: [44, 14, 36] },
-      { id: 'counterweight_tower', role: 'counterweight_tower', pos: [origin.x + 42, base + 10.0, origin.z + 196], size: [18, 26, 18] },
-      { id: 'undercroft_return', role: 'undercroft_return', pos: [origin.x - 2, base + 0.6, origin.z + 216], size: [30, 10, 28] },
-      { id: 'upper_gallery', role: 'upper_gallery', pos: [origin.x + 78, base + 16.0, origin.z + 258], size: [20, 12, 38] },
-    ],
-    landmarkAnchor: { x: origin.x + 44, y: base + 18.8, z: origin.z + 214, role: 'counterweight_crown' },
-  };
-}
-
-function buildDistrictSkeletonMeta(district) {
-  if (district.skeletonType === 'hanging_market_hybrid') return buildHangingMarketDistrictMeta(district);
-  if (district.skeletonType === 'lift_court_hybrid') return buildLiftCourtDistrictMeta(district);
-  return {
-    realSourceA: district.realSourceA || null,
-    realSourceB: district.realSourceB || null,
-    skeletonType: district.skeletonType || null,
-    patchStyle: district.patchStyle || null,
-    silhouetteRule: district.silhouetteRule || null,
-    roomOffsets: null,
-    segmentRoles: [],
-    circulationBands: [],
-    massAnchors: [],
-    landmarkAnchor: null,
-  };
-}
-
-function makeDistrictAcceptanceCheck(id, text, passed) {
-  return { id, text, passed: !!passed };
-}
-
-function buildDistrictValidationSummary(district, landmarkSchemas) {
-  if (!landmarkSchemas?.length) {
-    return {
-      implemented: false,
-      passes: null,
-      requiredOutputs: {},
-      categories: {},
-      failedChecks: [],
-      screenshotFailChecks: [],
-      tacticalCoverage: [],
-      wonderCoverage: [],
-      habitationProofCount: 0,
-    };
-  }
-  const tacticalCoverage = [...new Set(landmarkSchemas.flatMap((landmark) => landmark.tacticalFeatures || []))];
-  const wonderCoverage = [...new Set(landmarkSchemas.flatMap((landmark) => landmark.wonderTags || []))];
-  const habitationProofCount = landmarkSchemas.reduce((sum, landmark) => sum + (landmark.habitationProof?.length || 0), 0);
-  const hasHistoricalStories = landmarkSchemas.every((landmark) => landmark.formerUse && landmark.damageCause && landmark.currentOccupant && landmark.silhouetteFamily);
-  const hasWonderLandmark = landmarkSchemas.some((landmark) => (landmark.wonderTags?.length || 0) >= 3);
-  const hasCombatSentences = landmarkSchemas.every((landmark) => landmark.combatSentence);
-  const hasClimbRoutes = landmarkSchemas.some((landmark) => (landmark.climbRoutes?.length || 0) > 0);
-  const hasMeaningfulClimbRecovery = landmarkSchemas.some((landmark) => (landmark.climbRoutes || []).some((route) => /recovery/i.test(route.value || route.kind || '')));
-  const hasVisibilityTargets = landmarkSchemas.some((landmark) => (landmark.visibilityTargets?.length || 0) > 0);
-  const hasHabitationProof = habitationProofCount > 0;
-  const requiredOutputs = {
-    dominantFormerUseSkeleton: !!district.skeletonType && !!district.realSourceA,
-    hangingGardensLandmark: hasWonderLandmark,
-    chokepoint: tacticalCoverage.includes('chokepoint'),
-    strongpoint: tacticalCoverage.includes('strongpoint'),
-    killZone: tacticalCoverage.includes('kill_zone'),
-    escapeRoute: tacticalCoverage.includes('escape_route'),
-    climbRecoveryPath: hasMeaningfulClimbRecovery,
-    visibleFutureDestination: hasVisibilityTargets,
-    overUnderRead: (district.circulationBands?.length || 0) >= 3,
-    habitationProof: hasHabitationProof,
-  };
-  const categories = {
-    historicalRead: requiredOutputs.dominantFormerUseSkeleton && hasHistoricalStories && !!district.patchStyle && !!district.silhouetteRule,
-    hangingGardensWonderRead: requiredOutputs.hangingGardensLandmark && !!district.landmarkAnchor && wonderCoverage.some((tag) => tag === 'sky_exposure' || tag === 'bridges' || tag === 'terraces'),
-    tacticalRead: hasCombatSentences && requiredOutputs.chokepoint && requiredOutputs.strongpoint && requiredOutputs.killZone && requiredOutputs.escapeRoute,
-    climbValue: hasClimbRoutes && requiredOutputs.climbRecoveryPath && requiredOutputs.overUnderRead,
-    visibilityAndPull: requiredOutputs.visibleFutureDestination && requiredOutputs.hangingGardensLandmark,
-  };
-  const screenshotFailChecks = [
-    makeDistrictAcceptanceCheck('historical_read', 'district reads as a former structure with visible damage and occupancy', categories.historicalRead),
-    makeDistrictAcceptanceCheck('wonder_read', 'district creates at least one Hanging Gardens destination read', categories.hangingGardensWonderRead),
-    makeDistrictAcceptanceCheck('tactical_read', 'district exposes chokepoint, strongpoint, kill zone, and escape route decisions', categories.tacticalRead),
-    makeDistrictAcceptanceCheck('climb_value', 'climbing creates a meaningful recovery or alternate route', categories.climbValue),
-    makeDistrictAcceptanceCheck('visibility_pull', 'player can see a future destination or shortcut that pulls them forward', categories.visibilityAndPull),
-  ];
-  const failedChecks = [
-    ...Object.entries(requiredOutputs).filter(([, passed]) => !passed).map(([key]) => key),
-    ...screenshotFailChecks.filter((check) => !check.passed).map((check) => check.id),
-  ];
-  return {
-    implemented: true,
-    passes: failedChecks.length === 0,
-    requiredOutputs,
-    categories,
-    failedChecks,
-    screenshotFailChecks,
-    tacticalCoverage,
-    wonderCoverage,
-    habitationProofCount,
-  };
-}
-
-function buildHangingMarketLandmarkSchemas(district) {
-  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
-  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 7.4;
-  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 12.4;
-  const bridgeAnchor = district.landmarkAnchor || { x: district.origin.x + 86, y: highBand + 1.2, z: district.origin.z + 286, role: 'market_bridge_cluster' };
-  return [
-    {
-      id: district.id + '-market-bridge-cluster',
-      districtId: district.id,
-      formerUse: 'trade terrace marketplace bridge cluster',
-      damageCause: 'partial collapse and hanging salvage repair',
-      currentOccupant: 'toll keepers, scavenger stalls, corpsefire watchers',
-      silhouetteFamily: 'hanging market bridge cluster',
-      wonderTags: ['bridges', 'terraces', 'lanterns', 'sky_exposure', 'hanging_structures'],
-      tacticalFeatures: ['chokepoint', 'strongpoint', 'escape_route'],
-      combatSentence: 'push across the bridge or drop to the underdeck return',
-      climbRoutes: [
-        { id: 'brace-recovery', kind: 'brace_climb', value: 'recovery_route', fromBand: 'market_low', toBand: 'market_high' },
-        { id: 'awning-flank', kind: 'awning_scramble', value: 'ambush_route', fromBand: 'market_mid', toBand: 'market_high' },
-      ],
-      visibilityTargets: [
-        { id: 'shrine-rim', kind: 'future_landmark', prompt: 'how do i get there' },
-        { id: 'underdeck-return', kind: 'future_shortcut', prompt: 'can i drop and recover there' },
-      ],
-      lowerLayer: 'underdeck pressure and recovery return',
-      middleLayer: 'market pressure lane',
-      upperLayer: 'roof lane and bridge control',
-      supportLanguage: 'scaffold forest, chain hangs, diagonal braces',
-      habitationProof: ['bridge toll fires', 'market stalls', 'watch posts', 'lanterns'],
-      landmarkAnchors: [bridgeAnchor],
-      acceptanceChecks: [
-        { id: 'visible-bridge-cluster', text: 'bridge cluster reads before arrival' },
-        { id: 'over-under-market', text: 'upper bridge reads above an underdeck return' },
-      ],
-    },
-    {
-      id: district.id + '-market-core-court',
-      districtId: district.id,
-      formerUse: 'retaining-wall market court',
-      damageCause: 'wall breach, awning collapse, and scaffold replacement',
-      currentOccupant: 'stall keepers, corpsefire guards, roaming scavengers',
-      silhouetteFamily: 'stacked market court',
-      wonderTags: ['terraces', 'lanterns', 'architecture', 'gardens'],
-      tacticalFeatures: ['kill_zone', 'strongpoint'],
-      combatSentence: 'circle through the court or climb out to the roof lane',
-      climbRoutes: [
-        { id: 'court-awning', kind: 'awning_climb', value: 'alternate_route', fromBand: 'market_mid', toBand: 'market_high' },
-      ],
-      visibilityTargets: [
-        { id: 'bridge-cluster', kind: 'future_landmark', prompt: 'the high bridge market tier ahead' },
-      ],
-      lowerLayer: 'stall shadows and pressure pockets',
-      middleLayer: 'main crowd court and combat lane',
-      upperLayer: 'roof eaves and hanging crosswalks',
-      supportLanguage: 'retaining walls with scaffold infill',
-      habitationProof: ['stalls', 'garden trays', 'lanterns', 'work benches'],
-      landmarkAnchors: [{ x: district.origin.x + 24, y: midBand + 0.6, z: district.origin.z + 168, role: 'market_court' }],
-      acceptanceChecks: [
-        { id: 'court-kill-zone', text: 'court reads as a surround-risk arena' },
-      ],
-    },
-    {
-      id: district.id + '-underdeck-return',
-      districtId: district.id,
-      formerUse: 'service undercroft and maintenance pass',
-      damageCause: 'load sag, missing planks, and emergency bracing',
-      currentOccupant: 'maintenance scavengers and hidden survivors',
-      silhouetteFamily: 'underdeck service run',
-      wonderTags: ['hanging_structures', 'sky_exposure', 'bridges'],
-      tacticalFeatures: ['escape_route', 'chokepoint'],
-      combatSentence: 'drop to recover or hold the narrow return against pursuit',
-      climbRoutes: [
-        { id: 'service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'market_low', toBand: 'market_mid' },
-      ],
-      visibilityTargets: [
-        { id: 'market-core-return', kind: 'future_shortcut', prompt: 'this can save a missed jump' },
-      ],
-      lowerLayer: 'recovery and ambush pressure lane',
-      middleLayer: 'rejoin point back into the market route',
-      upperLayer: 'visible roof traffic overhead',
-      supportLanguage: 'timber braces and hanging chain repairs',
-      habitationProof: ['maintenance lamps', 'wells', 'hidden shrines'],
-      landmarkAnchors: [{ x: district.origin.x + 12, y: lowBand + 0.5, z: district.origin.z + 220, role: 'underdeck_return' }],
-      acceptanceChecks: [
-        { id: 'underdeck-recovery', text: 'underdeck path visibly reads as a survivable recovery route' },
-      ],
-    },
-  ];
-}
-
-
-function buildLiftCourtLandmarkSchemas(district) {
-  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
-  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 9.0;
-  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 16.2;
-  const crownAnchor = district.landmarkAnchor || { x: district.origin.x + 44, y: highBand + 2.4, z: district.origin.z + 214, role: 'counterweight_crown' };
-  return [
-    {
-      id: district.id + '-counterweight-crown',
-      districtId: district.id,
-      formerUse: 'fortified hoist tower and lift crown',
-      damageCause: 'partial collapse, seized rigging, and emergency chain retrofits',
-      currentOccupant: 'watch crews, execution wardens, and salvage haulers',
-      silhouetteFamily: 'counterweight tower crown',
-      wonderTags: ['height', 'bridges', 'lanterns', 'sky_exposure', 'hanging_structures'],
-      tacticalFeatures: ['strongpoint', 'chokepoint'],
-      combatSentence: 'take the upper gallery or get pinned below the hoist crown',
-      climbRoutes: [
-        { id: 'tower-maintenance-climb', kind: 'tower_climb', value: 'alternate_route', fromBand: 'lift_mid', toBand: 'lift_high' },
-      ],
-      visibilityTargets: [
-        { id: 'crown-gallery', kind: 'future_landmark', prompt: 'how do i reach the hoist crown' },
-      ],
-      lowerLayer: 'counterweight shaft and chain pit',
-      middleLayer: 'tower approach and winch floor',
-      upperLayer: 'crown gallery and bridge control',
-      supportLanguage: 'old stone piers with timber winch retrofits',
-      habitationProof: ['signal lanterns', 'warden perch', 'rope stores'],
-      landmarkAnchors: [crownAnchor],
-      acceptanceChecks: [
-        { id: 'crown-reads-early', text: 'counterweight crown reads before arrival' },
-      ],
-    },
-    {
-      id: district.id + '-execution-court',
-      districtId: district.id,
-      formerUse: 'cargo staging and tribunal court',
-      damageCause: 'public violence, dropped loads, and broken retaining edges',
-      currentOccupant: 'haulers, guards, and scavengers moving salvage through the court',
-      silhouetteFamily: 'execution and cargo court',
-      wonderTags: ['architecture', 'terraces', 'lanterns'],
-      tacticalFeatures: ['kill_zone', 'chokepoint'],
-      combatSentence: 'hold the court or break toward the flanking lanes and stairs',
-      climbRoutes: [
-        { id: 'court-scramble', kind: 'gantry_scramble', value: 'ambush_route', fromBand: 'lift_mid', toBand: 'lift_high' },
-      ],
-      visibilityTargets: [
-        { id: 'upper-gallery', kind: 'future_shortcut', prompt: 'there is a higher route over the court' },
-      ],
-      lowerLayer: 'load shadow and choke pressure',
-      middleLayer: 'main kill court',
-      upperLayer: 'gallery gunslit equivalent and pressure rail',
-      supportLanguage: 'retaining walls, hoist beams, and partial screen walls',
-      habitationProof: ['tool benches', 'water buckets', 'cargo pallets'],
-      landmarkAnchors: [{ x: district.origin.x + 8, y: midBand + 0.4, z: district.origin.z + 144, role: 'execution_court' }],
-      acceptanceChecks: [
-        { id: 'court-is-kill-zone', text: 'court reads as a surround-risk kill zone' },
-      ],
-    },
-    {
-      id: district.id + '-undercroft-return',
-      districtId: district.id,
-      formerUse: 'maintenance undercroft and brake access corridor',
-      damageCause: 'chain drag, water seepage, and blocked shaft collapse',
-      currentOccupant: 'maintenance survivors and hidden runners',
-      silhouetteFamily: 'machinery undercroft',
-      wonderTags: ['hanging_structures', 'bridges', 'architecture'],
-      tacticalFeatures: ['escape_route'],
-      combatSentence: 'drop to recover and re-enter or stay above and risk the choke',
-      climbRoutes: [
-        { id: 'service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'lift_low', toBand: 'lift_mid' },
-      ],
-      visibilityTargets: [
-        { id: 'court-return', kind: 'future_shortcut', prompt: 'this can save a bad fight or missed movement line' },
-      ],
-      lowerLayer: 'recovery and maintenance lane',
-      middleLayer: 'rejoin point into the hoist court',
-      upperLayer: 'visible hoist tower overhead',
-      supportLanguage: 'stone undercroft with chained service braces',
-      habitationProof: ['bucket stations', 'repair alcoves', 'hidden shrines'],
-      landmarkAnchors: [{ x: district.origin.x - 4, y: lowBand + 0.2, z: district.origin.z + 220, role: 'maintenance_return' }],
-      acceptanceChecks: [
-        { id: 'undercroft-is-recovery', text: 'undercroft reads as a survivable recovery route' },
-      ],
-    },
-  ];
-}
-
-function cloneDistrictLandmarkSchemas(landmarkSchemas) {
-  return landmarkSchemas.map((landmark) => ({
-    ...landmark,
-    wonderTags: [...(landmark.wonderTags || [])],
-    tacticalFeatures: [...(landmark.tacticalFeatures || [])],
-    climbRoutes: (landmark.climbRoutes || []).map((route) => ({ ...route })),
-    visibilityTargets: (landmark.visibilityTargets || []).map((target) => ({ ...target })),
-    habitationProof: [...(landmark.habitationProof || [])],
-    landmarkAnchors: (landmark.landmarkAnchors || []).map((anchor) => ({ ...anchor })),
-    acceptanceChecks: (landmark.acceptanceChecks || []).map((check) => ({ ...check })),
-  }));
-}
-
-function addUniqueValues(target, values) {
-  for (const value of values) {
-    if (!target.includes(value)) target.push(value);
-  }
-}
-
-function applyHangingMarketDesignRepairs(district, initialLandmarkSchemas, initialValidation) {
-  const landmarkSchemas = cloneDistrictLandmarkSchemas(initialLandmarkSchemas);
-  const repairsApplied = [];
-  let budget = 6;
-  const noteRepair = (id, detail) => {
-    if (budget <= 0) return false;
-    repairsApplied.push({ id, detail });
-    budget -= 1;
-    return true;
-  };
-  const bridge = landmarkSchemas.find((landmark) => /bridge-cluster$/.test(landmark.id)) || landmarkSchemas[0];
-  const court = landmarkSchemas.find((landmark) => /core-court$/.test(landmark.id)) || landmarkSchemas[1] || bridge;
-  const underdeck = landmarkSchemas.find((landmark) => /underdeck-return$/.test(landmark.id)) || landmarkSchemas[2] || bridge;
-
-  if ((!district.realSourceA || !district.skeletonType || !district.patchStyle || !district.silhouetteRule) && noteRepair('historical_defaults', 'restored missing Hanging Market historical skeleton fields')) {
-    district.realSourceA = district.realSourceA || 'medina_kasbah';
-    district.realSourceB = district.realSourceB || 'stilt_wharf_settlement';
-    district.skeletonType = district.skeletonType || 'hanging_market_hybrid';
-    district.patchStyle = district.patchStyle || 'scaffold_chain_infill';
-    district.silhouetteRule = district.silhouetteRule || 'lateral stacked market over a visible support forest';
-  }
-
-  if ((district.circulationBands?.length || 0) < 3 && noteRepair('circulation_band_fallback', 'forced three circulation bands for over-under readability')) {
-    district.circulationBands = [
-      { id: 'market_low', y: district.baseElevation + 3.2, role: 'support_stair' },
-      { id: 'market_mid', y: district.baseElevation + 7.4, role: 'market_court' },
-      { id: 'market_high', y: district.baseElevation + 12.4, role: 'roof_lane' },
-    ];
-  }
-
-  let validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.hangingGardensLandmark || !validation.categories.hangingGardensWonderRead) && noteRepair('wonder_boost', 'reinforced Hanging Gardens wonder tags and anchor visibility')) {
-    addUniqueValues(bridge.wonderTags, ['bridges', 'terraces', 'sky_exposure', 'lanterns', 'hanging_structures']);
-    addUniqueValues(court.wonderTags, ['gardens', 'architecture', 'terraces']);
-    district.landmarkAnchor = district.landmarkAnchor || { x: district.origin.x + 86, y: district.baseElevation + 13.6, z: district.origin.z + 286, role: 'market_bridge_cluster' };
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.chokepoint || !validation.requiredOutputs.strongpoint || !validation.requiredOutputs.killZone || !validation.requiredOutputs.escapeRoute || !validation.categories.tacticalRead) && noteRepair('tactical_sentence_boost', 'completed tactical feature coverage across bridge, court, and underdeck')) {
-    addUniqueValues(bridge.tacticalFeatures, ['chokepoint', 'strongpoint', 'escape_route']);
-    addUniqueValues(court.tacticalFeatures, ['kill_zone', 'strongpoint']);
-    addUniqueValues(underdeck.tacticalFeatures, ['escape_route', 'chokepoint']);
-    bridge.combatSentence = bridge.combatSentence || 'push across the bridge or drop to the underdeck return';
-    court.combatSentence = court.combatSentence || 'circle through the court or climb out to the roof lane';
-    underdeck.combatSentence = underdeck.combatSentence || 'drop to recover or hold the narrow return against pursuit';
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.climbRecoveryPath || !validation.categories.climbValue) && noteRepair('climb_recovery_boost', 'added explicit recovery climb routes between underdeck, court, and roof')) {
-    underdeck.climbRoutes = underdeck.climbRoutes || [];
-    court.climbRoutes = court.climbRoutes || [];
-    underdeck.climbRoutes.push({ id: 'repair-service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'market_low', toBand: 'market_mid' });
-    court.climbRoutes.push({ id: 'repair-court-scramble', kind: 'awning_climb', value: 'alternate_route', fromBand: 'market_mid', toBand: 'market_high' });
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.visibleFutureDestination || !validation.categories.visibilityAndPull) && noteRepair('visibility_pull_boost', 'added future landmark and shortcut targets to pull the player forward')) {
-    bridge.visibilityTargets = bridge.visibilityTargets || [];
-    underdeck.visibilityTargets = underdeck.visibilityTargets || [];
-    bridge.visibilityTargets.push({ id: 'repair-shrine-rim', kind: 'future_landmark', prompt: 'how do i get there' });
-    underdeck.visibilityTargets.push({ id: 'repair-market-return', kind: 'future_shortcut', prompt: 'this can save a missed jump' });
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.habitationProof || !validation.categories.historicalRead) && noteRepair('habitation_proof_boost', 'added survivor habitation evidence across market, bridge, and underdeck')) {
-    addUniqueValues(bridge.habitationProof, ['bridge toll fires', 'lanterns', 'watch posts']);
-    addUniqueValues(court.habitationProof, ['stalls', 'garden trays', 'work benches']);
-    addUniqueValues(underdeck.habitationProof, ['maintenance lamps', 'wells', 'hidden shrines']);
-    bridge.currentOccupant = bridge.currentOccupant || 'toll keepers and scavenger stalls';
-    court.currentOccupant = court.currentOccupant || 'stall keepers and roaming scavengers';
-    underdeck.currentOccupant = underdeck.currentOccupant || 'maintenance scavengers and hidden survivors';
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-  return { landmarkSchemas, validation, repairsApplied };
-}
-
-
-function applyLiftCourtDesignRepairs(district, initialLandmarkSchemas, initialValidation) {
-  const landmarkSchemas = cloneDistrictLandmarkSchemas(initialLandmarkSchemas);
-  const repairsApplied = [];
-  let budget = 6;
-  const noteRepair = (id, detail) => {
-    if (budget <= 0) return false;
-    repairsApplied.push({ id, detail });
-    budget -= 1;
-    return true;
-  };
-  const crown = landmarkSchemas.find((landmark) => /counterweight-crown$/.test(landmark.id)) || landmarkSchemas[0];
-  const court = landmarkSchemas.find((landmark) => /execution-court$/.test(landmark.id)) || landmarkSchemas[1] || crown;
-  const undercroft = landmarkSchemas.find((landmark) => /undercroft-return$/.test(landmark.id)) || landmarkSchemas[2] || crown;
-
-  if ((!district.realSourceA || !district.skeletonType || !district.patchStyle || !district.silhouetteRule) && noteRepair('historical_defaults', 'restored missing Lift Court historical skeleton fields')) {
-    district.realSourceA = district.realSourceA || 'fortified_hoist_yard';
-    district.realSourceB = district.realSourceB || 'cliff_granary_terraces';
-    district.skeletonType = district.skeletonType || 'lift_court_hybrid';
-    district.patchStyle = district.patchStyle || 'counterweight_chain_retrofit';
-    district.silhouetteRule = district.silhouetteRule || 'a hoist court stacked around a visible counterweight tower and upper winch gallery';
-  }
-
-  if ((district.circulationBands?.length || 0) < 3 && noteRepair('circulation_band_fallback', 'forced three circulation bands for Lift Court readability')) {
-    district.circulationBands = [
-      { id: 'lift_low', y: district.baseElevation + 3.2, role: 'undercroft_pass' },
-      { id: 'lift_mid', y: district.baseElevation + 9.0, role: 'kill_court' },
-      { id: 'lift_high', y: district.baseElevation + 16.2, role: 'winch_gallery' },
-    ];
-  }
-
-  let validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.hangingGardensLandmark || !validation.categories.hangingGardensWonderRead) && noteRepair('wonder_boost', 'reinforced the hoist crown and upper gallery as the district wonder destination')) {
-    addUniqueValues(crown.wonderTags, ['height', 'bridges', 'lanterns', 'sky_exposure', 'hanging_structures']);
-    district.landmarkAnchor = district.landmarkAnchor || { x: district.origin.x + 44, y: district.baseElevation + 18.8, z: district.origin.z + 214, role: 'counterweight_crown' };
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.chokepoint || !validation.requiredOutputs.strongpoint || !validation.requiredOutputs.killZone || !validation.requiredOutputs.escapeRoute || !validation.categories.tacticalRead) && noteRepair('tactical_sentence_boost', 'completed tactical coverage across crown, court, and undercroft')) {
-    addUniqueValues(crown.tacticalFeatures, ['strongpoint', 'chokepoint']);
-    addUniqueValues(court.tacticalFeatures, ['kill_zone', 'chokepoint']);
-    addUniqueValues(undercroft.tacticalFeatures, ['escape_route']);
-    crown.combatSentence = crown.combatSentence || 'take the upper gallery or get pinned below the hoist crown';
-    court.combatSentence = court.combatSentence || 'hold the court or break toward the flanking lanes and stairs';
-    undercroft.combatSentence = undercroft.combatSentence || 'drop to recover and re-enter or stay above and risk the choke';
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.climbRecoveryPath || !validation.categories.climbValue) && noteRepair('climb_recovery_boost', 'added recovery climbs and alternate tower scrambles')) {
-    undercroft.climbRoutes = undercroft.climbRoutes || [];
-    crown.climbRoutes = crown.climbRoutes || [];
-    undercroft.climbRoutes.push({ id: 'repair-service-ladder', kind: 'service_climb', value: 'recovery_route', fromBand: 'lift_low', toBand: 'lift_mid' });
-    crown.climbRoutes.push({ id: 'repair-tower-scramble', kind: 'tower_climb', value: 'alternate_route', fromBand: 'lift_mid', toBand: 'lift_high' });
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.visibleFutureDestination || !validation.categories.visibilityAndPull) && noteRepair('visibility_pull_boost', 'added crown and return-path visibility targets')) {
-    crown.visibilityTargets = crown.visibilityTargets || [];
-    undercroft.visibilityTargets = undercroft.visibilityTargets || [];
-    crown.visibilityTargets.push({ id: 'repair-crown-gallery', kind: 'future_landmark', prompt: 'how do i reach the hoist crown' });
-    undercroft.visibilityTargets.push({ id: 'repair-court-return', kind: 'future_shortcut', prompt: 'this can save a bad fight' });
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-
-  if ((!validation.requiredOutputs.habitationProof || !validation.categories.historicalRead) && noteRepair('habitation_proof_boost', 'added worker and survivor evidence across the lift court')) {
-    addUniqueValues(crown.habitationProof, ['signal lanterns', 'warden perch', 'rope stores']);
-    addUniqueValues(court.habitationProof, ['tool benches', 'water buckets', 'cargo pallets']);
-    addUniqueValues(undercroft.habitationProof, ['bucket stations', 'repair alcoves', 'hidden shrines']);
-  }
-
-  validation = buildDistrictValidationSummary(district, landmarkSchemas);
-  return { landmarkSchemas, validation, repairsApplied };
-}
-
-function buildDistrictDesignContract(district) {
-  if (district.skeletonType === 'hanging_market_hybrid') {
-    let landmarkSchemas = buildHangingMarketLandmarkSchemas(district);
-    let validation = buildDistrictValidationSummary(district, landmarkSchemas);
-    let repairsApplied = [];
-    if (!validation.passes) {
-      ({ landmarkSchemas, validation, repairsApplied } = applyHangingMarketDesignRepairs(district, landmarkSchemas, validation));
-    }
-    return { landmarkSchemas, validation, repairsApplied };
-  }
-  if (district.skeletonType === 'lift_court_hybrid') {
-    let landmarkSchemas = buildLiftCourtLandmarkSchemas(district);
-    let validation = buildDistrictValidationSummary(district, landmarkSchemas);
-    let repairsApplied = [];
-    if (!validation.passes) {
-      ({ landmarkSchemas, validation, repairsApplied } = applyLiftCourtDesignRepairs(district, landmarkSchemas, validation));
-    }
-    return { landmarkSchemas, validation, repairsApplied };
-  }
-  return {
-    landmarkSchemas: [],
-    validation: buildDistrictValidationSummary(district, []),
-    repairsApplied: [],
-  };
-}
-
-function shuffleWithRng(items, rng) {
-  const list = [...items];
-  for (let i = list.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list;
-}
-
-function sampleRange(rng, range) {
-  return range[0] + (range[1] - range[0]) * rng();
-}
-
-function pickDistrictLayout(template, rng) {
-  const layoutId = pick(rng, template.layoutIds || DISTRICT_LOCAL_LAYOUTS.map((layout) => layout.id));
-  return DISTRICT_LOCAL_LAYOUT_MAP[layoutId] || DISTRICT_LOCAL_LAYOUTS[0];
-}
-
-function buildDistrictMacroOrigins(rng, templates) {
-  const origins = [];
-  let zCursor = 0;
-  for (let i = 0; i < templates.length; i += 1) {
-    const template = templates[i];
-    const x = i === 0 ? 0 : (i % 2 === 1 ? 1 : -1) * sampleRange(rng, template.xRange);
-    if (i > 0) zCursor += sampleRange(rng, template.zRange);
-    const baseElevation = sampleRange(rng, template.baseRange);
-    origins.push(makeVec(x, baseElevation, zCursor));
-  }
-  return origins;
-}
-
-function classifySpineRoute(fromDistrict, toDistrict) {
-  const delta = toDistrict.baseElevation - fromDistrict.baseElevation;
-  if (delta >= 3.5) return 'climb';
-  if (delta <= -3.5) return 'descent';
-  return 'traverse';
-}
+const {
+  buildDistrictStoryPlacementCandidates,
+  buildDistrictStoryPlacements,
+  buildDistrictValidationSummary,
+  buildDistrictDesignContract,
+} = districtStory;
 
 function generateDistrictPlan(levelIndex) {
   const totalRooms = GENERATED_ROOM_BATCH.length;
@@ -3933,7 +3019,7 @@ function generateDistrictPlan(levelIndex) {
   const archetypes = [DISTRICT_ARCHETYPES.intake, climbArchetype, descentArchetype, DISTRICT_ARCHETYPES.shrine];
   const counts = [...pick(rng, DISTRICT_ROOM_COUNT_PROFILES)];
   const templates = archetypes.map((archetype) => applyDefaultArchitecturalFamily(archetype, DISTRICT_ARCHETYPE_TEMPLATES[archetype.id] || DISTRICT_MACRO_TEMPLATES.intake));
-  const origins = buildDistrictMacroOrigins(rng, templates);
+  const origins = buildDistrictMacroOrigins(rng, templates, { makeVec });
   const districts = [];
   const roomToDistrict = new Array(totalRooms).fill(0);
   let roomStart = 0;
@@ -3941,7 +3027,7 @@ function generateDistrictPlan(levelIndex) {
   for (let i = 0; i < archetypes.length; i += 1) {
     const archetype = archetypes[i];
     const template = templates[i];
-    const layout = pickDistrictLayout(template, rng);
+    const layout = pickDistrictLayout(template, rng, { pick });
     const roomCount = counts[i];
     const baseElevation = origins[i]?.y ?? sampleRange(rng, template.baseRange);
     const topElevation = Math.max(baseElevation + 4.0, sampleRange(rng, template.topRange));
@@ -3974,9 +3060,12 @@ function generateDistrictPlan(levelIndex) {
       skeletonType: template.skeletonType || null,
       patchStyle: template.patchStyle || null,
       silhouetteRule: template.silhouetteRule || null,
+      storyPilotId: template.storyPilotId || null,
+      storyPlacementSet: template.storyPlacementSet || null,
     };
     Object.assign(district, buildDistrictSkeletonMeta(district));
     Object.assign(district, buildDistrictDesignContract(district));
+    district.storyNookPlacements = buildDistrictStoryPlacements(district);
     for (let j = 0; j < roomCount && roomStart + j < totalRooms; j += 1) roomToDistrict[roomStart + j] = i;
     roomStart += roomCount;
     districts.push(district);
@@ -4503,201 +3592,197 @@ function addHangingMarketStall(parent, prefix, x, y, z, width, depth, yaw = 0) {
   return stall;
 }
 
-function addHangingMarketDistrictSkeleton(district) {
-  const origin = district.origin;
-  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
-  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 7.6;
-  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 12.8;
 
-  const terraceLowCenter = [origin.x - 34, lowBand - 0.22, origin.z + 66];
-  const terraceMidCenter = [origin.x + 8, midBand - 0.24, origin.z + 160];
-  const terraceHighCenter = [origin.x + 42, highBand - 0.18, origin.z + 228];
-  const bridgeCenter = [origin.x + 78, highBand + 0.28, origin.z + 286];
-  const undercroftCenter = [origin.x - 6, lowBand - 0.82, origin.z + 226];
-
-  addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-low', [34, 0.52, 30], terraceLowCenter, MAT.stone2, false, 0.1);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-mid', [46, 0.58, 38], terraceMidCenter, MAT.stone2, false, 0.1);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-high', [24, 0.48, 30], terraceHighCenter, MAT.platform, false, 0.08);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-bridge-remnant', [18, 0.46, 44], bridgeCenter, MAT.bridge, true, 0.06);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-undercroft-return', [28, 0.42, 32], undercroftCenter, MAT.connectorFloor, false, 0.08);
-
-  addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-a', [6.0, 10.5, 34], [origin.x - 58, district.baseElevation + 3.2, origin.z + 92], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-b', [6.0, 12.0, 40], [origin.x - 48, district.baseElevation + 5.0, origin.z + 166], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-retaining-wall-west-c', [6.0, 12.5, 34], [origin.x - 40, district.baseElevation + 5.6, origin.z + 240], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-north', [40, 5.2, 3.4], [origin.x + 6, district.baseElevation + 5.0, origin.z + 178], MAT.plaster, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-south', [34, 4.8, 3.2], [origin.x + 10, district.baseElevation + 4.8, origin.z + 138], MAT.plaster, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-basin-wall-east', [3.4, 5.0, 24], [origin.x + 28, district.baseElevation + 4.9, origin.z + 158], MAT.plaster, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-undercroft-back-wall', [24, 7.4, 3.2], [origin.x - 6, district.baseElevation + 0.2, origin.z + 244], MAT.connectorWall, false);
-
-  for (let i = 0; i < 5; i += 1) {
-    const z = origin.z + 178 + i * 26;
-    const x = origin.x - 20 + (i % 2) * 18;
-    addGroundedCylinder(roomGroup, 'district-' + district.id + '-support-column-' + i, 1.15, Math.max(10, highBand - district.baseElevation + 9), [x, district.baseElevation - 10.2, z], MAT.iron, 7);
-    addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-support-buttress-' + i, [1.4, 8.6 + i * 0.45, 1.4], [x + 5.8, district.baseElevation - 8.6, z + 4.4], MAT.trim, false, 0.03, 1).rotation.z = 0.38;
-  }
-
-  for (let i = 0; i < 3; i += 1) {
-    const ax = origin.x + 60 + i * 9;
-    addGroundedCylinder(roomGroup, 'district-' + district.id + '-aqueduct-pier-' + i, 1.0, 8.8 + i * 0.6, [ax, highBand - 7.8, origin.z + 286 + (i % 2) * 3], MAT.stone2, 6);
-    addBeveledBox(roomGroup, 'district-' + district.id + '-aqueduct-arch-' + i, [8.8, 1.3, 2.0], [ax + 4.2, highBand + 1.7, origin.z + 286], MAT.trim, false, 0.03, 1);
-  }
-  addBeveledBox(roomGroup, 'district-' + district.id + '-aqueduct-crown', [28, 1.1, 3.0], [origin.x + 78, highBand + 3.0, origin.z + 286], MAT.trim, false, 0.03, 1);
-
-  addBatchStairRun(roomGroup, 'district-' + district.id + '-entry-terrace-rise', makeVec(origin.x - 52, lowBand + PLAYER_EYE_HEIGHT, origin.z + 28), makeVec(origin.x - 20, lowBand + PLAYER_EYE_HEIGHT, origin.z + 86), lowBand - 0.08, midBand - 2.8, MAT.platform);
-  addBatchStairRun(roomGroup, 'district-' + district.id + '-court-rise', makeVec(origin.x - 6, midBand + PLAYER_EYE_HEIGHT, origin.z + 122), makeVec(origin.x + 28, highBand + PLAYER_EYE_HEIGHT, origin.z + 212), midBand - 0.06, highBand - 0.16, MAT.platform);
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-upper-gallery-run', makeVec(origin.x + 20, highBand, origin.z + 204), makeVec(origin.x + 62, highBand + 0.26, origin.z + 258), highBand + 0.14, 4.0, MAT.bridge, 0.95);
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-bridge-commit', makeVec(origin.x + 60, highBand + 0.2, origin.z + 260), makeVec(origin.x + 88, highBand + 0.58, origin.z + 304), highBand + 0.3, 3.8, MAT.bridge, 0.85);
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-undercroft-run', makeVec(origin.x - 28, lowBand - 0.44, origin.z + 174), makeVec(origin.x + 14, lowBand - 0.78, origin.z + 246), lowBand - 0.34, 3.2, MAT.connectorFloor, 0.95);
-
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-a', origin.x - 26, lowBand + 0.08, origin.z + 84, 4.6, 2.8, 0.14);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-b', origin.x - 8, lowBand + 0.08, origin.z + 110, 4.2, 2.6, -0.08);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-low-c', origin.x - 20, lowBand + 0.08, origin.z + 138, 4.0, 2.4, 0.24);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-a', origin.x + 4, midBand + 0.08, origin.z + 150, 5.2, 3.0, 0.06);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-b', origin.x + 24, midBand + 0.08, origin.z + 180, 4.8, 2.8, -0.12);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-mid-c', origin.x - 10, midBand + 0.08, origin.z + 176, 4.4, 2.6, 0.18);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-a', origin.x + 48, highBand + 0.08, origin.z + 232, 4.4, 2.6, 0.18);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-b', origin.x + 74, highBand + 0.08, origin.z + 276, 4.0, 2.4, -0.18);
-  addHangingMarketStall(roomGroup, 'district-' + district.id + '-stall-high-c', origin.x + 58, highBand + 0.08, origin.z + 258, 3.8, 2.2, 0.08);
-
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-a', origin.x - 18, lowBand + 0.02, origin.z + 74, 3.0, 1.1, 5);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-b', origin.x - 2, lowBand + 0.02, origin.z + 118, 2.6, 1.0, 4);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-low-c', origin.x - 30, lowBand + 0.02, origin.z + 96, 2.8, 1.0, 4);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-a', origin.x + 8, midBand + 0.02, origin.z + 142, 3.4, 1.2, 5);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-b', origin.x + 30, midBand + 0.02, origin.z + 188, 2.8, 1.0, 4);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-mid-c', origin.x - 12, midBand + 0.02, origin.z + 160, 2.6, 0.94, 4);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-high-a', origin.x + 54, highBand + 0.02, origin.z + 238, 2.4, 0.94, 4);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-high-b', origin.x + 68, highBand + 0.02, origin.z + 298, 2.2, 0.88, 4);
-  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-a', origin.x + 40, origin.z + 214, highBand + 2.6, highBand + 0.62);
-  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-b', origin.x + 74, origin.z + 270, highBand + 3.0, highBand + 0.74);
-  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-c', origin.x - 6, origin.z + 154, midBand + 2.2, midBand + 0.58);
-  addHangingPlanter(roomGroup, 'district-' + district.id + '-hanger-d', origin.x + 24, origin.z + 202, highBand + 2.0, highBand + 0.54);
-  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-a', origin.x + 26, midBand + 0.04, origin.z + 134, 4.6, 2.4, 0.02);
-  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-b', origin.x - 10, lowBand - 0.18, origin.z + 214, 3.8, 2.2, -0.3);
-  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis-c', origin.x + 62, highBand + 0.04, origin.z + 246, 3.4, 2.0, -0.12);
-
-  addCisternPool(roomGroup, 'district-' + district.id + '-cistern', origin.x + 2, district.baseElevation + 3.42, origin.z + 158, 7.4, 5.4);
-  addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine-niche', origin.x - 14, district.baseElevation + 0.12, origin.z + 228, 0.18);
-  addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine-small', origin.x + 34, highBand + 0.02, origin.z + 222, -0.22);
-  addWellSet(roomGroup, 'district-' + district.id + '-well', origin.x + 16, midBand + 0.02, origin.z + 170);
-  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-low', origin.x - 4, lowBand + 0.02, origin.z + 126, 5, 1.4);
-  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-mid', origin.x + 18, midBand + 0.02, origin.z + 194, 6, 1.6);
-  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-high', origin.x + 70, highBand + 0.02, origin.z + 288, 5, 1.2);
-  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-a', origin.x - 2, lowBand + 0.02, origin.z + 102, 4.6, 0.08);
-  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-b', origin.x + 36, highBand + 0.02, origin.z + 248, 4.2, -0.12);
-  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line-c', origin.x + 12, midBand + 0.02, origin.z + 156, 5.0, 0.18);
-  addWatchPost(roomGroup, 'district-' + district.id + '-watch-post', origin.x + 88, highBand + 0.02, origin.z + 294, -0.18);
-  addWatchPost(roomGroup, 'district-' + district.id + '-watch-post-mid', origin.x - 28, midBand + 0.02, origin.z + 196, 0.22);
-  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-low-a', origin.x - 30, lowBand + 0.02, origin.z + 146, 0.12, 5);
-  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-mid-a', origin.x + 30, midBand + 0.02, origin.z + 206, -0.18, 6);
-  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-under-a', origin.x - 2, lowBand - 0.42, origin.z + 236, 0.28, 5);
-  addBenchTableSet(roomGroup, 'district-' + district.id + '-bench-set-a', origin.x - 14, lowBand + 0.02, origin.z + 96, 0.08);
-  addBenchTableSet(roomGroup, 'district-' + district.id + '-bench-set-b', origin.x + 20, midBand + 0.02, origin.z + 174, -0.14);
-  addArchFragment(roomGroup, 'district-' + district.id + '-arch-a', origin.x + 42, midBand + 0.02, origin.z + 144, 0.18);
-  addArchFragment(roomGroup, 'district-' + district.id + '-arch-b', origin.x + 82, highBand + 0.02, origin.z + 306, -0.12);
-  addGateChokeSet(roomGroup, 'district-' + district.id + '-gate-a', origin.x - 16, lowBand + 0.02, origin.z + 86, 0.02);
-  addGateChokeSet(roomGroup, 'district-' + district.id + '-gate-b', origin.x + 56, highBand + 0.02, origin.z + 260, -0.16);
-
-  addBrazier(roomGroup, 'district-' + district.id + '-brazier-entry', [origin.x - 18, lowBand + 0.18, origin.z + 92], { kind: 'flame' });
-  addBrazier(roomGroup, 'district-' + district.id + '-brazier-court', [origin.x + 12, midBand + 0.18, origin.z + 166], { kind: 'corpsefire' });
-  addBrazier(roomGroup, 'district-' + district.id + '-brazier-bridge', [origin.x + 78, highBand + 0.18, origin.z + 282], { kind: 'flame' });
-
-  for (let i = 0; i < 4; i += 1) {
-    addHangingChain(roomGroup, 'district-' + district.id + '-bridge-chain-' + i, origin.x + 58 + i * 8, origin.z + 250 + i * 10, highBand + 3.2, 6, MAT.iron, rngFromSeed(hashRoomKey(district.id + '-ancient-chain-' + i)), { length: 2.4 + (i % 2) * 0.5, sway: 0.02, dropStone: false });
-  }
-
-  const landmark = district.landmarkAnchor;
-  if (landmark) {
-    addBrazier(roomGroup, 'district-' + district.id + '-landmark', [landmark.x, landmark.y - PLAYER_EYE_HEIGHT + 0.4, landmark.z], { kind: 'corpsefire' });
-    addBeveledBox(roomGroup, 'district-' + district.id + '-landmark-crown', [6.4, 0.7, 2.0], [landmark.x, landmark.y + 1.2, landmark.z], MAT.bronze, false, 0.03, 1);
+function crystalRulesForRole(role) {
+  switch (role) {
+    case 'support_stair':
+      return [
+        { habit: 'blade_fan', climbable: true, scale: 1.95, verticalSpan: 4.1, edgeOffset: 2.7, alongSpread: 1.2, perchLift: 0.18, topLift: 0.12, count: 2, chance: 1 },
+        { habit: 'column_cluster', climbable: false, scale: 1.55, verticalSpan: 3.45, edgeOffset: 3.45, alongSpread: 0.9, perchLift: 0.72, topLift: 0.2, count: 1, chance: 0.92, sideSign: -1 },
+      ];
+    case 'bridge_landing':
+      return [
+        { habit: 'column_cluster', climbable: true, scale: 1.88, verticalSpan: 3.8, edgeOffset: 2.9, alongSpread: 1.0, perchLift: 0.26, topLift: 0.12, count: 2, chance: 0.96 },
+      ];
+    case 'roof_lane':
+      return [
+        { habit: 'spray', climbable: true, scale: 1.6, verticalSpan: 3.3, edgeOffset: 2.4, alongSpread: 1.4, perchLift: 0.32, topLift: 0.14, count: 2, chance: 0.86 },
+      ];
+    case 'underdeck_pass':
+    case 'undercroft_pass':
+    case 'undercroft_run':
+    case 'recovery_return':
+      return [
+        { habit: 'blade_fan', climbable: true, scale: 1.92, verticalSpan: 4.35, edgeOffset: 2.55, alongSpread: 1.25, perchLift: 0.12, topLift: 0.1, count: 2, chance: 0.9 },
+      ];
+    case 'market_court':
+    case 'bath_court':
+      return [
+        { habit: 'spray', climbable: false, scale: 1.48, verticalSpan: 2.8, edgeOffset: 2.85, alongSpread: 1.7, perchLift: 0.54, topLift: 0.2, count: 2, chance: 0.7 },
+      ];
+    case 'retaining_gate':
+      return [
+        { habit: 'column_cluster', climbable: true, scale: 2.08, verticalSpan: 4.5, edgeOffset: 3.2, alongSpread: 1.2, perchLift: 0.28, topLift: 0.16, count: 2, chance: 0.92 },
+      ];
+    case 'aqueduct_remnant':
+      return [
+        { habit: 'column_cluster', climbable: false, scale: 2.3, verticalSpan: 5.0, edgeOffset: 3.6, alongSpread: 1.6, perchLift: 1.0, topLift: 0.24, count: 2, chance: 0.96 },
+        { habit: 'spray', climbable: true, scale: 1.68, verticalSpan: 3.6, edgeOffset: 2.5, alongSpread: 1.0, perchLift: 0.44, topLift: 0.12, count: 1, chance: 0.84 },
+      ];
+    default:
+      return [];
   }
 }
 
+function addCrystalGrowthCluster(parent, prefix, options) {
+  const normal = options.normal.clone();
+  normal.y = 0;
+  if (normal.lengthSq() < 0.0001) return null;
+  normal.normalize();
+  const scale = options.scale || 1;
+  const rng = rngFromSeed(options.seed || hashRoomKey(prefix));
+  const yaw = Math.atan2(normal.x, normal.z);
+  const basePos = options.basePos.clone ? options.basePos.clone() : makeVec(options.basePos.x, options.basePos.y, options.basePos.z);
+  const anchorY = options.anchorY;
+  const topLift = options.topLift ?? 0.12;
+  const topY = anchorY + topLift;
+  const cluster = new THREE.Group();
+  cluster.name = prefix;
+  cluster.position.copy(basePos);
+  cluster.rotation.y = yaw;
+  parent.add(cluster);
+  const topLocal = topY - basePos.y;
+  const rootMat = MAT.crystalDark;
+  const accentMat = options.climbable ? MAT.crystal : (rng() < 0.5 ? MAT.crystal : MAT.crystalDark);
 
-function addLiftCourtDistrictSkeleton(district) {
-  const origin = district.origin;
-  const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
-  const midBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 9.0;
-  const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 16.2;
-
-  addWalkableBox(roomGroup, 'district-' + district.id + '-gate-terrace', [28, 0.56, 24], [origin.x - 22, lowBand - 0.18, origin.z + 56], MAT.stone2, false, 0.1);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-kill-court', [42, 0.62, 36], [origin.x + 6, midBand - 0.18, origin.z + 144], MAT.plaster, false, 0.1);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-tower-platform', [18, 0.56, 18], [origin.x + 42, midBand + 4.4, origin.z + 198], MAT.platform, false, 0.08);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-upper-gallery', [18, 0.48, 40], [origin.x + 78, highBand - 0.16, origin.z + 258], MAT.bridge, true, 0.08);
-  addWalkableBox(roomGroup, 'district-' + district.id + '-undercroft-return', [28, 0.42, 26], [origin.x - 2, lowBand - 0.76, origin.z + 220], MAT.connectorFloor, false, 0.08);
-
-  addWallBox(roomGroup, 'district-' + district.id + '-retaining-west-a', [5.8, 9.2, 30], [origin.x - 40, district.baseElevation + 1.8, origin.z + 84], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-retaining-west-b', [5.8, 11.4, 42], [origin.x - 30, district.baseElevation + 3.8, origin.z + 152], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-retaining-east', [4.8, 8.8, 26], [origin.x + 34, district.baseElevation + 5.4, origin.z + 146], MAT.wall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-screen-north', [36, 3.8, 1.8], [origin.x + 4, midBand + 1.6, origin.z + 126], MAT.plaster, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-court-screen-south', [30, 3.2, 1.8], [origin.x + 12, midBand + 1.4, origin.z + 164], MAT.plaster, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-tower-core', [10.0, 22.0, 10.0], [origin.x + 42, district.baseElevation + 11.0, origin.z + 198], MAT.connectorWall, false);
-  addWallBox(roomGroup, 'district-' + district.id + '-undercroft-back', [24, 6.2, 2.4], [origin.x - 2, lowBand + 1.2, origin.z + 234], MAT.connectorWall, false);
-
-  addBatchStairRun(roomGroup, 'district-' + district.id + '-entry-rise', makeVec(origin.x - 38, lowBand + PLAYER_EYE_HEIGHT, origin.z + 22), makeVec(origin.x - 12, lowBand + PLAYER_EYE_HEIGHT, origin.z + 92), lowBand - 0.08, midBand - 2.4, MAT.platform);
-  addBatchStairRun(roomGroup, 'district-' + district.id + '-court-rise', makeVec(origin.x + 10, midBand + PLAYER_EYE_HEIGHT, origin.z + 158), makeVec(origin.x + 54, highBand + PLAYER_EYE_HEIGHT, origin.z + 214), midBand + 0.1, highBand - 0.2, MAT.platform);
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-gallery-run', makeVec(origin.x + 48, highBand, origin.z + 214), makeVec(origin.x + 92, highBand + 0.24, origin.z + 268), highBand + 0.14, 4.0, MAT.bridge, 0.95);
-  addBatchRouteSegment(roomGroup, 'district-' + district.id + '-undercroft-run', makeVec(origin.x - 20, lowBand - 0.52, origin.z + 178), makeVec(origin.x + 8, lowBand - 0.62, origin.z + 238), lowBand - 0.38, 3.0, MAT.connectorFloor, 0.92);
-
-  const liftSupportTop = (x, z, fallbackY) => resolveSupportHeight(x, z, fallbackY + 0.24, 0)?.topY ?? fallbackY;
-
-  addCounterweightFrame(roomGroup, 'district-' + district.id + '-tower-frame', origin.x + 42, midBand + 0.3, origin.z + 198, 10.8, 0);
-  addHangingWeightCluster(roomGroup, 'district-' + district.id + '-weights-a', origin.x + 46, midBand + 0.3, origin.z + 190, highBand + 5.2, 0);
-  addHangingWeightCluster(roomGroup, 'district-' + district.id + '-weights-b', origin.x + 38, midBand + 0.3, origin.z + 206, highBand + 4.8, 0);
-  addPulleyDrum(roomGroup, 'district-' + district.id + '-drum-a', origin.x + 20, midBand + 0.1, origin.z + 136, 0.82, 2.2, 0.2);
-  addPulleyDrum(roomGroup, 'district-' + district.id + '-drum-b', origin.x + 66, highBand + 0.1, origin.z + 244, 0.72, 1.8, -0.12);
-  addCargoCage(roomGroup, 'district-' + district.id + '-cage-a', origin.x + 4, liftSupportTop(origin.x + 4, origin.z + 148, midBand) + 0.02, origin.z + 148, 0.08);
-  addCargoCage(roomGroup, 'district-' + district.id + '-cage-b', origin.x + 76, liftSupportTop(origin.x + 76, origin.z + 264, highBand) + 0.02, origin.z + 264, -0.14);
-  addHookPost(roomGroup, 'district-' + district.id + '-hook-a', origin.x - 8, liftSupportTop(origin.x - 8, origin.z + 132, midBand) + 0.02, origin.z + 132, 0.12);
-  addHookPost(roomGroup, 'district-' + district.id + '-hook-b', origin.x + 62, liftSupportTop(origin.x + 62, origin.z + 254, highBand) + 0.02, origin.z + 254, -0.22);
-  addToolBench(roomGroup, 'district-' + district.id + '-bench-a', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 154, midBand) + 0.02, origin.z + 154, -0.08);
-  addToolBench(roomGroup, 'district-' + district.id + '-bench-b', origin.x - 6, liftSupportTop(origin.x - 6, origin.z + 226, lowBand - 0.42) + 0.02, origin.z + 226, 0.18);
-  addBrakeLeverStand(roomGroup, 'district-' + district.id + '-lever-a', origin.x + 34, liftSupportTop(origin.x + 34, origin.z + 176, midBand) + 0.02, origin.z + 176, 0.16);
-  addBrakeLeverStand(roomGroup, 'district-' + district.id + '-lever-b', origin.x + 84, liftSupportTop(origin.x + 84, origin.z + 248, highBand) + 0.02, origin.z + 248, -0.18);
-  addScreenWallSegment(roomGroup, 'district-' + district.id + '-screen-a', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 124, midBand) + 0.02, origin.z + 124, 6.2, 0.02);
-  addScreenWallSegment(roomGroup, 'district-' + district.id + '-screen-b', origin.x + 20, liftSupportTop(origin.x + 20, origin.z + 166, midBand) + 0.02, origin.z + 166, 5.8, -0.22);
-
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-execution-dais', [6.2, 0.82, 3.8], [origin.x + 10, midBand + 0.1, origin.z + 140], MAT.trim, true, 0.05, 1);
-  addGroundedBeveledBox(roomGroup, 'district-' + district.id + '-execution-block', [1.8, 1.0, 1.4], [origin.x + 10, midBand + 0.92, origin.z + 138], MAT.bronze, true, 0.04, 1);
-  addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-post-left', [0.28, 3.6, 0.28], [origin.x + 8.7, midBand + 2.3, origin.z + 140], MAT.timber, false, 0.02, 1);
-  addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-post-right', [0.28, 3.6, 0.28], [origin.x + 11.3, midBand + 2.3, origin.z + 140], MAT.timber, false, 0.02, 1);
-  addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-beam', [2.9, 0.22, 0.28], [origin.x + 10, midBand + 4.0, origin.z + 140], MAT.timber, false, 0.02, 1);
-  const blade = addBeveledBox(roomGroup, 'district-' + district.id + '-guillotine-blade', [0.94, 1.3, 0.12], [origin.x + 10, midBand + 2.74, origin.z + 140], MAT.iron, false, 0.01, 1);
-  blade.rotation.z = Math.PI * 0.25;
-
-  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-court-a', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 138, midBand) + 0.02, origin.z + 138, 0.22, 5);
-  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-court-b', origin.x + 28, liftSupportTop(origin.x + 28, origin.z + 154, midBand) + 0.02, origin.z + 154, -0.2, 5);
-  addCrateBundle(roomGroup, 'district-' + district.id + '-crates-gallery', origin.x + 82, liftSupportTop(origin.x + 82, origin.z + 276, highBand) + 0.02, origin.z + 276, -0.12, 4);
-  addBenchTableSet(roomGroup, 'district-' + district.id + '-bench-set', origin.x - 16, liftSupportTop(origin.x - 16, origin.z + 72, lowBand) + 0.02, origin.z + 72, 0.06);
-  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-court', origin.x + 24, liftSupportTop(origin.x + 24, origin.z + 162, midBand) + 0.02, origin.z + 162, 5, 1.4);
-  addHangingJarCluster(roomGroup, 'district-' + district.id + '-jars-undercroft', origin.x - 8, liftSupportTop(origin.x - 8, origin.z + 232, lowBand - 0.42) + 0.02, origin.z + 232, 4, 1.1);
-  addClothLineCluster(roomGroup, 'district-' + district.id + '-cloth-line', origin.x - 18, liftSupportTop(origin.x - 18, origin.z + 88, lowBand) + 0.02, origin.z + 88, 4.8, 0.1);
-  addWatchPost(roomGroup, 'district-' + district.id + '-watch-post', origin.x + 84, liftSupportTop(origin.x + 84, origin.z + 258, highBand) + 0.02, origin.z + 258, -0.16);
-  addShrineNicheSet(roomGroup, 'district-' + district.id + '-shrine', origin.x - 10, liftSupportTop(origin.x - 10, origin.z + 226, lowBand - 0.56), origin.z + 226, 0.18);
-  addWellSet(roomGroup, 'district-' + district.id + '-water-station', origin.x - 4, liftSupportTop(origin.x - 4, origin.z + 148, midBand) + 0.02, origin.z + 148);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-a', origin.x - 24, liftSupportTop(origin.x - 24, origin.z + 64, lowBand) + 0.02, origin.z + 64, 2.8, 1.0, 4);
-  addPlanterBed(roomGroup, 'district-' + district.id + '-planter-b', origin.x + 70, liftSupportTop(origin.x + 70, origin.z + 246, highBand) + 0.02, origin.z + 246, 2.2, 0.9, 3);
-  addTrellisWall(roomGroup, 'district-' + district.id + '-trellis', origin.x - 26, liftSupportTop(origin.x - 26, origin.z + 58, lowBand) + 0.02, origin.z + 58, 4.0, 2.2, 0);
-
-  for (let i = 0; i < 4; i += 1) {
-    addHangingChain(roomGroup, 'district-' + district.id + '-tower-chain-' + i, origin.x + 36 + i * 4.6, origin.z + 190 + i * 6.5, highBand + 5.8, 7, MAT.iron, rngFromSeed(hashRoomKey(district.id + '-tower-chain-' + i)), { length: 3.1 + (i % 2) * 0.6, sway: 0.015, dropStone: false });
+  const coreHeight = Math.max(0.7 * scale, topLocal * 0.34);
+  const coreY = Math.max(0.16 * scale, topLocal * 0.14);
+  addGroundedTaperedCylinder(cluster, prefix + '-core', 0.42 * scale, 0.68 * scale, coreHeight, [0, coreY, 0.28 * scale], rootMat, 6, true);
+  addGroundedBeveledBox(cluster, prefix + '-keel', [0.92 * scale, 0.18 * scale, 0.72 * scale], [0, coreY + coreHeight * 0.18, 0.56 * scale], rootMat, false, 0.03, 1).rotation.x = -0.14;
+  const spurCount = 2 + Math.floor(rng() * 2);
+  for (let i = 0; i < spurCount; i += 1) {
+    const spur = addGroundedBeveledBox(cluster, prefix + '-spur-' + i, [(0.22 + rng() * 0.14) * scale, (0.52 + rng() * 0.36) * scale, (0.18 + rng() * 0.1) * scale], [(rng() - 0.5) * 1.1 * scale, coreY + rng() * (topLocal * 0.28), (0.08 + rng() * 0.66) * scale], rng() < 0.4 ? accentMat : rootMat, true, 0.02, 1);
+    spur.rotation.y = (rng() - 0.5) * 0.8;
+    spur.rotation.x = -0.1 - rng() * 0.22;
+    spur.rotation.z = (rng() - 0.5) * 0.32;
   }
 
-  addBrazier(roomGroup, 'district-' + district.id + '-court-brazier-a', [origin.x - 8, liftSupportTop(origin.x - 8, origin.z + 132, midBand) + 0.18, origin.z + 132], { kind: 'flame' });
-  addBrazier(roomGroup, 'district-' + district.id + '-court-brazier-b', [origin.x + 28, liftSupportTop(origin.x + 28, origin.z + 158, midBand) + 0.18, origin.z + 158], { kind: 'corpsefire' });
-  addBrazier(roomGroup, 'district-' + district.id + '-gallery-brazier', [origin.x + 84, liftSupportTop(origin.x + 84, origin.z + 252, highBand) + 0.18, origin.z + 252], { kind: 'flame' });
-
-  const landmark = district.landmarkAnchor;
-  if (landmark) {
-    addBrazier(roomGroup, 'district-' + district.id + '-landmark', [landmark.x, landmark.y - PLAYER_EYE_HEIGHT + 0.4, landmark.z], { kind: 'corpsefire' });
-    addBeveledBox(roomGroup, 'district-' + district.id + '-landmark-crown', [4.8, 0.64, 4.8], [landmark.x, landmark.y + 0.8, landmark.z], MAT.bronze, false, 0.03, 1);
+  const habit = options.habit || 'column_cluster';
+  if (habit === 'column_cluster') {
+    const count = 7 + Math.floor(rng() * 4);
+    for (let i = 0; i < count; i += 1) {
+      const lateral = (rng() - 0.5) * 2.35 * scale;
+      const depth = -0.15 * scale + rng() * 1.55 * scale;
+      const radius = (0.14 + rng() * 0.22) * scale;
+      const height = (topLocal * (0.74 + rng() * 0.36)) + 0.6 * scale;
+      const startY = rng() * 0.32 * scale;
+      const crystal = addGroundedTaperedCylinder(cluster, prefix + '-col-' + i, radius * 0.68, radius, height, [lateral, startY, depth], i % 3 === 0 ? accentMat : rootMat, 6, true);
+      crystal.rotation.x = (rng() - 0.5) * 0.2;
+      crystal.rotation.z = (rng() - 0.5) * 0.24;
+    }
+  } else if (habit === 'blade_fan') {
+    const count = 6 + Math.floor(rng() * 3);
+    for (let i = 0; i < count; i += 1) {
+      const bladeWidth = (0.28 + rng() * 0.26) * scale;
+      const bladeDepth = (0.16 + rng() * 0.2) * scale;
+      const bladeHeight = (topLocal * (0.9 + rng() * 0.24)) + 0.72 * scale;
+      const lateral = (i - (count - 1) * 0.5) * (0.34 + rng() * 0.12) * scale;
+      const depth = -0.08 * scale + rng() * 1.08 * scale;
+      const startY = rng() * 0.22 * scale;
+      const blade = addGroundedBeveledBox(cluster, prefix + '-blade-' + i, [bladeWidth, bladeHeight, bladeDepth], [lateral, startY, depth], i % 2 === 0 ? accentMat : rootMat, true, 0.02, 1);
+      blade.rotation.y = (i - (count - 1) * 0.5) * 0.18 + (rng() - 0.5) * 0.14;
+      blade.rotation.x = -0.08 - rng() * 0.18;
+      blade.rotation.z = (i - (count - 1) * 0.5) * 0.09 + (rng() - 0.5) * 0.18;
+    }
+  } else {
+    const count = 8 + Math.floor(rng() * 4);
+    for (let i = 0; i < count; i += 1) {
+      const depth = -0.12 * scale + rng() * 1.34 * scale;
+      const lateral = (rng() - 0.5) * 2.45 * scale;
+      const startY = rng() * 0.24 * scale;
+      if (i % 2 === 0) {
+        const radius = (0.08 + rng() * 0.14) * scale;
+        const height = (topLocal * (0.5 + rng() * 0.36)) + 0.36 * scale;
+        const crystal = addGroundedTaperedCylinder(cluster, prefix + '-spray-col-' + i, radius * 0.56, radius, height, [lateral, startY, depth], i % 3 === 0 ? accentMat : rootMat, 6, true);
+        crystal.rotation.x = (rng() - 0.5) * 0.32;
+        crystal.rotation.z = (rng() - 0.5) * 0.32;
+      } else {
+        const blade = addGroundedBeveledBox(cluster, prefix + '-spray-blade-' + i, [(0.18 + rng() * 0.18) * scale, (topLocal * (0.46 + rng() * 0.26)) + 0.28 * scale, (0.12 + rng() * 0.12) * scale], [lateral, startY, depth], i % 3 === 0 ? accentMat : rootMat, true, 0.02, 1);
+        blade.rotation.y = (rng() - 0.5) * 0.72;
+        blade.rotation.x = -0.1 - rng() * 0.2;
+        blade.rotation.z = (rng() - 0.5) * 0.28;
+      }
+    }
   }
+  if (options.climbable) {
+    const shelfWidth = 1.58 * scale;
+    const shelfDepth = 1.22 * scale;
+    const shelfHeight = 0.24 * scale;
+    const topCenter = makeVec(basePos.x - normal.x * 0.18 * scale, topY, basePos.z - normal.z * 0.18 * scale);
+    const shelf = addGroundedBeveledBox(cluster, prefix + '-shelf', [shelfWidth, shelfHeight, shelfDepth], [0, topLocal - shelfHeight, -0.18 * scale], MAT.crystal, true, 0.03, 1);
+    shelf.rotation.x = -0.08;
+    registerWalkable([shelfWidth * 0.92, shelfHeight, shelfDepth * 0.94], [topCenter.x, topY - shelfHeight * 0.5, topCenter.z], 0.04, {
+      source: prefix + '-crystal-shelf',
+      traversalCritical: true,
+    });
+    registerClimbSurface({
+      center: makeVec(basePos.x + normal.x * 0.56 * scale, basePos.y + 0.1 * scale, basePos.z + normal.z * 0.56 * scale),
+      normal,
+      width: 1.78 * scale,
+      baseY: basePos.y + 0.1 * scale,
+      topY,
+      topCenter,
+      topWidth: shelfWidth * 0.92,
+      topDepth: shelfDepth,
+      source: prefix + '-crystal-climb',
+    });
+  }
+  return cluster;
 }
 
-function addDistrictSkeletonGeometry(district) {
-  if (!district) return;
-  if (district.skeletonType === 'hanging_market_hybrid') addHangingMarketDistrictSkeleton(district);
-  if (district.skeletonType === 'lift_court_hybrid') addLiftCourtDistrictSkeleton(district);
-}
+const districtGeometry = createDistrictGeometryApi({
+  PLAYER_EYE_HEIGHT,
+  MAT,
+  roomGroup,
+  rngFromSeed,
+  hashRoomKey,
+  buildDistrictStoryPlacementCandidates,
+  crystalRulesForRole,
+  makeVec,
+  addCrystalGrowthCluster,
+  addGroundedBeveledBox,
+  addGroundedCylinder,
+  addWalkableBox,
+  addWallBox,
+  addBatchStairRun,
+  addBatchRouteSegment,
+  addHangingMarketStall,
+  addPlanterBed,
+  addHangingPlanter,
+  addTrellisWall,
+  addCisternPool,
+  addShrineNicheSet,
+  addWellSet,
+  addHangingJarCluster,
+  addClothLineCluster,
+  addWatchPost,
+  addCrateBundle,
+  addBenchTableSet,
+  addArchFragment,
+  addGateChokeSet,
+  addBrazier,
+  addHangingChain,
+  resolveSupportHeight,
+  addCounterweightFrame,
+  addHangingWeightCluster,
+  addPulleyDrum,
+  addCargoCage,
+  addHookPost,
+  addToolBench,
+  addBrakeLeverStand,
+  addScreenWallSegment,
+  addBeveledBox,
+});
 
 function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
   const repairs = [];
@@ -4840,7 +3925,7 @@ function buildGeneratedGauntlet(startIndex = 0) {
     const to = rooms[link.b]?.sockets?.[link.sideB];
     addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
   }
-  for (const district of districtPlan.districts) addDistrictSkeletonGeometry(district);
+  for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
   const designRepairs = districtPlan.districts
     .filter((district) => district.repairsApplied?.length)
     .map((district) => ({ id: district.id, repairsApplied: district.repairsApplied }));
@@ -4921,6 +4006,8 @@ function completeGeneratedGauntlet() {
 }
 
 function buildRoom(movePlayer = true) {
+  ensureNookTtsLevelState();
+  stopNookTtsPlayback();
   const rootGroup = roomGroup;
   clearGroup(rootGroup);
   resetWalkableBounds();
@@ -4957,6 +4044,9 @@ function buildRoom(movePlayer = true) {
       skeletonType: district.skeletonType,
       patchStyle: district.patchStyle,
       silhouetteRule: district.silhouetteRule,
+      storyPilotId: district.storyPilotId || null,
+      storyPlacementSet: district.storyPlacementSet || null,
+      storyNookPlacements: (district.storyNookPlacements || []).map((placement) => ({ ...placement })),
       segmentRoles: [...(district.segmentRoles || [])],
       landmarkSchemas: (district.landmarkSchemas || []).map((landmark) => ({ ...landmark })),
       repairsApplied: (district.repairsApplied || []).map((repair) => ({ ...repair })),
@@ -5090,18 +4180,18 @@ function buildEnemy() {
   enemy.userData.lastHitLocalY = 0;
   enemy.userData.hitBox = fallbackEnemyHitBox();
 
-  enemyPrimitiveVisual = new THREE.Group();
-  enemyPrimitiveVisual.name = 'broken-knight-fallback';
-  addBox(enemyPrimitiveVisual, 'broken-knight-torso', [0.9, 1.25, 0.42], [0, 1.18, 0], MAT.iron);
-  addBox(enemyPrimitiveVisual, 'broken-knight-head', [0.58, 0.5, 0.5], [0, 2.15, 0], MAT.stone2);
-  addBox(enemyPrimitiveVisual, 'broken-knight-left-arm', [0.32, 1.05, 0.32], [-0.74, 1.2, 0], MAT.iron).rotation.z = -0.28;
-  addBox(enemyPrimitiveVisual, 'broken-knight-right-arm', [0.32, 1.05, 0.32], [0.74, 1.2, 0], MAT.iron).rotation.z = 0.28;
-  addBox(enemyPrimitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [-0.26, 0.48, 0], MAT.iron);
-  addBox(enemyPrimitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [0.26, 0.48, 0], MAT.iron);
-  const sword = addBox(enemyPrimitiveVisual, 'execution-sword', [0.16, 1.9, 0.16], [1.25, 1.25, 0.08], MAT.bone);
+  enemyRuntime.primitiveVisual = new THREE.Group();
+  enemyRuntime.primitiveVisual.name = 'broken-knight-fallback';
+  addBox(enemyRuntime.primitiveVisual, 'broken-knight-torso', [0.9, 1.25, 0.42], [0, 1.18, 0], MAT.iron);
+  addBox(enemyRuntime.primitiveVisual, 'broken-knight-head', [0.58, 0.5, 0.5], [0, 2.15, 0], MAT.stone2);
+  addBox(enemyRuntime.primitiveVisual, 'broken-knight-left-arm', [0.32, 1.05, 0.32], [-0.74, 1.2, 0], MAT.iron).rotation.z = -0.28;
+  addBox(enemyRuntime.primitiveVisual, 'broken-knight-right-arm', [0.32, 1.05, 0.32], [0.74, 1.2, 0], MAT.iron).rotation.z = 0.28;
+  addBox(enemyRuntime.primitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [-0.26, 0.48, 0], MAT.iron);
+  addBox(enemyRuntime.primitiveVisual, 'broken-knight-legs', [0.34, 1.0, 0.32], [0.26, 0.48, 0], MAT.iron);
+  const sword = addBox(enemyRuntime.primitiveVisual, 'execution-sword', [0.16, 1.9, 0.16], [1.25, 1.25, 0.08], MAT.bone);
   sword.rotation.z = -0.42;
-  enemyPrimitiveVisual.visible = false;
-  enemy.add(enemyPrimitiveVisual);
+  enemyRuntime.primitiveVisual.visible = false;
+  enemy.add(enemyRuntime.primitiveVisual);
   enemy.traverse((node) => { if (node.isMesh) node.castShadow = USE_DYNAMIC_SHADOWS; });
   scene.add(enemy);
 }
@@ -5423,13 +4513,13 @@ function summarizeEnemyRagdollDebug() {
 }
 
 function buildEnemyRagdollProfile() {
-  if (!enemyModel) {
+  if (!enemyRuntime.model) {
     if (enemy) enemy.userData.ragdollProfileInfo = { reason: 'no-model', entries: 0, links: 0, missingKeys: [], resolvedKeys: [] };
     return null;
   }
   const entries = [];
   for (const def of ENEMY_RAGDOLL_DEFS) {
-    const bone = findBoneByAliases(enemyModel, def.names);
+    const bone = findBoneByAliases(enemyRuntime.model, def.names);
     if (!bone) continue;
     entries.push({
       key: def.key,
@@ -5498,7 +4588,7 @@ function fallbackEnemyHitBox() {
 
 function cacheEnemyHitBox() {
   if (!enemy) return;
-  enemy.userData.hitBox = computeObjectLocalBounds(enemyModel) || fallbackEnemyHitBox();
+  enemy.userData.hitBox = computeObjectLocalBounds(enemyRuntime.model) || fallbackEnemyHitBox();
 }
 
 function resetEnemyDeathState() {
@@ -5520,8 +4610,8 @@ function resetEnemyDeathState() {
   enemy.userData.suppressEnemyMixer = false;
   enemy.userData.physicsOwner = '';
   resetEnemyDissolve();
-  enemyCurrentAction = null;
-  if (enemyModel) enemyModel.updateMatrixWorld(true);
+  enemyRuntime.currentAction = null;
+  if (enemyRuntime.model) enemyRuntime.model.updateMatrixWorld(true);
 }
 
 function despawnEnemyCorpse() {
@@ -5546,7 +4636,7 @@ function captureEnemyDeathRig() {
     }
     return null;
   }
-  enemyModel?.updateMatrixWorld?.(true);
+  enemyRuntime.model?.updateMatrixWorld?.(true);
   const entries = [];
   const entryMap = new Map();
   for (const profileEntry of profile.entries) {
@@ -5825,8 +4915,8 @@ function applyEnemyRagdollJointLimits(state) {
 
 function applyEnemyDeathPose() {
   const state = enemy?.userData?.ragdollState;
-  if (!enemy || !enemyModel || !state) return;
-  if (!enemyModel.visible && enemy.userData.dissolveProgress < 0.999) enemyModel.visible = true;
+  if (!enemy || !enemyRuntime.model || !state) return;
+  if (!enemyRuntime.model.visible && enemy.userData.dissolveProgress < 0.999) enemyRuntime.model.visible = true;
   const inverseParent = new THREE.Quaternion();
   const targetWorld = new THREE.Quaternion();
   const swing = new THREE.Quaternion();
@@ -5839,7 +4929,7 @@ function applyEnemyDeathPose() {
   for (const entry of state.entries) {
     entry.bone.position.copy(entry.bindLocalPosition || entry.startLocalPosition);
   }
-  enemyModel.updateMatrixWorld(true);
+  enemyRuntime.model.updateMatrixWorld(true);
   for (const entry of state.entries) {
     const child = entry.childKey ? state.entryMap.get(entry.childKey) : null;
     if (!child || !entry.baseChildDirection) {
@@ -5854,19 +4944,19 @@ function applyEnemyDeathPose() {
     currentDir.normalize();
     swing.setFromUnitVectors(entry.baseChildDirection, currentDir);
     targetWorld.copy(swing).multiply(entry.startWorldQuaternion);
-    const parentObject = entry.bone.parent && entry.bone.parent.isBone ? entry.bone.parent : enemyModel;
+    const parentObject = entry.bone.parent && entry.bone.parent.isBone ? entry.bone.parent : enemyRuntime.model;
     parentObject.getWorldQuaternion(inverseParent).invert();
     entry.bone.quaternion.copy(inverseParent.multiply(targetWorld));
     entry.bone.updateMatrixWorld(true);
   }
-  enemyModel.updateMatrixWorld(true);
+  enemyRuntime.model.updateMatrixWorld(true);
   if (desiredAnchor) {
     const posedAnchor = computeEnemyRagdollPoseAnchor(state);
     if (posedAnchor) {
       const correction = desiredAnchor.sub(posedAnchor);
       enemy.position.add(correction);
       enemy.userData.baseY = enemy.position.y;
-      enemyModel.updateMatrixWorld(true);
+      enemyRuntime.model.updateMatrixWorld(true);
     }
   }
 }
@@ -5886,7 +4976,7 @@ function updateEnemyRagdollDeath(dt) {
       mode: enemy.userData.mode || '-',
       attackTimer: enemy.userData.attackTimer || 0,
       navJump: !!getEnemyNavState()?.jump,
-      currentAction: enemyCurrentAction?.getClip?.().name || '',
+      currentAction: enemyRuntime.currentAction?.getClip?.().name || '',
       phase: state.phase || 'settled',
       settled: true,
       settleFrames: state.settleFrames || 0,
@@ -6001,7 +5091,7 @@ function updateEnemyRagdollDeath(dt) {
     mode: enemy.userData.mode || '-',
     attackTimer: enemy.userData.attackTimer || 0,
     navJump: !!getEnemyNavState()?.jump,
-    currentAction: enemyCurrentAction?.getClip?.().name || '',
+    currentAction: enemyRuntime.currentAction?.getClip?.().name || '',
     phase: state.phase,
     elapsed: state.elapsed || 0,
     motionFade: state.motionFade || 0,
@@ -6054,8 +5144,8 @@ function startEnemyDeath(attackDirection, damage = 1) {
     entry.previous.copy(entry.position.clone().sub(impulse.multiplyScalar(1 / 60)));
   }
   if (DEBUG_RAGDOLL) console.info('enemy ragdoll start', { entries: state.entries.length, constraints: state.constraints.length, keys: state.entries.map((entry) => entry.key) });
-  if (enemyMixer) enemyMixer.stopAllAction();
-  enemyCurrentAction = null;
+  if (enemyRuntime.mixer) enemyRuntime.mixer.stopAllAction();
+  enemyRuntime.currentAction = null;
   const nav = getEnemyNavState();
   if (nav) {
     clearEnemyRoute(nav);
@@ -6074,39 +5164,6 @@ function cameraAimDirection() {
   const pitch = player.pitch + (input.gyroPitch || 0);
   const cosPitch = Math.cos(pitch);
   return new THREE.Vector3(-Math.sin(yaw) * cosPitch, -Math.sin(pitch), -Math.cos(yaw) * cosPitch).normalize();
-}
-
-function chooseEnemyHitReaction(attack) {
-  const aim = cameraAimDirection();
-  const targetRoot = enemyModel || enemy;
-  const hitBox = enemy?.userData?.hitBox || fallbackEnemyHitBox();
-  const horizontalAim = Math.hypot(aim.x, aim.z);
-  const centerLocal = hitBox.getCenter(new THREE.Vector3());
-  const centerWorld = targetRoot.localToWorld(centerLocal.clone());
-  const horizontalDistance = Math.hypot(centerWorld.x - player.position.x, centerWorld.z - player.position.z);
-  const travel = horizontalDistance / Math.max(0.001, horizontalAim);
-  const impact = player.position.clone().addScaledVector(aim, travel);
-  const unclampedLocalImpact = targetRoot.worldToLocal(impact.clone());
-  const clampedLocalImpact = unclampedLocalImpact.clone().clamp(hitBox.min, hitBox.max);
-  const size = hitBox.getSize(new THREE.Vector3());
-  const normalizedX = size.x > 0.001 ? (clampedLocalImpact.x - hitBox.min.x) / size.x : 0.5;
-  const normalizedY = size.y > 0.001 ? (clampedLocalImpact.y - hitBox.min.y) / size.y : 0.5;
-  const centeredX = normalizedX - 0.5;
-  const zone = normalizedY >= ENEMY_HIT_HEAD_NORMALIZED_Y ? 'head' : 'body';
-  let name = 'reactBodyCenter';
-  if (zone === 'head') name = centeredX <= -ENEMY_HIT_HEAD_SIDE_THRESHOLD ? 'reactHeadLeft' : 'reactHeadRight';
-  return {
-    name,
-    zone,
-    worldImpact: targetRoot.localToWorld(clampedLocalImpact.clone()),
-    localX: clampedLocalImpact.x,
-    localY: clampedLocalImpact.y,
-    normalizedX,
-    normalizedY,
-    centeredX,
-    aim: aim.clone(),
-    attackName: attack?.def?.name || '',
-  };
 }
 
 function clipMap(clips) {
@@ -6272,160 +5329,6 @@ function canStandOnSolidTop(solid, x, z) {
 
 function faceYawFromNormal(normal) {
   return Math.atan2(-normal.x, -normal.z);
-}
-
-function tryBeginClimb(attachForward = true) {
-  if (player.mode === 'climb' || player.mode === 'mantle') return false;
-  if (player.attack) return false;
-  const chestY = player.position.y - PLAYER_EYE_HEIGHT + 1.1;
-  const facing = cameraForwardYaw(player.yaw).normalize();
-  let best = null;
-  let bestScore = Infinity;
-  const candidateFaces = [];
-  for (const solid of solidColliders) {
-    if (solid.sizeY < CLIMB_MIN_HEIGHT) continue;
-    if (Math.max(solid.sizeX, solid.sizeZ) < CLIMB_MIN_TOP_SIZE) continue;
-    candidateFaces.push(
-      { axis: 'x', plane: solid.minX, normal: makeVec(-1, 0, 0), rangeA: [solid.minZ, solid.maxZ] },
-      { axis: 'x', plane: solid.maxX, normal: makeVec(1, 0, 0), rangeA: [solid.minZ, solid.maxZ] },
-      { axis: 'z', plane: solid.minZ, normal: makeVec(0, 0, -1), rangeA: [solid.minX, solid.maxX] },
-      { axis: 'z', plane: solid.maxZ, normal: makeVec(0, 0, 1), rangeA: [solid.minX, solid.maxX] },
-    );
-    for (const face of candidateFaces.splice(0)) {
-      const towardWall = face.normal.clone().multiplyScalar(-1);
-      const faceDot = facing.dot(towardWall);
-      if (attachForward && faceDot < 0.38) continue;
-      const distance = face.axis === 'x' ? Math.abs(player.position.x - face.plane) : Math.abs(player.position.z - face.plane);
-      if (distance > CLIMB_ATTACH_DISTANCE) continue;
-      const lateral = face.axis === 'x' ? player.position.z : player.position.x;
-      if (lateral < face.rangeA[0] - PLAYER_SOLID_RADIUS || lateral > face.rangeA[1] + PLAYER_SOLID_RADIUS) continue;
-      if (chestY < solid.minY + 0.2 || chestY > solid.maxY + 0.65) continue;
-      const score = distance - faceDot * 0.15 + Math.abs(chestY - clamp(chestY, solid.minY + 0.45, solid.maxY - 0.2)) * 0.05;
-      if (score < bestScore) {
-        bestScore = score;
-        best = { solid, face };
-      }
-    }
-  }
-  if (!best) return false;
-  const { solid, face } = best;
-  const right = new THREE.Vector3(-face.normal.z, 0, face.normal.x);
-  const hangY = clamp(player.position.y, solid.minY + 0.4 + PLAYER_EYE_HEIGHT, solid.maxY - 0.12 + PLAYER_EYE_HEIGHT);
-  const lateral = face.axis === 'x'
-    ? clamp(player.position.z, solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS)
-    : clamp(player.position.x, solid.minX + PLAYER_SOLID_RADIUS, solid.maxX - PLAYER_SOLID_RADIUS);
-  player.mode = 'climb';
-  player.climb = {
-    solid,
-    normal: face.normal.clone(),
-    right,
-    planeAxis: face.axis,
-    plane: face.plane,
-    minLateral: face.rangeA[0] + PLAYER_SOLID_RADIUS,
-    maxLateral: face.rangeA[1] - PLAYER_SOLID_RADIUS,
-    minY: solid.minY + 0.12 + PLAYER_EYE_HEIGHT,
-    maxY: solid.maxY - CLIMB_TOP_OUT_THRESHOLD + PLAYER_EYE_HEIGHT,
-  };
-  player.mantle = null;
-  player.velocity.set(0, 0, 0);
-  player.grounded = false;
-  player.runCharge = 0;
-  player.isRunning = false;
-  player.lastRunIntent = false;
-  player.attack = null;
-  player.attackTimer = 0;
-  if (face.axis === 'x') {
-    player.position.x = face.plane + face.normal.x * CLIMB_FACE_OFFSET;
-    player.position.z = lateral;
-  } else {
-    player.position.z = face.plane + face.normal.z * CLIMB_FACE_OFFSET;
-    player.position.x = lateral;
-  }
-  player.position.y = hangY;
-  player.yaw = faceYawFromNormal(face.normal.clone().multiplyScalar(-1));
-  return true;
-}
-
-function startMantleFromClimb() {
-  const climb = player.climb;
-  if (!climb) return false;
-  const solid = climb.solid;
-  const topX = climb.planeAxis === 'x'
-    ? solid.centerX
-    : clamp(player.position.x + climb.normal.x * CLIMB_MANTLE_FORWARD, solid.minX + PLAYER_SOLID_RADIUS, solid.maxX - PLAYER_SOLID_RADIUS);
-  const topZ = climb.planeAxis === 'z'
-    ? solid.centerZ
-    : clamp(player.position.z + climb.normal.z * CLIMB_MANTLE_FORWARD, solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS);
-  const endX = climb.planeAxis === 'x'
-    ? clamp(climb.plane + climb.normal.x * (PLAYER_SOLID_RADIUS + CLIMB_MANTLE_FORWARD), solid.minX + PLAYER_SOLID_RADIUS, solid.maxX - PLAYER_SOLID_RADIUS)
-    : topX;
-  const endZ = climb.planeAxis === 'z'
-    ? clamp(climb.plane + climb.normal.z * (PLAYER_SOLID_RADIUS + CLIMB_MANTLE_FORWARD), solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS)
-    : topZ;
-  if (!canStandOnSolidTop(solid, endX, endZ)) return false;
-  player.mode = 'mantle';
-  player.mantle = {
-    start: player.position.clone(),
-    end: makeVec(endX, solid.maxY + PLAYER_EYE_HEIGHT, endZ),
-    elapsed: 0,
-    duration: CLIMB_MANTLE_DURATION,
-    faceYaw: player.yaw,
-  };
-  player.climb = null;
-  player.velocity.set(0, 0, 0);
-  return true;
-}
-
-function updatePlayerClimb(dt, moveX, moveY) {
-  const climb = player.climb;
-  if (!climb) {
-    player.mode = 'air';
-    return;
-  }
-  const lateralDelta = moveX * CLIMB_SPEED_HORIZONTAL * dt;
-  const verticalDelta = moveY * CLIMB_SPEED_VERTICAL * dt;
-  let lateral = climb.planeAxis === 'x' ? player.position.z : player.position.x;
-  lateral = clamp(lateral + lateralDelta, climb.minLateral, climb.maxLateral);
-  const nextY = clamp(player.position.y + verticalDelta, climb.minY, climb.maxY + 0.28);
-  if (climb.planeAxis === 'x') {
-    player.position.x = climb.plane + climb.normal.x * CLIMB_FACE_OFFSET;
-    player.position.z = lateral;
-  } else {
-    player.position.z = climb.plane + climb.normal.z * CLIMB_FACE_OFFSET;
-    player.position.x = lateral;
-  }
-  player.position.y = nextY;
-  player.velocity.set(0, 0, 0);
-  player.grounded = false;
-  player.yaw = faceYawFromNormal(climb.normal.clone().multiplyScalar(-1));
-  if (moveY > 0.18 && player.position.y >= climb.maxY - 0.02) startMantleFromClimb();
-  else if (moveY < -0.45 && player.position.y <= climb.minY + 0.02) {
-    player.mode = 'air';
-    player.climb = null;
-  }
-}
-
-function updatePlayerMantle(dt) {
-  const mantle = player.mantle;
-  if (!mantle) {
-    player.mode = 'ground';
-    return;
-  }
-  mantle.elapsed = Math.min(mantle.duration, mantle.elapsed + dt);
-  const t = clamp(mantle.elapsed / mantle.duration, 0, 1);
-  const eased = t * t * (3 - 2 * t);
-  const lift = Math.sin(Math.PI * eased) * 0.18;
-  player.position.lerpVectors(mantle.start, mantle.end, eased);
-  player.position.y += lift;
-  player.velocity.set(0, 0, 0);
-  player.grounded = false;
-  player.yaw = mantle.faceYaw;
-  if (t >= 1) {
-    player.position.copy(mantle.end);
-    player.mode = 'ground';
-    player.mantle = null;
-    player.grounded = true;
-  }
 }
 
 function finalizePlayerFrame(dt, now, stickMagnitude) {
@@ -7183,7 +6086,7 @@ function pushEnemyWaypoint(list, point) {
 }
 
 function enemyJumpDuration() {
-  return Math.max(0.42, enemyActions.get('jumping')?.getClip?.().duration || ENEMY_ATTACK_RECOVERY);
+  return Math.max(0.42, enemyRuntime.actions.get('jumping')?.getClip?.().duration || ENEMY_ATTACK_RECOVERY);
 }
 
 function enemyCanJumpBetween(from, to) {
@@ -7719,7 +6622,7 @@ function ensureEnemyDissolveShards() {
   const hitBox = enemy.userData.hitBox || fallbackEnemyHitBox();
   const min = hitBox.min.clone();
   const max = hitBox.max.clone();
-  const baseOffset = enemyModel ? enemyModel.position.clone() : new THREE.Vector3();
+  const baseOffset = enemyRuntime.model ? enemyRuntime.model.position.clone() : new THREE.Vector3();
   const shards = [];
   const rand = (seed) => {
     const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
@@ -7794,9 +6697,9 @@ function setEnemyDissolveProgress(progress) {
   const clamped = clamp(progress, 0, 1);
   if (enemy) enemy.userData.dissolveProgress = clamped;
   updateEnemyDissolveShards(clamped);
-  if (!enemyModel) return;
-  enemyModel.visible = clamped < 0.999;
-  enemyModel.traverse((node) => {
+  if (!enemyRuntime.model) return;
+  enemyRuntime.model.visible = clamped < 0.999;
+  enemyRuntime.model.traverse((node) => {
     if (!node.isMesh && !node.isSkinnedMesh) return;
     const mats = Array.isArray(node.material) ? node.material : [node.material];
     for (const mat of mats) {
@@ -7820,7 +6723,7 @@ function setEnemyDissolveProgress(progress) {
 
 function resetEnemyDissolve() {
   setEnemyDissolveProgress(0);
-  if (enemyModel) enemyModel.visible = true;
+  if (enemyRuntime.model) enemyRuntime.model.visible = true;
 }
 
 function syncEnemyDissolveToRagdollState(state) {
@@ -7862,27 +6765,27 @@ function loadOrcBerserkerEnemy() {
   fbxLoader.load(ORC_BERSERKER_MODEL, (asset) => {
     try {
       if (!enemy) return;
-      if (enemyModel?.parent) enemyModel.parent.remove(enemyModel);
-      enemyActions.clear();
-      enemyCurrentAction = null;
-      enemyModel = asset;
-      const scale = configureOrcBerserkerModel(enemyModel);
+      if (enemyRuntime.model?.parent) enemyRuntime.model.parent.remove(enemyRuntime.model);
+      enemyRuntime.actions.clear();
+      enemyRuntime.currentAction = null;
+      enemyRuntime.model = asset;
+      const scale = configureOrcBerserkerModel(enemyRuntime.model);
       cacheEnemyHitBox();
       buildEnemyRagdollProfile();
-      enemyMixer = asset.animations?.length ? new THREE.AnimationMixer(enemyModel) : null;
-      if (enemyMixer) {
+      enemyRuntime.mixer = asset.animations?.length ? new THREE.AnimationMixer(enemyRuntime.model) : null;
+      if (enemyRuntime.mixer) {
         registerEnemyClip('idle', asset.animations);
         playEnemyAction('idle', 0.01);
         loadProMeleeAxeEnemyClips();
       }
-      enemy.add(enemyModel);
+      enemy.add(enemyRuntime.model);
       enemy.userData.attackBones = {};
       resetEnemyDissolve();
-      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
+      if (enemyRuntime.primitiveVisual) enemyRuntime.primitiveVisual.visible = false;
       setStatus('standing idle orc imported' + (scale ? ' scale ' + scale.toFixed(3) : ''));
     } catch (err) {
       console.warn('standing idle orc setup failed; keeping primitive fallback', err);
-      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+      if (enemyRuntime.primitiveVisual) enemyRuntime.primitiveVisual.visible = true;
       const summary = rememberError('Orc setup error', err);
       setStatus(summary.toLowerCase());
       hintEl.textContent = summary;
@@ -7890,7 +6793,7 @@ function loadOrcBerserkerEnemy() {
     }
   }, undefined, (err) => {
     console.warn('standing idle orc failed; keeping primitive fallback', err);
-    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+    if (enemyRuntime.primitiveVisual) enemyRuntime.primitiveVisual.visible = true;
     const summary = rememberError('Orc load error', err);
     setStatus(summary.toLowerCase());
     hintEl.textContent = summary;
@@ -7919,30 +6822,19 @@ function configureMutantOrcModel(model) {
 }
 
 function registerEnemyClip(name, clips, options = {}) {
-  if (!enemyMixer || !clips?.length) return null;
+  if (!enemyRuntime.mixer || !clips?.length) return null;
   const sourceClip = clips[0];
   const clip = options.stripRootMotionXZ ? stripRootMotionXZ(sourceClip) : sourceClip.clone();
   clip.name = name;
-  const action = enemyMixer.clipAction(clip, enemyModel);
+  const action = enemyRuntime.mixer.clipAction(clip, enemyRuntime.model);
   action.enabled = true;
   if (options.timeScale) action.timeScale = options.timeScale;
   if (options.once) {
     action.loop = THREE.LoopOnce;
     action.clampWhenFinished = true;
   }
-  enemyActions.set(name, action);
+  enemyRuntime.actions.set(name, action);
   return action;
-}
-
-function playEnemyAction(name, fade = 0.16, options = {}) {
-  if (isEnemyCorpseActive()) return;
-  const next = enemyActions.get(name) || enemyActions.get('idle');
-  if (!next) return;
-  const restart = !!options.restart;
-  if (next === enemyCurrentAction && !restart) return;
-  if (enemyCurrentAction && enemyCurrentAction !== next) enemyCurrentAction.fadeOut(fade);
-  next.reset().fadeIn(fade).play();
-  enemyCurrentAction = next;
 }
 
 function loadEnemyClip(name, path, options = {}) {
@@ -7980,13 +6872,13 @@ function loadProMeleeAxeEnemyClips() {
 function loadMutantOrcEnemy() {
   fbxLoader.load(MUTANT_ORC_CLIPS.idle, (asset) => {
     try {
-      enemyModel = asset;
-      configureMutantOrcModel(enemyModel);
-      enemyMixer = new THREE.AnimationMixer(enemyModel);
+      enemyRuntime.model = asset;
+      configureMutantOrcModel(enemyRuntime.model);
+      enemyRuntime.mixer = new THREE.AnimationMixer(enemyRuntime.model);
       registerEnemyClip('idle', asset.animations);
-      enemy.add(enemyModel);
+      enemy.add(enemyRuntime.model);
       resetEnemyDissolve();
-      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = false;
+      if (enemyRuntime.primitiveVisual) enemyRuntime.primitiveVisual.visible = false;
       playEnemyAction('idle', 0.01);
       loadEnemyClip('run', MUTANT_ORC_CLIPS.run);
       loadEnemyClip('walking', MUTANT_ORC_CLIPS.walking);
@@ -7996,7 +6888,7 @@ function loadMutantOrcEnemy() {
       setStatus('mutant orc enemy imported');
     } catch (err) {
       console.warn('mutant orc setup failed; keeping primitive fallback', err);
-      if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+      if (enemyRuntime.primitiveVisual) enemyRuntime.primitiveVisual.visible = true;
       const summary = rememberError('Mutant orc setup error', err);
       setStatus(summary.toLowerCase());
       hintEl.textContent = summary;
@@ -8004,7 +6896,7 @@ function loadMutantOrcEnemy() {
     }
   }, undefined, (err) => {
     console.warn('mutant orc enemy failed; keeping primitive fallback', err);
-    if (enemyPrimitiveVisual) enemyPrimitiveVisual.visible = true;
+    if (enemyRuntime.primitiveVisual) enemyRuntime.primitiveVisual.visible = true;
     const summary = rememberError('Mutant orc load error', err);
     setStatus(summary.toLowerCase());
     hintEl.textContent = summary;
@@ -8012,26 +6904,6 @@ function loadMutantOrcEnemy() {
   });
 }
 
-
-function updateEnemyMixer(dt) {
-  if (!enemyMixer || enemy?.userData?.dead || enemy?.userData?.suppressEnemyMixer || isEnemyCorpseActive()) return;
-  enemyMixer.update(dt);
-  if (!enemy?.userData?.dead && enemyCurrentAction) {
-    const clipName = enemyCurrentAction.getClip().name;
-    const oneShotReturns = ['jumping', 'react'];
-    if (oneShotReturns.includes(clipName) && enemyCurrentAction.time >= enemyCurrentAction.getClip().duration - 0.05) {
-      playEnemyAction('idle', 0.12);
-      return;
-    }
-  }
-  if (!enemyCurrentAction) {
-    const idle = enemyActions.get('idle');
-    if (idle) {
-      idle.reset().fadeIn(0.01).play();
-      enemyCurrentAction = idle;
-    }
-  }
-}
 
 function loadArms() {
   loader.load('assets/models/FPSPlayer.glb', (gltf) => {
@@ -8094,6 +6966,7 @@ function loadArms() {
     setStatus('using primitive arms fallback');
   });
 }
+
 
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -8588,614 +7461,6 @@ function updatePlayer(dt) {
   finalizePlayerFrame(dt, now, stickMagnitude);
 }
 
-function getEnemyAttackDefinition(name, clipDuration = ENEMY_ATTACK_RECOVERY) {
-  const source = ENEMY_ATTACK_DEFS[name];
-  if (!source) {
-    return {
-      name,
-      handAliases: [],
-      activeStart: ENEMY_ATTACK_WINDUP,
-      activeEnd: ENEMY_ATTACK_ACTIVE_END,
-      lungeStart: 0,
-      lungeEnd: Math.min(0.1, clipDuration),
-      sweepHalfExtents: new THREE.Vector3(0.16, 0.16, 0.12),
-      sweepRangePadding: 0.3,
-      damage: 1,
-      knockback: 1.65,
-      fallbackOffset: new THREE.Vector3(0.72, 1.18, 0),
-      clipDuration: clipDuration,
-    };
-  }
-  const duration = Math.max(0.001, clipDuration || ENEMY_ATTACK_RECOVERY);
-  const activeStart = source.activeStartTime !== undefined
-    ? clamp(source.activeStartTime, 0, duration)
-    : clamp(duration * source.activeStartNorm, 0, duration);
-  const activeEnd = source.activeEndTime !== undefined
-    ? clamp(source.activeEndTime, activeStart, duration)
-    : (source.activeEndNorm !== undefined
-      ? clamp(duration * source.activeEndNorm, activeStart, duration)
-      : clamp(activeStart + source.activeDuration, activeStart, duration));
-  const lungeStart = source.lungeStartNorm !== undefined ? clamp(duration * source.lungeStartNorm, 0, duration) : Math.max(0, activeStart - (source.lungeLead || 0));
-  const lungeEnd = source.lungeDuration !== undefined ? clamp(lungeStart + source.lungeDuration, lungeStart, duration) : activeEnd;
-  return {
-    name,
-    handAliases: [...(source.handAliases || [])],
-    activeStart,
-    activeEnd,
-    lungeStart,
-    lungeEnd,
-    sweepHalfExtents: source.sweepHalfExtents ? source.sweepHalfExtents.clone() : new THREE.Vector3(0.16, 0.16, 0.12),
-    sweepRangePadding: source.sweepRangePadding ?? 0.3,
-    damage: source.damage ?? 1,
-    knockback: source.knockback ?? 1.65,
-    fallbackOffset: source.fallbackOffset ? source.fallbackOffset.clone() : new THREE.Vector3(0.72, 1.18, 0),
-    clipDuration: duration,
-  };
-}
-
-function resolveEnemyAttackHandBone(attackDef) {
-  if (!enemy || !attackDef) return null;
-  enemy.userData.attackBones = enemy.userData.attackBones || {};
-  const cached = enemy.userData.attackBones[attackDef.name];
-  if (cached?.parent) return cached;
-  const bone = findBoneByAliases(enemyModel || enemy, attackDef.handAliases || []);
-  if (bone) enemy.userData.attackBones[attackDef.name] = bone;
-  return bone;
-}
-
-function sampleEnemyAttackHandWorld(attackDef, target = new THREE.Vector3()) {
-  const bone = resolveEnemyAttackHandBone(attackDef);
-  if (bone) return bone.getWorldPosition(target);
-  target.copy(attackDef?.fallbackOffset || new THREE.Vector3(0.72, 1.18, 0));
-  return enemy.localToWorld(target);
-}
-
-function getPlayerDamageCapsule(targetA, targetB) {
-  const feetY = player.position.y - PLAYER_EYE_HEIGHT;
-  targetA.set(player.position.x, feetY + PLAYER_SOLID_RADIUS, player.position.z);
-  targetB.set(player.position.x, player.position.y + 0.06, player.position.z);
-  return PLAYER_SOLID_RADIUS;
-}
-
-function segmentSegmentDistanceSq(a0, a1, b0, b1) {
-  const EPS = 1e-6;
-  const u = a1.clone().sub(a0);
-  const v = b1.clone().sub(b0);
-  const w = a0.clone().sub(b0);
-  const a = u.dot(u);
-  const b = u.dot(v);
-  const c = v.dot(v);
-  const d = u.dot(w);
-  const e = v.dot(w);
-  const D = a * c - b * b;
-  let sN, sD = D;
-  let tN, tD = D;
-  if (D < EPS) {
-    sN = 0;
-    sD = 1;
-    tN = e;
-    tD = c;
-  } else {
-    sN = (b * e - c * d);
-    tN = (a * e - b * d);
-    if (sN < 0) {
-      sN = 0;
-      tN = e;
-      tD = c;
-    } else if (sN > sD) {
-      sN = sD;
-      tN = e + b;
-      tD = c;
-    }
-  }
-  if (tN < 0) {
-    tN = 0;
-    if (-d < 0) sN = 0;
-    else if (-d > a) sN = sD;
-    else {
-      sN = -d;
-      sD = a;
-    }
-  } else if (tN > tD) {
-    tN = tD;
-    if ((-d + b) < 0) sN = 0;
-    else if ((-d + b) > a) sN = sD;
-    else {
-      sN = (-d + b);
-      sD = a;
-    }
-  }
-  const sc = Math.abs(sN) < EPS ? 0 : sN / sD;
-  const tc = Math.abs(tN) < EPS ? 0 : tN / tD;
-  const dP = w.add(u.multiplyScalar(sc)).sub(v.multiplyScalar(tc));
-  return dP.lengthSq();
-}
-
-function sweepEnemyAttackHitsPlayer(previousHand, currentHand, attackDef) {
-  if (!previousHand || !currentHand || !attackDef) return { hit: false, reason: 'invalid' };
-  const center = previousHand.clone().add(currentHand).multiplyScalar(0.5);
-  const horizontalDistance = Math.hypot(center.x - player.position.x, center.z - player.position.z);
-  const travelLength = previousHand.distanceTo(currentHand);
-  const capsuleStart = new THREE.Vector3();
-  const capsuleEnd = new THREE.Vector3();
-  const playerRadius = getPlayerDamageCapsule(capsuleStart, capsuleEnd);
-  const sweepRadius = Math.max(attackDef.sweepHalfExtents.x, attackDef.sweepHalfExtents.y);
-  const distanceSq = segmentSegmentDistanceSq(previousHand, currentHand, capsuleStart, capsuleEnd);
-  const threshold = playerRadius + sweepRadius;
-  const thresholdSq = threshold * threshold;
-  if (distanceSq > thresholdSq) {
-    return {
-      hit: false,
-      reason: 'distance',
-      center,
-      distanceSq,
-      thresholdSq,
-      horizontalDistance,
-      handTravel: travelLength,
-      sweepRadius,
-    };
-  }
-  return {
-    hit: true,
-    reason: 'hit',
-    center,
-    distanceSq,
-    thresholdSq,
-    horizontalDistance,
-    handTravel: travelLength,
-    sweepRadius,
-    direction: new THREE.Vector3(player.position.x - center.x, 0, player.position.z - center.z).normalize(),
-  };
-}
-
-function applyEnemyAttackHit(attackDef, toPlayerDir, hit) {
-  const direction = hit?.direction?.lengthSq() ? hit.direction.clone() : toPlayerDir.clone();
-  direction.y = 0;
-  if (direction.lengthSq() < 0.0001) direction.set(0, 0, -1);
-  direction.normalize();
-  const damage = attackDef?.damage || 1;
-  player.healthPulse = 0.45;
-  player.health = Math.max(0, (player.health ?? player.maxHealth ?? PLAYER_MAX_HEALTH) - damage);
-  player.damageTaken = (player.damageTaken || 0) + damage;
-  player.damageFlash = Math.min(1, Math.max(player.damageFlash || 0, 0.95));
-  player.lastDamageAt = performance.now();
-  player.attack = null;
-  player.attackTimer = 0;
-  player.hurtTimer = Math.max(0.18, hurtAction?.getClip?.().duration || 0.46);
-  player.hurtRecoverTimer = 0;
-  if (hurtAction) playArmAction(hurtAction, 0.03, true);
-  player.velocity.addScaledVector(direction, attackDef?.knockback || 1.65);
-  playThud(1.05);
-}
-
-function startEnemyAttack() {
-  if (!enemy || isEnemyCorpseActive() || enemy.userData.attackTimer > 0) return;
-  const attackName = enemyActions.has('attackHorizontal') ? 'attackHorizontal' : '';
-  if (!attackName) {
-    console.warn('enemy attack missing attackHorizontal; refusing fallback attack');
-    return;
-  }
-  const clipDuration = enemyActions.get(attackName)?.getClip?.().duration || ENEMY_ATTACK_RECOVERY;
-  const attackDef = getEnemyAttackDefinition(attackName, clipDuration);
-  enemy.userData.attackName = attackName;
-  enemy.userData.attackDefKey = attackName;
-  enemy.userData.attackDef = attackDef;
-  enemy.userData.attackTimer = Math.max(clipDuration, ENEMY_ATTACK_RECOVERY);
-  enemy.userData.attackElapsed = 0;
-  enemy.userData.attackHitDone = false;
-  enemy.userData.attackCurrentHand = sampleEnemyAttackHandWorld(attackDef);
-  enemy.userData.attackPrevHand = enemy.userData.attackCurrentHand.clone();
-  enemy.userData.attackContactPoint = null;
-  playEnemyAction(attackName, 0.055, { restart: true });
-}
-
-function updateEnemyEngagement(dt) {
-  if (!enemy) return;
-  enemy.userData.hitTimer = Math.max(0, enemy.userData.hitTimer - dt);
-  enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer || 0);
-  const nav = getEnemyNavState();
-  const baseY = Number.isFinite(enemy.userData.baseY) ? enemy.userData.baseY : enemy.position.y;
-  if (!enemy.visible) return;
-  if (enemy.userData.dead || isEnemyCorpseActive()) {
-    enemy.scale.setScalar(1);
-    updateEnemyRagdollDeath(dt);
-    if (enemy.userData.deathTimer > 0) {
-      enemy.userData.deathTimer = Math.max(0, enemy.userData.deathTimer - dt);
-      if (enemy.userData.deathTimer <= 0) despawnEnemyCorpse();
-    }
-    return;
-  }
-  updateEnemyMixer(dt);
-  enemy.position.y = baseY + Math.sin(performance.now() * 0.002) * 0.025;
-  enemy.scale.setScalar(enemy.userData.hitTimer > 0 ? 1.08 : 1);
-
-  const support = findEnemySupport(enemy.position.x, enemy.position.z, baseY, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
-  if (support) {
-    enemy.userData.baseY = support.topY;
-    if (nav) nav.lastValidSupport = makeVec(enemy.position.x, support.topY, enemy.position.z);
-  }
-  const previousGoal = nav?.goal ? nav.goal.clone() : null;
-  const playerGoalY = player.grounded ? (player.position.y - PLAYER_EYE_HEIGHT) : (previousGoal?.y ?? (player.position.y - PLAYER_EYE_HEIGHT));
-  const routeGoal = makeVec(player.position.x, playerGoalY, player.position.z);
-  const playerFloorY = playerGoalY;
-  const verticalGap = playerFloorY - enemy.userData.baseY;
-  const directCombatGoal = enemyCombatGoalPoint();
-  const toPlayer = player.position.clone().sub(enemy.position);
-  toPlayer.y = 0;
-  const dist = toPlayer.length();
-  const toPlayerDir = dist > 0.001 ? toPlayer.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1);
-
-  let playerRoomIndex = findNearestGauntletRoomIndex(player.position);
-  let enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
-  if (nav) {
-    nav.lastSeenPlayer = player.position.clone();
-    nav.repathTimer = Math.max(0, nav.repathTimer - dt);
-    if (nav.jump) {
-      advanceEnemyJump(dt);
-      return;
-    }
-    const roomDelta = (playerRoomIndex >= 0 && enemyRoomIndex >= 0)
-      ? Math.abs(playerRoomIndex - enemyRoomIndex)
-      : Number.POSITIVE_INFINITY;
-    const shouldWake = dist <= ENEMY_AI_WAKE_DISTANCE || roomDelta <= ENEMY_AI_WAKE_ROOM_DELTA;
-    const shouldSleep = dist >= ENEMY_AI_SLEEP_DISTANCE || roomDelta > ENEMY_AI_SLEEP_ROOM_DELTA;
-    if (nav.asleep ? !shouldWake : shouldSleep) {
-      if (!nav.asleep) {
-        nav.asleep = true;
-        clearEnemyRoute(nav);
-      }
-      nav.goal = null;
-      nav.jump = null;
-      nav.repathTimer = ENEMY_NAV_REPATH_INTERVAL;
-      nav.stallCount = 0;
-      enemy.userData.attackTimer = 0;
-      enemy.userData.attackElapsed = 0;
-      enemy.userData.attackHitDone = false;
-      enemy.userData.attackName = '';
-      enemy.userData.attackDefKey = '';
-      enemy.userData.attackDef = null;
-      enemy.userData.attackPrevHand = null;
-      enemy.userData.attackCurrentHand = null;
-      enemy.userData.attackContactPoint = null;
-      enemy.userData.mode = 'hold';
-      enemy.userData.modeTimer = 0;
-      playEnemyAction('idle', 0.16);
-      return;
-    }
-    if (nav.asleep) {
-      nav.asleep = false;
-      nav.repathTimer = 0;
-      nav.lastEnemyRoomIndex = -1;
-      nav.lastPlayerRoomIndex = -1;
-    }
-    nav.goal = routeGoal.clone();
-    const goalChanged = !previousGoal || (player.grounded ? previousGoal.distanceToSquared(nav.goal) > 0.36 : ((previousGoal.x - nav.goal.x) ** 2 + (previousGoal.z - nav.goal.z) ** 2 > 0.36));
-    const roomChanged = nav.lastEnemyRoomIndex !== enemyRoomIndex || nav.lastPlayerRoomIndex !== playerRoomIndex;
-    const staleRoute = nav.waypoints.length === 0 || nav.repathTimer <= 0 || roomChanged || goalChanged;
-    if (staleRoute) rebuildEnemyRoute(roomChanged || nav.waypoints.length === 0);
-    nav.lastEnemyRoomIndex = enemyRoomIndex;
-    nav.lastPlayerRoomIndex = playerRoomIndex;
-  }
-  enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
-
-  enemy.userData.attackCooldown = Math.max(0, (enemy.userData.attackCooldown || 0) - dt);
-  enemy.userData.commitTimer = Math.max(0, (enemy.userData.commitTimer || 0) - dt);
-  enemy.userData.modeTimer = Math.max(0, (enemy.userData.modeTimer || 0) - dt);
-  if (enemy.userData.hitTimer > 0) return;
-
-  if (enemy.userData.attackTimer > 0) {
-    const attackDef = enemy.userData.attackDef || getEnemyAttackDefinition(enemy.userData.attackDefKey || enemy.userData.attackName || 'attackHorizontal', enemy.userData.attackTimer);
-    enemy.userData.attackDef = attackDef;
-    enemy.userData.attackElapsed += dt;
-    enemy.userData.attackTimer = Math.max(0, enemy.userData.attackTimer - dt);
-    enemy.updateMatrixWorld(true);
-    const previousHand = enemy.userData.attackPrevHand ? enemy.userData.attackPrevHand.clone() : null;
-    const preDashHand = sampleEnemyAttackHandWorld(attackDef);
-    const preTravel = previousHand ? previousHand.distanceTo(preDashHand) : 0;
-    if (enemy.userData.attackElapsed >= attackDef.lungeStart && enemy.userData.attackElapsed <= attackDef.lungeEnd) {
-      applyEnemyMove(toPlayerDir, ENEMY_LUNGE_SPEED, dt);
-    }
-    enemy.updateMatrixWorld(true);
-    const currentHand = sampleEnemyAttackHandWorld(attackDef);
-    const postTravel = previousHand ? previousHand.distanceTo(currentHand) : 0;
-    enemy.userData.attackCurrentHand = currentHand.clone();
-    const attackActive = enemy.userData.attackElapsed >= attackDef.activeStart && enemy.userData.attackElapsed <= attackDef.activeEnd;
-    let attackProbe = null;
-    let attackHit = null;
-    if (!enemy.userData.attackHitDone && attackActive && previousHand) {
-      attackProbe = sweepEnemyAttackHitsPlayer(previousHand, currentHand, attackDef);
-      if (attackProbe?.hit) {
-        attackHit = attackProbe;
-        enemy.userData.attackHitDone = true;
-        enemy.userData.attackContactPoint = attackHit.center.clone();
-        applyEnemyAttackHit(attackDef, toPlayerDir, attackHit);
-      }
-    }
-    if (attackActive && previousHand) {
-      spawnEnemyAttackSweepDebug(previousHand, preDashHand, attackDef, null, { color: 0xff6f91 });
-      spawnEnemyAttackSweepDebug(previousHand, currentHand, attackDef, attackHit || attackProbe, { color: 0x6fffd5 });
-    }
-    if (DEBUG_ATTACK_SWEEP) {
-      enemy.userData.attackDebug = {
-        active: attackActive,
-        hitDone: !!enemy.userData.attackHitDone,
-        prev: previousHand ? previousHand.clone() : null,
-        curr: currentHand.clone(),
-        elapsed: enemy.userData.attackElapsed,
-        total: attackDef.clipDuration || 0,
-        activeStart: attackDef.activeStart,
-        activeEnd: attackDef.activeEnd,
-        lungeStart: attackDef.lungeStart,
-        lungeEnd: attackDef.lungeEnd,
-        distToPlayer: dist,
-        contactPoint: enemy.userData.attackContactPoint ? enemy.userData.attackContactPoint.clone() : null,
-        preHandTravel: preTravel,
-        handTravel: postTravel,
-        probeReason: attackProbe?.reason || '-',
-        probeDistanceSq: attackProbe?.distanceSq ?? -1,
-        probeThresholdSq: attackProbe?.thresholdSq ?? -1,
-        probeHorizontalDistance: attackProbe?.horizontalDistance ?? -1,
-      };
-    }
-    attackDebug.snapshot = {
-      name: enemy.userData.attackName || attackDef.name,
-      elapsed: enemy.userData.attackElapsed || 0,
-      total: attackDef.clipDuration || 0,
-      activeStart: attackDef.activeStart,
-      activeEnd: attackDef.activeEnd,
-      lungeStart: attackDef.lungeStart,
-      lungeEnd: attackDef.lungeEnd,
-      preDist: dist,
-      postDist: enemy.position.distanceTo(player.position),
-      active: attackActive,
-      reason: attackProbe?.reason || '-',
-      actual: attackProbe?.distanceSq >= 0 ? Math.sqrt(attackProbe.distanceSq) : 0,
-      threshold: attackProbe?.thresholdSq >= 0 ? Math.sqrt(attackProbe.thresholdSq) : (PLAYER_SOLID_RADIUS + Math.max(attackDef.sweepHalfExtents.x, attackDef.sweepHalfExtents.y)),
-      preTravel: preTravel,
-      postTravel: postTravel,
-    };
-    if (!enemy.userData.attackPrevHand) enemy.userData.attackPrevHand = currentHand.clone();
-    else enemy.userData.attackPrevHand.copy(currentHand);
-    if (enemy.userData.attackTimer <= 0) {
-      enemy.userData.attackCooldown = ENEMY_ATTACK_COOLDOWN;
-      enemy.userData.attackName = '';
-      enemy.userData.attackDefKey = '';
-      enemy.userData.attackDef = null;
-      enemy.userData.attackPrevHand = null;
-      enemy.userData.attackCurrentHand = null;
-      enemy.userData.attackContactPoint = null;
-      setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
-      playEnemyAction('idle', 0.12);
-    }
-    return;
-  }
-
-  attackDebug.snapshot = ATTACK_LAB ? {
-    name: enemy.userData.attackName || 'idle',
-    elapsed: 0,
-    total: 0,
-    activeStart: 0,
-    activeEnd: 0,
-    lungeStart: 0,
-    lungeEnd: 0,
-    preDist: dist,
-    postDist: dist,
-    active: false,
-    reason: '-',
-    actual: 0,
-    threshold: 0,
-    preTravel: 0,
-    postTravel: 0,
-  } : null;
-
-  if (ATTACK_LAB) {
-    if (enemy.userData.attackCooldown <= 0 && dist <= ENEMY_ATTACK_RANGE) {
-      startEnemyAttack();
-      return;
-    }
-    const moved = applyEnemyMove(toPlayerDir, dist > ENEMY_ATTACK_RANGE ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED, dt);
-    playEnemyAction(dist > ENEMY_ATTACK_RANGE + 0.2 ? 'run' : 'walk', 0.12);
-    if (!moved) enemy.rotation.y = Math.atan2(enemy.position.x - player.position.x, enemy.position.z - player.position.z);
-    return;
-  }
-
-  const mode = enemy.userData.mode || 'approach';
-  const directCombatPath = enemyHasDirectCombatPath();
-  if (nav && directCombatPath && nav.waypoints.length && !nav.jump) {
-    clearEnemyRoute(nav);
-    nav.routePath.length = 0;
-    nav.repathTimer = ENEMY_NAV_REPATH_INTERVAL * 0.5;
-  }
-  const tangent = new THREE.Vector3(-toPlayerDir.z, 0, toPlayerDir.x).multiplyScalar(enemy.userData.orbitSign || 1);
-  const navTarget = nav?.waypoints?.length ? nav.waypoints[0].clone() : null;
-  const navKind = nav?.waypointKinds?.[0] || 'flat';
-  const toNavTarget = navTarget ? navTarget.clone().sub(enemy.position) : null;
-  if (toNavTarget) toNavTarget.y = 0;
-  const navDist = toNavTarget ? toNavTarget.length() : dist;
-  const navDir = toNavTarget && navDist > 0.001 ? toNavTarget.clone().multiplyScalar(1 / navDist) : toPlayerDir;
-  const needsClimb = player.grounded && verticalGap > 0.22;
-  const separatedByGraph = enemyRoomIndex >= 0 && playerRoomIndex >= 0 && enemyRoomIndex !== playerRoomIndex;
-  const traversalActive = Boolean(navTarget) && (separatedByGraph || (nav?.routePath?.length || 0) > 0 || navKind !== 'flat' || navDist > ENEMY_ATTACK_RANGE + 0.45);
-
-  if (navTarget && navDist < 0.36) {
-    shiftEnemyRouteWaypoint(nav);
-    nav.repathTimer = 0;
-  }
-  if (nav?.jump) {
-    advanceEnemyJump(dt);
-    return;
-  }
-
-  if (traversalActive) {
-    setEnemyMode('approach');
-    const segmentNeedsJump = !sampleEnemyMoveSupport(enemy.position, navTarget) && enemyCanJumpBetween(enemy.position, navTarget);
-    if (segmentNeedsJump) {
-      startEnemyJump(navTarget);
-      return;
-    }
-    const navSpeed = (navKind === 'stair' || navKind === 'drop')
-      ? ENEMY_WALK_SPEED
-      : (navDist > ENEMY_RING_RADIUS + 1.75 || navKind === 'bridge' || navKind === 'branch' || navKind === 'jump' ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED);
-    const moved = applyEnemyMove(navDir, navSpeed, dt);
-    playEnemyAction(navSpeed > ENEMY_WALK_SPEED + 0.1 ? 'run' : 'walk', 0.16);
-    if (!moved) {
-      if (nav) {
-        nav.stallCount += 1;
-        nav.repathTimer = 0;
-        rebuildEnemyRoute(true);
-      }
-    } else if (nav) {
-      nav.stallCount = 0;
-      nav.lastValidSupport = makeVec(enemy.position.x, baseY, enemy.position.z);
-    }
-    return;
-  }
-
-  if (needsClimb) {
-    setEnemyMode('approach');
-    const climbDir = navTarget ? navDir : toPlayerDir;
-    const moved = applyEnemyMove(climbDir, ENEMY_RUN_SPEED, dt);
-    playEnemyAction('run', 0.16);
-    if (!moved && nav) {
-      nav.stallCount += 1;
-      nav.repathTimer = 0;
-      rebuildEnemyRoute(true);
-    }
-    return;
-  }
-
-  if (dist <= ENEMY_ATTACK_RANGE && enemy.userData.attackCooldown <= 0 && mode !== 'retreat' && !needsClimb && !traversalActive) {
-    startEnemyAttack();
-    return;
-  }
-
-  if (mode === 'commit') {
-    enemy.userData.commitElapsed += dt;
-    const moved = applyEnemyMove(navTarget ? navDir : toPlayerDir, ENEMY_RUN_SPEED, dt);
-    playEnemyAction('run', 0.12);
-    if (dist <= ENEMY_ATTACK_RANGE && enemy.userData.attackCooldown <= 0) {
-      startEnemyAttack();
-      return;
-    }
-    if (!moved || enemy.userData.commitElapsed >= ENEMY_COMMIT_TIMEOUT) {
-      setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
-      if (nav) nav.repathTimer = 0;
-    }
-    return;
-  }
-
-  if (mode === 'retreat') {
-    const retreatDir = toPlayerDir.clone().multiplyScalar(-0.85).addScaledVector(tangent, 0.42);
-    const moved = applyEnemyMove(retreatDir, ENEMY_RETREAT_SPEED, dt);
-    playEnemyAction(enemy.userData.orbitSign > 0 ? 'sidestepRight' : 'sidestepLeft', 0.14);
-    if (!moved || enemy.userData.modeTimer <= 0 || dist >= ENEMY_RING_RADIUS + ENEMY_RING_TOLERANCE) {
-      setEnemyMode('hold', 0.55);
-      if (nav) nav.repathTimer = 0;
-    }
-    return;
-  }
-
-  if (navTarget) {
-    const moved = applyEnemyMove(navDir, navDist > ENEMY_RING_RADIUS + 2.2 ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED, dt);
-    playEnemyAction(navDist > ENEMY_RING_RADIUS + 2.2 ? 'run' : 'walk', 0.16);
-    if (!moved) {
-      if (nav) {
-        nav.stallCount += 1;
-        nav.repathTimer = 0;
-        rebuildEnemyRoute(true);
-      }
-    } else if (nav) {
-      nav.stallCount = 0;
-      nav.lastValidSupport = makeVec(enemy.position.x, baseY, enemy.position.z);
-    }
-    return;
-  }
-
-  if (dist > ENEMY_RING_RADIUS + ENEMY_RING_TOLERANCE) {
-    setEnemyMode('approach');
-    const moved = applyEnemyMove(toPlayerDir, dist > ENEMY_RING_RADIUS + 2.2 ? ENEMY_RUN_SPEED : ENEMY_WALK_SPEED, dt);
-    playEnemyAction(dist > ENEMY_RING_RADIUS + 2.2 ? 'run' : 'walk', 0.16);
-    if (!moved) {
-      if (nav) {
-        nav.stallCount += 1;
-        nav.repathTimer = 0;
-        rebuildEnemyRoute(true);
-      }
-    }
-    return;
-  }
-
-  if (dist < ENEMY_ATTACK_RANGE * 0.78 && !needsClimb) {
-    setEnemyMode('retreat', ENEMY_RETREAT_DURATION);
-    return;
-  }
-
-  setEnemyMode('hold');
-  if (enemy.userData.commitTimer <= 0 && enemy.userData.attackCooldown <= 0) {
-    setEnemyMode('commit');
-    return;
-  }
-
-  const radialError = dist - ENEMY_RING_RADIUS;
-  const holdMove = tangent.clone().addScaledVector(toPlayerDir, radialError * 0.22);
-  const moved = applyEnemyMove(holdMove, ENEMY_SIDESTEP_SPEED, dt);
-  if (!moved) {
-    enemy.userData.orbitSign *= -1;
-    enemy.userData.commitTimer = Math.min(enemy.userData.commitTimer || 0, 0.25);
-    if (nav) {
-      nav.stallCount += 1;
-      nav.repathTimer = 0;
-      if (nav.stallCount >= ENEMY_NAV_STALL_LIMIT) rebuildEnemyRoute(true);
-    }
-  } else if (nav) {
-    nav.stallCount = 0;
-  }
-  playEnemyAction(enemy.userData.orbitSign > 0 ? 'sidestepRight' : 'sidestepLeft', 0.18);
-}
-
-function updateAttack(dt) {
-  player.attackTimer = Math.max(0, player.attackTimer - dt);
-  player.comboTimer = Math.max(0, player.comboTimer - dt);
-  const attack = player.attack;
-  if (!attack) return;
-  attack.elapsed += dt;
-  const def = attack.def;
-  if (!attack.hitDone && attack.elapsed >= def.hitAt) {
-    attack.hitDone = true;
-    const toEnemy = enemy.position.clone().sub(player.position);
-    toEnemy.y = 0;
-    const dist = toEnemy.length();
-    const alignment = dist > 0.001 ? attack.direction.dot(toEnemy.normalize()) : 0;
-    if (enemy.visible && !enemy.userData.dead && dist < def.range && alignment > 0.5) {
-      const reaction = chooseEnemyHitReaction(attack);
-      const reactionName = enemyActions.has(reaction.name) ? reaction.name : 'react';
-      const reactionAction = enemyActions.get(reactionName) || enemyActions.get('react');
-      enemy.userData.health -= def.damage;
-      enemy.userData.attackTimer = 0;
-      enemy.userData.attackElapsed = 0;
-      enemy.userData.attackHitDone = false;
-      enemy.userData.attackName = '';
-      enemy.userData.hitTimer = Math.max(0.24, Math.min(0.7, reactionAction?.getClip?.().duration || 0.32));
-      enemy.userData.lastHitReaction = reactionName;
-      enemy.userData.lastHitZone = reaction.zone;
-      enemy.userData.lastHitLocalX = reaction.localX;
-      enemy.userData.lastHitLocalY = reaction.localY;
-      enemy.position.addScaledVector(attack.direction, 0.28 + def.damage * 0.12);
-      playEnemyAction(reactionName, 0.012, { restart: true });
-      triggerHitJuice(reaction.worldImpact, attack.direction, def.damage);
-      playThud(1.05 + def.damage * 0.16);
-      if (enemy.userData.health <= 0) {
-        startEnemyDeath(attack.direction, def.damage);
-        if (enemy.userData.dead) setStatus('orc berserker down. survive another room.');
-      }
-    }
-  }
-  if (attack.elapsed >= def.duration) {
-    player.attack = null;
-    player.attackTimer = 0;
-  }
-}
-
 function updateArms(dt) {
   if (armsMixer) armsMixer.update(dt);
   player.hurtTimer = Math.max(0, player.hurtTimer - dt);
@@ -9274,6 +7539,7 @@ function render() {
     updateAttack(dt);
     updateEnemyEngagement(dt);
     updateArms(dt);
+    updateNookTts(dt);
     updateDiegeticLights(performance.now() / 1000);
     updatePad();
     renderer.clear();
@@ -9314,6 +7580,7 @@ function init() {
     placeActionPad();
     loadArms();
     loadOrcBerserkerEnemy();
+    loadNookTtsManifest();
     setStatus(ATTACK_LAB ? 'Attack lab ready' : 'Limbo room ready');
     render();
   } catch (err) {

@@ -130,3 +130,17 @@ Each prop cluster must answer one of these:
 - how the old structure was repurposed
 
 If it cannot answer one, it is filler.
+
+
+## Story Nook Placement
+
+Absent-people story nooks now have their own placement layer in `data/nook_story_placement_rules.json`.
+
+Use that file when a prop cluster is meant to carry household, shrine, burial, ration, or repair story evidence rather than only tactical clutter.
+
+Current Hanging Gardens wiring:
+
+- `hg_market_intake_nooks`: intake/customs domestic survival pilot
+- `hg_shrine_rim_nooks`: shrine-rim witness culture pilot
+
+Placement rule: story nooks should prefer side pockets, recesses, niche walls, service benches, and memorial shadows. They should not consume the main touch-safe route envelope.

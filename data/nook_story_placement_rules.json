@@ -1,0 +1,189 @@
+{
+  "version": "0.1.0",
+  "family": "hanging_gardens",
+  "goal": "Attach absent-people story packets to support-aware district recesses and circulation pockets without blocking the main touch-safe route.",
+  "placement_sets": [
+    {
+      "id": "hg_market_intake_nooks",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "district_archetypes": [
+        "intake"
+      ],
+      "skeleton_type": "hanging_market_hybrid",
+      "rules": [
+        "Prefer underdeck recesses, retaining-wall niches, toll alcoves, and stair veils before exposed bridge centerlines.",
+        "A nook may narrow a lane visually, but must preserve the reserved route envelope for touch movement.",
+        "Shelter and burial packets prefer covered recesses; repair and ration packets may sit closer to service or bridge-adjacent circulation."
+      ],
+      "cluster_rules": [
+        {
+          "cluster_id": "intake_shelter_layer",
+          "preferred_packet_ids": [
+            "hg_np_01_cistern_sleep_ledge",
+            "hg_np_04_grain_wall_recess",
+            "hg_np_05_name_veil_niche"
+          ],
+          "preferred_segment_roles": [
+            "support_stair",
+            "underdeck_pass"
+          ],
+          "preferred_mass_anchor_roles": [
+            "retaining_gate",
+            "undercroft_run"
+          ],
+          "support_mode": "floor_snap_recess",
+          "cover_requirement": "high",
+          "story_read": "domestic survival inside former public water and customs infrastructure"
+        },
+        {
+          "cluster_id": "customs_law_friction",
+          "preferred_packet_ids": [
+            "hg_np_07_toll_icon_shelf",
+            "hg_np_09_bell_blind_memorial",
+            "hg_np_12_underbridge_ash_wrap"
+          ],
+          "preferred_segment_roles": [
+            "market_court",
+            "bridge_landing"
+          ],
+          "preferred_mass_anchor_roles": [
+            "retaining_gate",
+            "aqueduct_remnant"
+          ],
+          "support_mode": "wall_niche_or_bridge_sidebay",
+          "cover_requirement": "medium",
+          "story_read": "official rule and household survival in direct conflict"
+        },
+        {
+          "cluster_id": "escape_preparation",
+          "preferred_packet_ids": [
+            "hg_np_03_splice_bench",
+            "hg_np_08_hidden_jar_crawlspace",
+            "hg_np_11_veil_stair_school"
+          ],
+          "preferred_segment_roles": [
+            "bridge_landing",
+            "underdeck_pass",
+            "roof_lane"
+          ],
+          "preferred_mass_anchor_roles": [
+            "aqueduct_remnant",
+            "undercroft_run"
+          ],
+          "support_mode": "service_edge_or_hidden_cache",
+          "cover_requirement": "medium",
+          "story_read": "covert eastward movement prepared through rope work, reserves, and child route training"
+        },
+        {
+          "cluster_id": "former_garden_memory",
+          "preferred_packet_ids": [
+            "hg_np_06_bath_step_corner",
+            "hg_np_10_garden_graft_table",
+            "hg_np_02_lamp_shelf_shrine"
+          ],
+          "preferred_segment_roles": [
+            "support_stair",
+            "market_court",
+            "roof_lane"
+          ],
+          "preferred_mass_anchor_roles": [
+            "bath_court",
+            "aqueduct_remnant"
+          ],
+          "support_mode": "former_use_surface",
+          "cover_requirement": "low_to_medium",
+          "story_read": "ordinary tending and ritual memory surviving inside the settlement machine"
+        }
+      ]
+    },
+    {
+      "id": "hg_shrine_rim_nooks",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "district_archetypes": [
+        "shrine"
+      ],
+      "skeleton_type": "hanging_market_hybrid",
+      "rules": [
+        "Prefer upper ledges, blind bell corners, sanctuary walls, and sealed stair approaches before open roof edges.",
+        "Witness, shrine, and memorial packets may sit near high silhouettes, but they must not obscure the player's critical route read.",
+        "Repair and ration packets should frame the sealed cistern attempt as a practical hope, not as abstract lore decoration."
+      ],
+      "cluster_rules": [
+        {
+          "cluster_id": "witness_sanctuary",
+          "preferred_packet_ids": [
+            "hg2_np_01_bell_tongue_reliquary",
+            "hg2_np_07_substitute_offering_wall",
+            "hg2_np_10_blind_choir_corner"
+          ],
+          "preferred_segment_roles": [
+            "roof_lane",
+            "bridge_landing"
+          ],
+          "preferred_mass_anchor_roles": [
+            "aqueduct_remnant"
+          ],
+          "support_mode": "high_wall_niche_or_screen_back",
+          "cover_requirement": "medium",
+          "story_read": "rites persist through substitution, witness, and silence"
+        },
+        {
+          "cluster_id": "law_and_exemption",
+          "preferred_packet_ids": [
+            "hg2_np_03_double_seal_bench",
+            "hg2_np_09_handprint_count_panel",
+            "hg2_np_11_linen_name_drawer"
+          ],
+          "preferred_segment_roles": [
+            "market_court",
+            "roof_lane"
+          ],
+          "preferred_mass_anchor_roles": [
+            "retaining_gate"
+          ],
+          "support_mode": "bench_panel_drawer_wall",
+          "cover_requirement": "medium",
+          "story_read": "civic rule survives only when rewritten by witness and mercy"
+        },
+        {
+          "cluster_id": "sealed_route_hope",
+          "preferred_packet_ids": [
+            "hg2_np_04_unblessed_water_shelf",
+            "hg2_np_08_cistern_cap_table",
+            "hg2_np_12_sealed_stair_cache"
+          ],
+          "preferred_segment_roles": [
+            "support_stair",
+            "underdeck_pass",
+            "bridge_landing"
+          ],
+          "preferred_mass_anchor_roles": [
+            "aqueduct_remnant",
+            "undercroft_run"
+          ],
+          "support_mode": "water_edge_or_service_table",
+          "cover_requirement": "medium",
+          "story_read": "the district's future is tied to reopening a sealed water route"
+        },
+        {
+          "cluster_id": "failed_bell_memory",
+          "preferred_packet_ids": [
+            "hg2_np_02_witness_step_school",
+            "hg2_np_05_unrung_memorial_arc",
+            "hg2_np_06_roof_curtain_cell"
+          ],
+          "preferred_segment_roles": [
+            "support_stair",
+            "roof_lane"
+          ],
+          "preferred_mass_anchor_roles": [
+            "retaining_gate"
+          ],
+          "support_mode": "stair_landing_or_watch_berth",
+          "cover_requirement": "high",
+          "story_read": "failed warning systems reshaped teaching, mourning, and nightly watch discipline"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,393 @@
+{
+  "version": "0.1.0",
+  "pilot_id": "hanging_gardens_absent_people_01",
+  "world_family": "hanging_gardens",
+  "district_label": "Floating Gardens Pilot",
+  "district_role": "intake_terraces_and_bridge_customs",
+  "hidden_run_story_state": {
+    "origin_population": "terrace_households",
+    "secondary_influence": "rope_market_carriers",
+    "rupture_event": "aqueduct poisoning",
+    "survival_doctrine": "concealment and rationed speech",
+    "taboo": "do not name the dead after dusk",
+    "hope": "eastward ascent to the lit terraces"
+  },
+  "recurring_motifs": [
+    "blue cord knots marking safe household routes",
+    "seven-bowl sharing sets for households larger than their utensils",
+    "eastward arrows scratched beside sheltered niches",
+    "covered names with age marks left visible",
+    "water-measure lines repurposed as ration and child-growth marks"
+  ],
+  "nook_packets": [
+    {
+      "id": "hg_np_01_cistern_sleep_ledge",
+      "nook_family": "shelter",
+      "former_use": "cistern inspection ledge",
+      "survival_use": "family sleeping shelf hidden behind a broken water screen",
+      "speaker_class": "caretaker",
+      "dominant_verb": "slept",
+      "material_context": "wet stone, patched reed mats, bowl stack, wind cloth tied to cracked bronze rings",
+      "survival_pressure": "crowding and the need to hide dependents near water access",
+      "taboo_or_rule": "children sleep furthest from the outer edge and no voice rises above a whisper after the second lantern",
+      "evidence_objects": [
+        "three layered bedroll nests",
+        "seven chipped bowls for one household",
+        "waterline marks reused as child-height marks",
+        "blue cord tied around the safest sleeping corner"
+      ],
+      "text_fragments": [
+        "Third ledge holds two. Do not take the mat if you are leaving before dawn.",
+        "Blue cord on the left post means the water below is still drawn.",
+        "Mark your count on the stone. Caretaker checks at first bell."
+      ],
+      "symbol_fragments": [
+        "three short chalk lines repeated beside the smallest bedroll",
+        "bowl arrangement from smallest to largest sleeper"
+      ],
+      "absence_or_interruption": "one bedroll niche is warm-shaped but empty, with its bowl turned upside down.",
+      "linked_motif": "seven-bowl sharing set",
+      "story_function": "origin_clue",
+      "location_hint": "under the first terrace stair where runoff still reaches the stone lip",
+      "voice_note": "Caretaker voice: the ledge is managed infrastructure, not refuge, and the phrasing enforces that distinction under scarcity."
+    },
+    {
+      "id": "hg_np_02_lamp_shelf_shrine",
+      "nook_family": "shrine",
+      "former_use": "lantern maintenance recess",
+      "survival_use": "household votive shelf for asking silence and concealment",
+      "speaker_class": "penitent",
+      "dominant_verb": "prayed",
+      "material_context": "soot-black alcove, wax drips, broken lamp cups reused as offering bowls",
+      "survival_pressure": "fear that speaking too freely brings tribunal attention and invites loss",
+      "taboo_or_rule": "a vow is knotted, not spoken, if the bridge below still carries listeners",
+      "evidence_objects": [
+        "wax pooled in old lamp cups",
+        "rope-knotted petitions instead of written names",
+        "erased saint face with only the hands left visible"
+      ],
+      "text_fragments": [
+        "One wick per household. Do not light for the unnamed.",
+        "Age only. No name after dusk. This was agreed.",
+        "Seven bowls. Three remain. Do not move the arrangement."
+      ],
+      "symbol_fragments": [
+        "three blue knots tied around a lamp hook",
+        "soot cross-lines covering an older blessing"
+      ],
+      "absence_or_interruption": "the central name plaque has been scraped smooth, but finger-polish remains where people still touch it.",
+      "linked_motif": "blue cord safe-route marker",
+      "story_function": "doctrine_clue",
+      "location_hint": "halfway up the intake wall between two collapsed lantern brackets",
+      "voice_note": "Mourner voice enforcing the taboo against naming the dead after dusk, with the bowl-count as a grief tally that doubles as inventory."
+    },
+    {
+      "id": "hg_np_03_splice_bench",
+      "nook_family": "repair",
+      "former_use": "market rope and load-splice bench",
+      "survival_use": "quiet maintenance corner for bridge-line repairs and covert route marking",
+      "speaker_class": "work_captain",
+      "dominant_verb": "repaired",
+      "material_context": "scarred plank, bronze hook fragments, chalk measures on stone, snapped pulley tooth",
+      "survival_pressure": "bridge travel must continue without attracting customs scrutiny or total structural failure",
+      "taboo_or_rule": "never replace two public lines in the same watch",
+      "evidence_objects": [
+        "chalk splice lengths",
+        "bundle of mismatched cord",
+        "hook sorted by load size",
+        "half-finished replacement pin"
+      ],
+      "text_fragments": [
+        "Blue cord spliced here must hold forty spans before the next anchor.",
+        "Novice: do not cut short to save time. The captain will know.",
+        "Eastward lines are priority. Mark them twice."
+      ],
+      "symbol_fragments": [
+        "load arrows with one safe path bent eastward",
+        "crossed-out measure where original cord thickness is impossible"
+      ],
+      "absence_or_interruption": "the strongest replacement rope is gone, but the weak public-looking rope remains in place.",
+      "linked_motif": "eastward route correction",
+      "story_function": "hope_clue",
+      "location_hint": "beside the old scaffold market drop where carriers once rebalanced loads",
+      "voice_note": "Work captain instruction left for a novice, practical and slightly threatening, tied to the eastward-ascent route motif."
+    },
+    {
+      "id": "hg_np_04_grain_wall_recess",
+      "nook_family": "ration",
+      "former_use": "grain tax wall niche",
+      "survival_use": "hidden issue point for household shares and emergency reductions",
+      "speaker_class": "quartermaster",
+      "dominant_verb": "counted",
+      "material_context": "sealed jars, weight stones, scraped tally wall, cloth plugs against damp",
+      "survival_pressure": "food is low and official measures no longer match real mouths",
+      "taboo_or_rule": "the old toll weights may be read but never trusted",
+      "evidence_objects": [
+        "three jar sizes color-marked by chalk",
+        "stones grouped by child, elder, worker",
+        "tally wall where public and private counts diverge"
+      ],
+      "text_fragments": [
+        "Twelve measures in. Seven spoken for. Do not touch the bottom row.",
+        "Water-line at the third mark is the household share. Not the carrier share.",
+        "If the seal is broken and you did not break it, go east. Now."
+      ],
+      "symbol_fragments": [
+        "double tally system, one bold and one hidden under soot",
+        "jar caps turned east for reserve stock"
+      ],
+      "absence_or_interruption": "the official ledger shelf is empty, but the chalk beneath it records more people than the tax niche was built to feed.",
+      "linked_motif": "water measure reused as ration law",
+      "story_function": "rupture_clue",
+      "location_hint": "inside a cracked retaining wall near the intake arch",
+      "voice_note": "Quartermaster voice: the recess is a rationed store, and the final line encodes the survival doctrine of concealment as an emergency instruction."
+    },
+    {
+      "id": "hg_np_05_name_veil_niche",
+      "nook_family": "burial",
+      "former_use": "service-urn recess",
+      "survival_use": "covered memorial for those who died during the first poison nights",
+      "speaker_class": "mourner",
+      "dominant_verb": "named",
+      "material_context": "ash jars, wrapped bundles, linen strips over names, apology offerings of dried herbs",
+      "survival_pressure": "grief must be preserved without breaking the dusk naming taboo",
+      "taboo_or_rule": "after dusk, ages may be counted but names must be veiled",
+      "evidence_objects": [
+        "three ash jars with cloth veils",
+        "age marks carved beside hidden names",
+        "one child-height token tied to an adult jar"
+      ],
+      "text_fragments": [
+        "Veil stays until the seventh morning. Do not lift it to check.",
+        "Age: 44. Age: 9. Age: 9.",
+        "We do not say them here. We said them at the east terrace."
+      ],
+      "symbol_fragments": [
+        "smallest age marks clustered nearest the wall",
+        "veils tied with the same blue cord seen on safe routes"
+      ],
+      "absence_or_interruption": "one jar space is empty and still ringed by fresh ash, as if the body never stayed long enough to cool.",
+      "linked_motif": "covered names with visible ages",
+      "story_function": "taboo_clue",
+      "location_hint": "behind the intake customs altar where old service vessels were once stored",
+      "voice_note": "Mourner voice: the ages without names honor the taboo while the repeated child-age makes the loss legible without exposition."
+    },
+    {
+      "id": "hg_np_06_bath_step_corner",
+      "nook_family": "shelter",
+      "former_use": "bathhouse waiting step",
+      "survival_use": "daytime schooling and sewing corner for the smallest children",
+      "speaker_class": "child",
+      "dominant_verb": "waited",
+      "material_context": "shallow step basin, thread scraps, chalk copy lines, folded cloth dolls without faces",
+      "survival_pressure": "children must remain quiet, occupied, and ready to move fast",
+      "taboo_or_rule": "copy the rule until your hand knows it better than your mouth",
+      "evidence_objects": [
+        "chalk copy lines at knee height",
+        "tiny folded cloth dolls missing mouths",
+        "needle wrap hidden under a basin lip"
+      ],
+      "text_fragments": [
+        "Water here is not for drinking. Do not let the children forget.",
+        "Ration line is the third scratch from the drain. Below that, report to the caretaker.",
+        "Soap left means someone is coming back. Do not use it."
+      ],
+      "symbol_fragments": [
+        "child-sized arrows all pointing to the same hidden stair",
+        "practice tally marks that stop midway across the stone"
+      ],
+      "absence_or_interruption": "one copy line breaks off after the word 'mother' and is smeared by a wet hand.",
+      "linked_motif": "eastward arrows beside child marks",
+      "story_function": "hope_clue",
+      "location_hint": "on the dry bath step above the cracked basin drain",
+      "voice_note": "Caretaker voice with a refugee clerk's precision: the soap line encodes hope and absence simultaneously without naming either."
+    },
+    {
+      "id": "hg_np_07_toll_icon_shelf",
+      "nook_family": "shrine",
+      "former_use": "toll icon and customs seal shelf",
+      "survival_use": "contested devotional and legal nook where rule and mercy are argued in marks",
+      "speaker_class": "refugee_clerk",
+      "dominant_verb": "bargained",
+      "material_context": "stamp trays, seal wax, scratched exemptions, candle stubs set in tax weights",
+      "survival_pressure": "old gate law still controls movement, but household survival requires exemptions no authority can cleanly grant",
+      "taboo_or_rule": "do not stamp a child as cargo, even if the bridge demands a count",
+      "evidence_objects": [
+        "old customs stamp beside melted votive wax",
+        "small ledger shards with rewritten entries",
+        "weights used as candle holders"
+      ],
+      "text_fragments": [
+        "Toll ledger closed at the poisoning. These marks are ours now.",
+        "Blue cord tied to the left bracket: safe passage confirmed this morning.",
+        "Do not move the icon. The guard uses it to count who has passed."
+      ],
+      "symbol_fragments": [
+        "official seal crossed by a hand-drawn lantern",
+        "same line entered twice, once in rule-script and once in hurried household shorthand"
+      ],
+      "absence_or_interruption": "the heaviest stamp is gone, but its clean square remains in the dust.",
+      "linked_motif": "rule versus household survival",
+      "story_function": "contradiction_clue",
+      "location_hint": "inside the customs alcove overlooking the first bridge gate",
+      "voice_note": "Guard voice repurposing official toll infrastructure for concealed household route-signaling, showing the rupture event's administrative aftermath."
+    },
+    {
+      "id": "hg_np_08_hidden_jar_crawlspace",
+      "nook_family": "ration",
+      "former_use": "drain maintenance crawlspace",
+      "survival_use": "reserve cache for households planning an eastward break",
+      "speaker_class": "scavenger",
+      "dominant_verb": "stored",
+      "material_context": "low stone tunnel, sealed jars, wrapped dried roots, blue knot markers on the third brick seam",
+      "survival_pressure": "public stores are watched; any real escape needs hidden food and dry cloth",
+      "taboo_or_rule": "never empty the reserve in one crossing",
+      "evidence_objects": [
+        "three reserve jars behind removable stone",
+        "bundle of dry wraps",
+        "chalk count on tunnel ceiling visible only when lying down"
+      ],
+      "text_fragments": [
+        "Three jars. The cracked one is not food. Do not open it in here.",
+        "If you are reading this and you are not from the terrace households, leave one jar and go.",
+        "Mark on the lid means it was tested. No mark means wait for the caretaker."
+      ],
+      "symbol_fragments": [
+        "third-brick blue knot code",
+        "ceiling marks for number of crossings supplied"
+      ],
+      "absence_or_interruption": "one jar ring is empty and recently swept clean, but no new count replaces it.",
+      "linked_motif": "reserve stock facing east",
+      "story_function": "hope_clue",
+      "location_hint": "under the drain lip beneath the second terrace bridge",
+      "voice_note": "Scavenger voice with a refugee clerk's caution: the cracked jar implies the poisoning without naming it, and the conditional address enforces concealment doctrine."
+    },
+    {
+      "id": "hg_np_09_bell_blind_memorial",
+      "nook_family": "burial",
+      "former_use": "bell rope blind corner",
+      "survival_use": "memorial stop for those taken when the warning bells failed",
+      "speaker_class": "guard",
+      "dominant_verb": "mourned",
+      "material_context": "frayed bell rope, charcoal wall marks, stacked token stones, one snapped clapper shard",
+      "survival_pressure": "many deaths came from route failure and delayed warning rather than open battle",
+      "taboo_or_rule": "the blind bell is touched once for each household lost, never rung",
+      "evidence_objects": [
+        "token stone stacks by household",
+        "rope polished by silent touch",
+        "charcoal marks for each failed watch"
+      ],
+      "text_fragments": [
+        "Bell is not rung after dusk. This was decided.",
+        "Scratch a line for each household that passed through. Forty-one lines.",
+        "Do not ask who stopped counting."
+      ],
+      "symbol_fragments": [
+        "watch marks split into before-poison and after-poison counts",
+        "one child's token nested inside a larger stack"
+      ],
+      "absence_or_interruption": "the clapper is gone, but the rope is more worn than any active bell line nearby.",
+      "linked_motif": "route warning failure",
+      "story_function": "rupture_clue",
+      "location_hint": "at the blind side of the collapsed bell station above the intake run",
+      "voice_note": "Mourner voice compressed to near-silence: the tally and the unanswered question carry the grief without any ornament."
+    },
+    {
+      "id": "hg_np_10_garden_graft_table",
+      "nook_family": "repair",
+      "former_use": "terrace grafting and pruning table",
+      "survival_use": "mixed-use bench where plant care techniques were repurposed into splinting and rope patching",
+      "speaker_class": "caretaker",
+      "dominant_verb": "substituted",
+      "material_context": "pruning grooves, twine, reed splints, bronze knife with root sap and lamp soot on the same edge",
+      "survival_pressure": "old garden craft survives only by being turned toward bodies, ropes, and concealment",
+      "taboo_or_rule": "good binding is used first for the living, then for the wall",
+      "evidence_objects": [
+        "grafting knife reused for cord trimming",
+        "reed splints cut to forearm length",
+        "old plant labels turned into measure tabs"
+      ],
+      "text_fragments": [
+        "Eastward rootstock only. The western beds are not worth the water.",
+        "Child's copy: graft at the third node, bind with the thin cord, do not touch for nine days.",
+        "If it takes, mark the pot with a line. If it does not, say nothing."
+      ],
+      "symbol_fragments": [
+        "former plant rows crossed into limb-length marks",
+        "sap stains overlapping repair chalk"
+      ],
+      "absence_or_interruption": "the table still has labeled garden pegs, but no living grafts remain nearby.",
+      "linked_motif": "former use survives through body care",
+      "story_function": "origin_clue",
+      "location_hint": "on a terrace spur where the old hanging beds once caught runoff",
+      "voice_note": "Work captain instruction transcribed by a child into a copy exercise, with the eastward-ascent hope embedded in the agricultural priority."
+    },
+    {
+      "id": "hg_np_11_veil_stair_school",
+      "nook_family": "shelter",
+      "former_use": "service stair pause landing",
+      "survival_use": "teaching nook where children learn route law and silence practice before crossings",
+      "speaker_class": "novice",
+      "dominant_verb": "taught",
+      "material_context": "curtain veil, chalk panel, low stool, hidden bundle of spare wraps",
+      "survival_pressure": "every child must know the route rules before their first concealed crossing",
+      "taboo_or_rule": "you may point east before you may say east",
+      "evidence_objects": [
+        "chalk panel with erased route lesson",
+        "low stool worn into one corner",
+        "spare wraps measured to child height"
+      ],
+      "text_fragments": [
+        "Copy until the line is straight. Caretaker will check the angle.",
+        "Do not write names. Write ages. Write directions. Write counts.",
+        "Eastward arrow: draw it the same way every time. This matters."
+      ],
+      "symbol_fragments": [
+        "rows of hand-drawn arrows with only one left un-crossed",
+        "small handprints stopping at the safe edge line"
+      ],
+      "absence_or_interruption": "the final lesson panel is washed clean except for one eastward arrow at the bottom.",
+      "linked_motif": "speech rationed into gesture",
+      "story_function": "doctrine_clue",
+      "location_hint": "behind the veil on the stair just before the customs overlook",
+      "voice_note": "Novice and child voice in a constrained lesson environment where the curriculum is survival literacy, not letters."
+    },
+    {
+      "id": "hg_np_12_underbridge_ash_wrap",
+      "nook_family": "burial",
+      "former_use": "bridge maintenance tool bay",
+      "survival_use": "rapid-wrap station for bodies that could not be kept in open household space",
+      "speaker_class": "work_captain",
+      "dominant_verb": "concealed",
+      "material_context": "tool hooks, ash cloth, lime bowl, hurried knot wraps, one official hook still labeled for bridge irons",
+      "survival_pressure": "poison deaths came too quickly for full rites and too openly for public mourning",
+      "taboo_or_rule": "if the body crosses before dusk, the name waits until morning",
+      "evidence_objects": [
+        "stacked ash cloth wraps",
+        "lime bowl beside old iron hook labels",
+        "bundle tags marked by age and household count instead of name"
+      ],
+      "text_fragments": [
+        "Ash wrap means the household is finished. Do not disturb the bundle.",
+        "Penitent: if you wrapped it, you owe three days of water-carrying. No exceptions.",
+        "Age marked on the outside. Name is inside. It stays inside."
+      ],
+      "symbol_fragments": [
+        "bundle tags grouped by family knot pattern",
+        "hook labels overwritten with ash counts"
+      ],
+      "absence_or_interruption": "one wrap is tied but empty, as if a body was taken back by its household after the count was made.",
+      "linked_motif": "household identity over official naming",
+      "story_function": "contradiction_clue",
+      "location_hint": "in the tool bay beneath the main customs bridge",
+      "voice_note": "Penitent and mourner voice: the ash wrap is a burial practice shaped entirely by the taboo, with the name's concealment made physically literal."
+    }
+  ],
+  "integrated_writing_pass": {
+    "source": "../thunder-brainstorm/generated/story_drafts/infinite_brutality_hanging_gardens_nook_story_claude.json",
+    "raw_source": "../thunder-brainstorm/generated/story_drafts/infinite_brutality_hanging_gardens_nook_story_claude_raw.txt",
+    "date": "2026-06-11",
+    "method": "bounded Claude packet pass integrated by Codex",
+    "notes": "Replaced pilot text_fragments with Claude-authored short environmental fragments and preserved voice notes per packet."
+  }
+}

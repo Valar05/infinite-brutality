@@ -87,6 +87,7 @@ Build the world in this order:
 Important:
 
 - District skeleton metadata must exist before room fitting.
+- District story-placement metadata must exist before nook/evidence placement, even if readable text surfaces are deferred.
 - District skeleton geometry must not be allowed to silently invalidate room anchors.
 - Spawn sanitization is the final defensive layer, not the primary layout tool.
 
@@ -250,6 +251,7 @@ Room and traversal systems use these support concepts:
 
 - `walkableSurfaces`
 - `solidColliders`
+- `climbSurfaces`
 - `findEnemySupport(...)`
 - `findEnemyCapsuleSupport(...)`
 - `resolveEnemySpawnPoint(...)`
@@ -257,6 +259,7 @@ Room and traversal systems use these support concepts:
 Rules:
 
 - support snap chooses legal floor support
+- climb attach may use `climbSurfaces` for normals-based recovery faces even when collision remains coarse
 - body clearance must be checked separately from floor support
 - a valid top surface is not enough if the enemy capsule intersects a nearby mass
 
@@ -403,3 +406,7 @@ When converting a new district skeleton:
 7. only then copy the pattern to the next district
 
 Do not convert multiple districts at once until the runtime contract holds for one proof district.
+
+`storyNookPlacements` is the resolved runtime placement plan: packet IDs, cluster IDs, target roles, and world positions chosen from district anchors and segment roles before any later prose or prop rendering.
+
+District crystal growths may also be derived from the same segment-role basis at runtime. They are allowed to add cheap recovery shelves and `climbSurfaces`, but they must stay offset from the main route and must not replace the canonical room bundle or district spine.

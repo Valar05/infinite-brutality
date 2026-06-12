@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "source": "../thunder-brainstorm/generated/story_drafts/infinite_brutality_nook_tts_claude.json",
+  "speaker_profiles": [
+    {
+      "id": "nook_narrator",
+      "model": "gpt-4o-mini-tts",
+      "voice": "sage",
+      "speed": 0.94,
+      "instructions": "Speak as a brief severe environmental narrator. One sentence, human, grim, and controlled. Avoid theatrical flourish."
+    }
+  ],
+  "clips": [
+    {
+      "id": "nook_tts_hg_np_01_cistern_sleep_ledge",
+      "packet_id": "hg_np_01_cistern_sleep_ledge",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Children slept furthest from the edge.",
+      "text_key": "9858bb099836a10327f469c6fe0364a2cb82b30f25ad669afc771e657464abf8",
+      "generation_key": "nook_narrator_9381964990ba181e",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_9381964990ba181e.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_02_lamp_shelf_shrine",
+      "packet_id": "hg_np_02_lamp_shelf_shrine",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Vows were knotted here because the bridge still listened.",
+      "text_key": "67771c9e25a7689524106417e73b3f9e7dbec904f2a34c7b8c087d10d00ba292",
+      "generation_key": "nook_narrator_dcc03c30f075c4a6",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_dcc03c30f075c4a6.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_03_splice_bench",
+      "packet_id": "hg_np_03_splice_bench",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "East lines were repaired first and marked twice.",
+      "text_key": "508a1521dfa7a462becc85d2a60d4ef5993e2ac1c87fb97af37d69d55ac765f7",
+      "generation_key": "nook_narrator_87ca97a8d550e6c2",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_87ca97a8d550e6c2.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_04_grain_wall_recess",
+      "packet_id": "hg_np_04_grain_wall_recess",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "A broken grain seal meant flee east at once.",
+      "text_key": "aa4a7026092d1e7cd9f9bfce7942f7b339d2f44f26fbd96d561d2a218b2c6461",
+      "generation_key": "nook_narrator_4313238b815fa868",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_4313238b815fa868.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_05_name_veil_niche",
+      "packet_id": "hg_np_05_name_veil_niche",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Ages were cut in stone and names stayed veiled.",
+      "text_key": "977021a81b364e671d562e9ac986a0905865ce165706ccb3eadc5f07a97dbae5",
+      "generation_key": "nook_narrator_04236f8abd9f2789",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_04236f8abd9f2789.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_06_bath_step_corner",
+      "packet_id": "hg_np_06_bath_step_corner",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Children learned the ration law on this step.",
+      "text_key": "a03130bf6ea7bd89c1b492bf2ac4d372184e0c0de389806ed3f5d48a2046d13d",
+      "generation_key": "nook_narrator_3593c5d1718d11ae",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_3593c5d1718d11ae.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_07_toll_icon_shelf",
+      "packet_id": "hg_np_07_toll_icon_shelf",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "The toll ledger ended at the poisoning.",
+      "text_key": "4cbdd448bf7e186970e10b6f36ad6cd378c848e14c3d66f2dc4ca64bccbb6774",
+      "generation_key": "nook_narrator_999304e1503af316",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_999304e1503af316.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_08_hidden_jar_crawlspace",
+      "packet_id": "hg_np_08_hidden_jar_crawlspace",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Three jars waited here for the eastward crossing.",
+      "text_key": "a67d84963745a833a407e4b1fd5adc4b0c9bbf792a5bffb0b58fcdbb1ec01bbf",
+      "generation_key": "nook_narrator_bebcc6e28c8bbfb7",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_bebcc6e28c8bbfb7.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_09_bell_blind_memorial",
+      "packet_id": "hg_np_09_bell_blind_memorial",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Forty-one households passed before the counting stopped.",
+      "text_key": "e36c718898d39032f59b8342e697cdabb246b4c30c16039e46fbb3713cd939ab",
+      "generation_key": "nook_narrator_56e0e78a6463f128",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_56e0e78a6463f128.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_10_garden_graft_table",
+      "packet_id": "hg_np_10_garden_graft_table",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "This grafting table became a splinting bench.",
+      "text_key": "08d406c794ef121e187fd137bf736bee7be98b5089d33ecd4ad662f996115deb",
+      "generation_key": "nook_narrator_a5ff9530a99c5bf1",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_a5ff9530a99c5bf1.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_11_veil_stair_school",
+      "packet_id": "hg_np_11_veil_stair_school",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "Children pointed east before they were allowed to say it.",
+      "text_key": "73cf6438d34b0f29f1e53f838daf5ed048d79dd64ee96bfe28fc91c4f865b1e0",
+      "generation_key": "nook_narrator_e47ec514d0aea091",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_e47ec514d0aea091.mp3"
+    },
+    {
+      "id": "nook_tts_hg_np_12_underbridge_ash_wrap",
+      "packet_id": "hg_np_12_underbridge_ash_wrap",
+      "pilot_id": "hanging_gardens_absent_people_01",
+      "speaker_id": "nook_narrator",
+      "text": "The dead were wrapped with age outside and name inside.",
+      "text_key": "09d55ddd505503535ca612cf9be2dd063c454a4d961ca1d10c241fccd31cb3a2",
+      "generation_key": "nook_narrator_e724d55b08620872",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_e724d55b08620872.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_01_bell_tongue_reliquary",
+      "packet_id": "hg2_np_01_bell_tongue_reliquary",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Seven bell tongues were wrapped here, and three never returned.",
+      "text_key": "df9ea25c4648469b2815ae057a7fbd6fbb40f56165886f5a0191854df8575092",
+      "generation_key": "nook_narrator_9eb2a4f7789ab926",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_9eb2a4f7789ab926.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_02_witness_step_school",
+      "packet_id": "hg2_np_02_witness_step_school",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Children named themselves here before touching the rope.",
+      "text_key": "cb9a34b501be7f484ab4090e1d707e52b00284d9d13880adf5d43b714ad0292f",
+      "generation_key": "nook_narrator_b4afcf89feb6e8aa",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_b4afcf89feb6e8aa.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_03_double_seal_bench",
+      "packet_id": "hg2_np_03_double_seal_bench",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Every seal needed a mercy mark on the back.",
+      "text_key": "a210cdce7524ee18b3cb172b4c99e2e7d21ef144b73306c6ebc7ab70344b964f",
+      "generation_key": "nook_narrator_8fc004cc9a17fdd7",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_8fc004cc9a17fdd7.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_04_unblessed_water_shelf",
+      "packet_id": "hg2_np_04_unblessed_water_shelf",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "These bowls stayed unblessed after the collapse.",
+      "text_key": "21a2e2b4901ffc2dcd174d3f69b19aca4e6276c00d8a2704b0a7b6afdd85906b",
+      "generation_key": "nook_narrator_518b9ea43b8ee59e",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_518b9ea43b8ee59e.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_05_unrung_memorial_arc",
+      "packet_id": "hg2_np_05_unrung_memorial_arc",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "The bell fell before any of these names were rung.",
+      "text_key": "7b518952b5527c9d201ebda54108f922662ce510d917feed47b7476450592e14",
+      "generation_key": "nook_narrator_495e64d13082f88a",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_495e64d13082f88a.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_06_roof_curtain_cell",
+      "packet_id": "hg2_np_06_roof_curtain_cell",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "The last watcher left this curtain torn open.",
+      "text_key": "220a93d2b78ee4b3a2d5f3ba50d33b2bae07312eecf66f4c453da224eac78c8a",
+      "generation_key": "nook_narrator_af9c845c9c2452c2",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_af9c845c9c2452c2.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_07_substitute_offering_wall",
+      "packet_id": "hg2_np_07_substitute_offering_wall",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "When offerings failed, folded names took their place.",
+      "text_key": "80fc72be056a16781ba501d4e7e89df9665adf66e341398bea8617547be63e9b",
+      "generation_key": "nook_narrator_335069d836289792",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_335069d836289792.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_08_cistern_cap_table",
+      "packet_id": "hg2_np_08_cistern_cap_table",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Route papers to the sealed stair were kept here.",
+      "text_key": "2151bd4526171d678de3ee38c6d511a92d66e230338c96c3e0e58484da69fb0c",
+      "generation_key": "nook_narrator_1c3b3d253cac59de",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_1c3b3d253cac59de.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_09_handprint_count_panel",
+      "packet_id": "hg2_np_09_handprint_count_panel",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Each white handprint marks one witness.",
+      "text_key": "13eef35a54349705ebe905a3fbf5e09c55dccdd47498c252321a9d6ed4322284",
+      "generation_key": "nook_narrator_f18ae6379378408f",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_f18ae6379378408f.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_10_blind_choir_corner",
+      "packet_id": "hg2_np_10_blind_choir_corner",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Children practiced the bell rhythm against bare stone.",
+      "text_key": "8ad0bd79c6cd3798d19487aa5bcf33b94efe66165c4d39ff2078ad32ecee328d",
+      "generation_key": "nook_narrator_c5571ad40d912444",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_c5571ad40d912444.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_11_linen_name_drawer",
+      "packet_id": "hg2_np_11_linen_name_drawer",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Knotted linen meant confirmed gone, and plain linen meant wait.",
+      "text_key": "33cee90afc9d1ea626d3aacccde7d2307f006aa20c1448495650433b8141c277",
+      "generation_key": "nook_narrator_b8131061ab5615f4",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_b8131061ab5615f4.mp3"
+    },
+    {
+      "id": "nook_tts_hg2_np_12_sealed_stair_cache",
+      "packet_id": "hg2_np_12_sealed_stair_cache",
+      "pilot_id": "hanging_gardens_absent_people_02",
+      "speaker_id": "nook_narrator",
+      "text": "Rope, lamp, and four dry days waited for the stair.",
+      "text_key": "7246239734348aaeee7e3ea51accfa57216dcd0dd46bd031501d6d5cb05c4d7b",
+      "generation_key": "nook_narrator_13409b880f92246e",
+      "file": "assets/audio/generated/nook_narrator/nook_narrator_13409b880f92246e.mp3"
+    }
+  ]
+}

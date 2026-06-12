@@ -13,6 +13,16 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 - Project links: `../thunder-brainstorm/generated/project_links/infinite_brutality_project_links.md`
 - Project links JSON: `../thunder-brainstorm/generated/project_links/infinite_brutality_project_links.json`
 - Manual source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_source_refs.jsonl`
+- Nook story / absent-people writing note: `../thunder-brainstorm/generated/session_learnings/2026-06-11_infinite_brutality_nook_story_brainstorm.md`
+- Nook story source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_nook_story_source_refs.jsonl`
+- Local nook story system: `docs/NOOK_STORY_WRITING_SYSTEM.md`
+- Local nook story placement rules: `docs/NOOK_STORY_PLACEMENT_RULES.md`
+- Local nook story seed data: `data/nook_story_seed.json`
+- Local nook story placement data: `data/nook_story_placement_rules.json`
+- Hanging Gardens pilot doc: `docs/HANGING_GARDENS_NOOK_STORY_PILOT.md`
+- Hanging Gardens pilot data: `data/hanging_gardens_nook_story_pilot.json`
+- Hanging Gardens Thunder note: `../thunder-brainstorm/generated/session_learnings/2026-06-11_infinite_brutality_hanging_gardens_story_pilot.md`
+- Hanging Gardens source packet: `../thunder-brainstorm/generated/source_packets/infinite_brutality_hanging_gardens_nook_story_source.md`
 - Precursor FPS/Arcane brainstorm: `../thunder-brainstorm/generated/session_learnings/2026-06-07_fps_platformer_arcane_ik_brainstorm.md`
 - Quake/touch movement brainstorm: `../thunder-brainstorm/generated/session_learnings/2026-06-08_quake_movement_touch_speedrun_brainstorm.md`
 - Quake route grammar curriculum: `../thunder-brainstorm/generated/quake_route_grammar/quake_route_grammar_curriculum.md`

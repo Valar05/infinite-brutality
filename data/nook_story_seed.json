@@ -1,0 +1,597 @@
+{
+  "version": "0.1.0",
+  "world_family": "hanging_gardens",
+  "system": "nook_story_packets",
+  "story_questions": [
+    "Where did these people come from?",
+    "How do they live now that the world has become Limbo?"
+  ],
+  "corpus_bands": [
+    {
+      "id": "foundation",
+      "purpose": "civilizational voice, public memory, ritual scale",
+      "source_families": [
+        "epic",
+        "tragedy",
+        "scripture",
+        "lament",
+        "apocalypse",
+        "funeral oration"
+      ]
+    },
+    {
+      "id": "daily_life",
+      "purpose": "ordinary survival texture and absent-human detail",
+      "source_families": [
+        "letters",
+        "household manuals",
+        "monastic rules",
+        "market rules",
+        "camp regulations",
+        "ledgers",
+        "pilgrim accounts"
+      ]
+    },
+    {
+      "id": "ruin",
+      "purpose": "collapse, exile, siege, plague, aftermath",
+      "source_families": [
+        "siege chronicles",
+        "plague writing",
+        "refugee testimony",
+        "prison writing",
+        "famine record",
+        "reconstruction account"
+      ]
+    },
+    {
+      "id": "child_domestic",
+      "purpose": "tenderness, learning, repetition, family habit",
+      "source_families": [
+        "copybook exercise",
+        "lullaby",
+        "teaching text",
+        "family admonition",
+        "apprentice instruction"
+      ]
+    },
+    {
+      "id": "local_canon",
+      "purpose": "project-specific recurrence and anti-generic vocabulary",
+      "source_families": [
+        "district roles",
+        "former use tags",
+        "settlement jobs",
+        "ritual formulas",
+        "taboos",
+        "landmark names"
+      ]
+    }
+  ],
+  "run_story_axes": {
+    "origin_populations": [
+      {
+        "id": "terrace_households",
+        "label": "Terrace Households",
+        "summary": "displaced orchard, bath, and cistern families clustering inside broken public infrastructure"
+      },
+      {
+        "id": "rope_market_carriers",
+        "label": "Rope-Market Carriers",
+        "summary": "porters and riggers who survive by circulation knowledge and rope code"
+      },
+      {
+        "id": "chapel_custodians",
+        "label": "Chapel Custodians",
+        "summary": "rite keepers preserving taboos with salvaged substitutes"
+      },
+      {
+        "id": "furnace_tenders",
+        "label": "Furnace Tenders",
+        "summary": "kiln and corpsefire workers who turn disposal into social power"
+      },
+      {
+        "id": "toll_remnant_scribes",
+        "label": "Toll Remnant Scribes",
+        "summary": "clerks and customs remnants trying to preserve authority through records"
+      }
+    ],
+    "rupture_events": [
+      "aqueduct poisoning",
+      "bridge tribunal purges",
+      "famine and weight rationing",
+      "corpsefire fuel crisis",
+      "belltower collapse and route severance",
+      "scaffold market sack"
+    ],
+    "survival_doctrines": [
+      "concealment and rationed speech",
+      "strict tally and measured sharing",
+      "ritual substitution over doctrinal purity",
+      "route secrecy over fixed residence",
+      "heat before sanctity"
+    ],
+    "taboos": [
+      "do not name the dead after dusk",
+      "do not sleep above an uncounted body",
+      "do not waste lamp oil on private grief",
+      "do not mark a child for weighing twice",
+      "do not ring a bridge bell without witness"
+    ],
+    "hopes": [
+      "eastward ascent to the lit terraces",
+      "reopening the sealed cistern route",
+      "a new count free of the old toll law",
+      "carrying the children above the corpsefire smoke",
+      "finding an unwatched bridge out"
+    ]
+  },
+  "fragment_channels": [
+    "inscription",
+    "chalk_note",
+    "scratched_mark",
+    "tally_system",
+    "icon_sequence",
+    "household_arrangement",
+    "object_repetition",
+    "absence_or_interruption",
+    "reused_official_plaque",
+    "stitched_or_knotted_signal"
+  ],
+  "speaker_classes": [
+    "caretaker",
+    "child",
+    "novice",
+    "quartermaster",
+    "mourner",
+    "scavenger",
+    "guard",
+    "penitent",
+    "refugee_clerk",
+    "work_captain"
+  ],
+  "nook_families": [
+    {
+      "id": "shelter",
+      "dominant_verbs": [
+        "slept",
+        "hid",
+        "waited"
+      ],
+      "evidence_objects": [
+        "pallet stack",
+        "windbreak cloth",
+        "shared bowls",
+        "hidden cache",
+        "child height marks"
+      ],
+      "text_forms": [
+        "sleeping order",
+        "ration note",
+        "lullaby fragment",
+        "silence prayer"
+      ],
+      "symbol_forms": [
+        "blanket fold code",
+        "door scratch cluster",
+        "bowl arrangement by age"
+      ],
+      "contradiction_hooks": [
+        "more sleeping places than bowls",
+        "child marks but no child bedding",
+        "cache emptied in haste"
+      ]
+    },
+    {
+      "id": "shrine",
+      "dominant_verbs": [
+        "prayed",
+        "vowed",
+        "bargained"
+      ],
+      "evidence_objects": [
+        "substitute offerings",
+        "wax drips",
+        "rope petitions",
+        "erased icon",
+        "hand-touch wear"
+      ],
+      "text_forms": [
+        "vow formula",
+        "forbidden-name omission",
+        "warning against false rite",
+        "ascent promise"
+      ],
+      "symbol_forms": [
+        "knot clusters",
+        "stacked stones",
+        "crossed soot lines"
+      ],
+      "contradiction_hooks": [
+        "devotional object reused as ration seal",
+        "two competing icon systems",
+        "prayer scraped away and rewritten"
+      ]
+    },
+    {
+      "id": "repair",
+      "dominant_verbs": [
+        "repaired",
+        "measured",
+        "substituted"
+      ],
+      "evidence_objects": [
+        "tool roll",
+        "chalk measure",
+        "scavenged fitting",
+        "failed brace",
+        "replacement pin"
+      ],
+      "text_forms": [
+        "work order fragment",
+        "substitution note",
+        "load warning",
+        "measurement string"
+      ],
+      "symbol_forms": [
+        "fit marks",
+        "weight arrows",
+        "crossed-out join diagram"
+      ],
+      "contradiction_hooks": [
+        "careful measure beside reckless patch",
+        "replacement part weaker than original",
+        "repair stopped mid-task"
+      ]
+    },
+    {
+      "id": "ration",
+      "dominant_verbs": [
+        "counted",
+        "stored",
+        "distributed"
+      ],
+      "evidence_objects": [
+        "tally wall",
+        "sealed jar",
+        "portion scoop",
+        "reserve compartment",
+        "spoiled allotment"
+      ],
+      "text_forms": [
+        "issue list",
+        "priority order",
+        "theft warning",
+        "emergency reduction note"
+      ],
+      "symbol_forms": [
+        "notch bands",
+        "jar cap colors",
+        "weight stones grouped by class"
+      ],
+      "contradiction_hooks": [
+        "private reserve hidden inside public stock",
+        "official count does not match vessel count",
+        "children assigned adult share marks"
+      ]
+    },
+    {
+      "id": "burial",
+      "dominant_verbs": [
+        "mourned",
+        "named",
+        "concealed"
+      ],
+      "evidence_objects": [
+        "wrapped bundle",
+        "ash jar",
+        "apology offering",
+        "covered names",
+        "kin tally"
+      ],
+      "text_forms": [
+        "memorial list",
+        "remembrance vow",
+        "silence rule",
+        "taboo line"
+      ],
+      "symbol_forms": [
+        "stacked ash tokens",
+        "age marks",
+        "veiled name plaques"
+      ],
+      "contradiction_hooks": [
+        "names removed but ages left",
+        "burial rite mixed with ration practice",
+        "memorial repeated in two hands with different counts"
+      ]
+    }
+  ],
+  "survivor_cultures": [
+    {
+      "id": "terrace_households",
+      "label": "Terrace Households",
+      "former_uses": [
+        "orchard terrace",
+        "bathhouse ward",
+        "cistern service quarter"
+      ],
+      "preferred_nooks": [
+        "shelter",
+        "ration",
+        "burial"
+      ],
+      "material_signatures": [
+        "washed bowls",
+        "patched cloth",
+        "water marks",
+        "child-height notches"
+      ],
+      "lexicon_tags": [
+        "measure",
+        "quiet",
+        "warmth",
+        "children",
+        "washing"
+      ],
+      "example_pressures": [
+        "crowding",
+        "water scarcity",
+        "hiding dependents"
+      ]
+    },
+    {
+      "id": "rope_market_carriers",
+      "label": "Rope-Market Carriers",
+      "former_uses": [
+        "market bridge",
+        "scaffold bazaar",
+        "freight gallery"
+      ],
+      "preferred_nooks": [
+        "repair",
+        "ration",
+        "shelter"
+      ],
+      "material_signatures": [
+        "knot code",
+        "load tallies",
+        "hook wear",
+        "route arrows"
+      ],
+      "lexicon_tags": [
+        "load",
+        "bridge",
+        "hand",
+        "lift",
+        "watch"
+      ],
+      "example_pressures": [
+        "route closure",
+        "load imbalance",
+        "checkpoint avoidance"
+      ]
+    },
+    {
+      "id": "chapel_custodians",
+      "label": "Chapel Custodians",
+      "former_uses": [
+        "abyss chapel",
+        "bell alcove",
+        "lantern stair shrine"
+      ],
+      "preferred_nooks": [
+        "shrine",
+        "burial",
+        "shelter"
+      ],
+      "material_signatures": [
+        "wax",
+        "smoke",
+        "rewritten litanies",
+        "substitute relics"
+      ],
+      "lexicon_tags": [
+        "mercy",
+        "count",
+        "name",
+        "dusk",
+        "ascent"
+      ],
+      "example_pressures": [
+        "doctrinal collapse",
+        "forbidden naming",
+        "ritual scarcity"
+      ]
+    },
+    {
+      "id": "furnace_tenders",
+      "label": "Furnace Tenders",
+      "former_uses": [
+        "kiln tier",
+        "corpsefire chamber",
+        "ash lift station"
+      ],
+      "preferred_nooks": [
+        "repair",
+        "ration",
+        "burial"
+      ],
+      "material_signatures": [
+        "ash ledgers",
+        "fuel marks",
+        "heat scoring",
+        "bone residue"
+      ],
+      "lexicon_tags": [
+        "heat",
+        "fuel",
+        "ash",
+        "weight",
+        "turn"
+      ],
+      "example_pressures": [
+        "fuel shortage",
+        "body overflow",
+        "air quality"
+      ]
+    },
+    {
+      "id": "toll_remnant_scribes",
+      "label": "Toll Remnant Scribes",
+      "former_uses": [
+        "bridge customs office",
+        "weigh station",
+        "gate ledger room"
+      ],
+      "preferred_nooks": [
+        "ration",
+        "shrine",
+        "repair"
+      ],
+      "material_signatures": [
+        "stamps",
+        "sealed tablets",
+        "amendment marks",
+        "crossed-out rules"
+      ],
+      "lexicon_tags": [
+        "entry",
+        "measure",
+        "pardon",
+        "witness",
+        "exemption"
+      ],
+      "example_pressures": [
+        "legitimacy collapse",
+        "record tampering",
+        "rule hoarding"
+      ]
+    }
+  ],
+  "packet_schema": {
+    "required": [
+      "id",
+      "district_role",
+      "nook_family",
+      "former_use",
+      "survival_use",
+      "speaker_class",
+      "dominant_verb",
+      "material_context",
+      "survival_pressure",
+      "run_story_axes",
+      "taboo_or_rule",
+      "evidence_objects",
+      "text_fragments",
+      "symbol_fragments",
+      "absence_or_interruption",
+      "linked_motif",
+      "story_function"
+    ],
+    "story_function_values": [
+      "origin_clue",
+      "doctrine_clue",
+      "rupture_clue",
+      "taboo_clue",
+      "hope_clue",
+      "contradiction_clue"
+    ]
+  },
+  "starter_fragment_templates": [
+    {
+      "id": "rule_fragment",
+      "channel": "inscription",
+      "example_shape": "Do not {action} before {condition}.",
+      "best_for": [
+        "shelter",
+        "shrine",
+        "burial"
+      ]
+    },
+    {
+      "id": "tally_fragment",
+      "channel": "tally_system",
+      "example_shape": "{count_group}:{count_mark} beside {resource_or_person}.",
+      "best_for": [
+        "ration",
+        "burial",
+        "shelter"
+      ]
+    },
+    {
+      "id": "vow_fragment",
+      "channel": "chalk_note",
+      "example_shape": "If {mercy_or_escape}, then {offering_or_obligation}.",
+      "best_for": [
+        "shrine",
+        "burial"
+      ]
+    },
+    {
+      "id": "substitution_fragment",
+      "channel": "scratched_mark",
+      "example_shape": "Use {replacement} for {lost_original}.",
+      "best_for": [
+        "repair",
+        "ration",
+        "shrine"
+      ]
+    },
+    {
+      "id": "warning_fragment",
+      "channel": "reused_official_plaque",
+      "example_shape": "{route_or_object} unsafe after {trigger}.",
+      "best_for": [
+        "repair",
+        "ration",
+        "shelter"
+      ]
+    },
+    {
+      "id": "memorial_fragment",
+      "channel": "inscription",
+      "example_shape": "{name_or_role}, {age_or_count}, {remembrance_clause}.",
+      "best_for": [
+        "burial",
+        "shrine"
+      ]
+    },
+    {
+      "id": "child_copy_fragment",
+      "channel": "chalk_note",
+      "example_shape": "I will {rule_or_prayer} repeated in uneven lines.",
+      "best_for": [
+        "shelter",
+        "shrine"
+      ]
+    },
+    {
+      "id": "route_fragment",
+      "channel": "icon_sequence",
+      "example_shape": "{safe_mark} toward {destination}; {crossed_mark} toward {false_destination}.",
+      "best_for": [
+        "repair",
+        "shelter",
+        "ration"
+      ]
+    },
+    {
+      "id": "work_fragment",
+      "channel": "scratched_mark",
+      "example_shape": "{step_one}, {step_two}, {step_three} with one step crossed out or incomplete.",
+      "best_for": [
+        "repair",
+        "ration"
+      ]
+    },
+    {
+      "id": "absence_fragment",
+      "channel": "absence_or_interruption",
+      "example_shape": "Expected {object_or_name} missing where the pattern says it should be.",
+      "best_for": [
+        "all"
+      ]
+    }
+  ]
+}

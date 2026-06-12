@@ -21,10 +21,12 @@ Read extra docs only when the change actually touches that area:
 - `docs/COMBAT_BRINGUP_PLAN.md`: attack logic, hurt logic, combat ownership, combat sequencing.
 - `docs/PROP_DECORATION_MANIFEST.md` and `data/prop_decoration_manifest.json`: prop families, district prop sets, decoration policy.
 - `docs/LEVEL_DESIGN_WORKFLOW.md`: level-design process and critique workflow.
+- `docs/NOOK_STORY_WRITING_SYSTEM.md`, `docs/NOOK_STORY_PLACEMENT_RULES.md`, `docs/NOOK_NARRATOR_VIBE.md`, `data/nook_story_seed.json`, and `data/nook_story_placement_rules.json`: corpus-backed environmental writing, narrator voice rules, district nook placement sets, survivor cultures, and story-fragment generation rules.
 
 ## Change Discipline
 
 - Prefer local edits over broad refactors.
+- For new durable runtime pieces, prefer object-oriented or factory-scoped stateful modules over adding more free functions and globals to `src/main.js`.
 - Preserve the single-family Hanging Gardens world policy unless the user explicitly changes it.
 - If a task crosses runtime-contract boundaries, update the relevant contract doc in the same pass.
 - If a new durable prop family, district rule, or validation rule is introduced, update the matching manifest or doc instead of leaving it implicit in code.

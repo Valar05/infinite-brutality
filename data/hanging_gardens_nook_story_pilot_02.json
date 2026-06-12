@@ -1,0 +1,392 @@
+{
+  "version": "0.1.0",
+  "pilot_id": "hanging_gardens_absent_people_02",
+  "world_family": "hanging_gardens",
+  "district_label": "Garden Rim Witness Pilot",
+  "district_role": "shrine_rim_and_bell_sanctuary",
+  "hidden_run_story_state": {
+    "origin_population": "chapel_custodians",
+    "secondary_influence": "toll_remnant_scribes",
+    "rupture_event": "belltower collapse and route severance",
+    "survival_doctrine": "ritual substitution over doctrinal purity",
+    "taboo": "do not ring a bridge bell without witness",
+    "hope": "reopening the sealed cistern route"
+  },
+  "recurring_motifs": [
+    "white plaster handprints used as witness counts",
+    "bell tongues wrapped in linen and stored like relics",
+    "double seals showing civic law beside devotional correction",
+    "upturned bowls marking unblessed or tainted water",
+    "vine-cut slit arrows pointing toward the sealed cistern stair"
+  ],
+  "nook_packets": [
+    {
+      "id": "hg2_np_01_bell_tongue_reliquary",
+      "nook_family": "shrine",
+      "former_use": "bell-service icon recess",
+      "survival_use": "reliquary shelf for wrapped bell tongues and witness petitions",
+      "speaker_class": "penitent",
+      "dominant_verb": "bargained",
+      "material_context": "plaster niche, soot rim, wrapped bronze tongues, ash wax, white handprint counts",
+      "survival_pressure": "the old call-to-order is gone, so authority must be reassembled through substitute rites",
+      "taboo_or_rule": "no tongue is struck without three witnessed hands",
+      "evidence_objects": [
+        "linen-wrapped bell tongues",
+        "stacked votive bowls turned mouth-down",
+        "witness handprints around the niche"
+      ],
+      "text_fragments": [
+        "Tongue of the third bell. Wrapped in salt cloth. Do not unwrap without two witnesses.",
+        "If the wrapping is dry, record it. If wet, report to the quartermaster before touching.",
+        "Seven tongues stored. Three unaccounted. Tally stands until route opens."
+      ],
+      "symbol_fragments": [
+        "three white palm marks beside the same wrapped tongue",
+        "crossed-out ring marks under newer witness dots"
+      ],
+      "absence_or_interruption": "the largest bell tongue is wrapped twice, as if too dangerous or too sacred to expose.",
+      "linked_motif": "white plaster witness counts",
+      "story_function": "doctrine_clue",
+      "location_hint": "high on the shrine rim wall beside a dead bell line",
+      "voice_note": "A caretaker's inventory note under pressure of dwindling accountability, where the act of wrapping substitutes for the act of ringing."
+    },
+    {
+      "id": "hg2_np_02_witness_step_school",
+      "nook_family": "shelter",
+      "former_use": "processional stair pause",
+      "survival_use": "teaching step where children learn witness law before bell routes",
+      "speaker_class": "novice",
+      "dominant_verb": "taught",
+      "material_context": "chalk panel, child-height step marks, folded wraps, cracked prayer stool",
+      "survival_pressure": "children must know how to move through sacred infrastructure without triggering old dangers",
+      "taboo_or_rule": "you may draw the witness mark before you may touch the bell rope",
+      "evidence_objects": [
+        "chalk witness circles",
+        "small handprints at even heights",
+        "stool worn smooth on one side"
+      ],
+      "text_fragments": [
+        "Stand on the marked step. Say your name aloud. Wait for the echo. That is witness enough.",
+        "Children: do not skip the step. The step is the rule now.",
+        "No echo means the passage is blocked again. Mark the date on the post."
+      ],
+      "symbol_fragments": [
+        "child-drawn circles around handprints",
+        "lesson arrows cut short at the sealed stair"
+      ],
+      "absence_or_interruption": "the last lesson line ends before the word 'ring'.",
+      "linked_motif": "handprints as law",
+      "story_function": "taboo_clue",
+      "location_hint": "on the inner stair before the upper lantern court",
+      "voice_note": "A work captain's instruction simplified for novices and children after formal witness rites could no longer be staffed."
+    },
+    {
+      "id": "hg2_np_03_double_seal_bench",
+      "nook_family": "repair",
+      "former_use": "customs seal desk",
+      "survival_use": "bench for forging exemptions, devotional countersigns, and witness-valid route papers",
+      "speaker_class": "refugee_clerk",
+      "dominant_verb": "substituted",
+      "material_context": "stamp tray, wax knives, chalk corrections, lead seal scraps, white plaster dust",
+      "survival_pressure": "old civic authority still blocks movement, so sanctuary requires document and ritual both",
+      "taboo_or_rule": "every civic seal must be answered by a witnessed mercy mark",
+      "evidence_objects": [
+        "paired seal impressions",
+        "scraped-out entries",
+        "wax blade used for both law and devotion"
+      ],
+      "text_fragments": [
+        "Both seals must press wet. One seal alone is a draft, not a record.",
+        "Civic seal left. Devotional seal right. Order is not optional.",
+        "If the devotional stamp is cracked, use the copy stamp. Note the substitution in the margin."
+      ],
+      "symbol_fragments": [
+        "square customs stamp beside round handprint mark",
+        "same docket amended in two inks"
+      ],
+      "absence_or_interruption": "the official bronze stamp is missing, but its dust square remains exact.",
+      "linked_motif": "double seal law",
+      "story_function": "contradiction_clue",
+      "location_hint": "at the old toll bench beneath the shrine ledger shelf",
+      "voice_note": "A refugee clerk's procedural reminder, insisting on legitimacy through form when institutional authority has already fractured."
+    },
+    {
+      "id": "hg2_np_04_unblessed_water_shelf",
+      "nook_family": "ration",
+      "former_use": "ablution bowl shelf",
+      "survival_use": "triage point for water judged safe, tainted, or unblessed",
+      "speaker_class": "quartermaster",
+      "dominant_verb": "counted",
+      "material_context": "ceramic bowls, water drip marks, bowl lids turned upside down, measure lines on plaster",
+      "survival_pressure": "ritual purity and bodily safety have diverged since the cistern routes failed",
+      "taboo_or_rule": "an upturned bowl is touched only by those already marked for bitter water",
+      "evidence_objects": [
+        "upright and inverted bowls in strict rows",
+        "water measure lines",
+        "chalk taste marks on the wall"
+      ],
+      "text_fragments": [
+        "Bowls upturned: water inside is not cleared. Do not drink. Do not pour on offerings.",
+        "Three bowls waiting since the collapse. No one with standing to bless them has come.",
+        "Leave them upturned. Touching them counts as a claim. You do not want the claim."
+      ],
+      "symbol_fragments": [
+        "triangle taste marks beside inverted bowls",
+        "measure lines cut deeper at the lower shelf"
+      ],
+      "absence_or_interruption": "one bowl row is empty except for a wet ring and a witness handprint.",
+      "linked_motif": "upturned bowls for tainted water",
+      "story_function": "rupture_clue",
+      "location_hint": "near the former washing arcade under the shrine rim",
+      "voice_note": "A caretaker's warning to scavengers, where the upturned bowl has become a legal and ritual boundary marker simultaneously."
+    },
+    {
+      "id": "hg2_np_05_unrung_memorial_arc",
+      "nook_family": "burial",
+      "former_use": "bell arch return",
+      "survival_use": "silent memorial stop for those lost when routes failed and bells never sounded",
+      "speaker_class": "mourner",
+      "dominant_verb": "mourned",
+      "material_context": "arch shadow, witness handprints, ash line, token stones, cracked bell bracket",
+      "survival_pressure": "the dead must be counted without invoking the bell that failed them",
+      "taboo_or_rule": "touch the bracket, do not strike it",
+      "evidence_objects": [
+        "stacked witness stones",
+        "plaster hand counts",
+        "ash rubbed into the old strike point"
+      ],
+      "text_fragments": [
+        "These names were never rung out. The bell fell before the list was read.",
+        "Do not ring a substitute here without a witness standing at the arc. That is the rule.",
+        "If you knew one of these names, press your hand to the plaster. That is permitted."
+      ],
+      "symbol_fragments": [
+        "rows of handprints grouped by household",
+        "old ring circles darkened over with ash"
+      ],
+      "absence_or_interruption": "the strike hammer is gone, but the reach marks are fresh.",
+      "linked_motif": "silent witness counts",
+      "story_function": "rupture_clue",
+      "location_hint": "in the shadow of the collapsed bell arch above the rim walkway",
+      "voice_note": "A mourner's posted instruction, holding the memorial open through substitution while acknowledging the original rite was never completed."
+    },
+    {
+      "id": "hg2_np_06_roof_curtain_cell",
+      "nook_family": "shelter",
+      "former_use": "roof lantern watch berth",
+      "survival_use": "curtained sleep cell for those tending the upper rites and watching the sealed stair",
+      "speaker_class": "caretaker",
+      "dominant_verb": "slept",
+      "material_context": "curtain strips, low pallet, oil flask, bowl pair, folded witness cloth",
+      "survival_pressure": "someone must keep continuous watch over the sealed cistern route while maintaining upper refuge quiet",
+      "taboo_or_rule": "the watcher sleeps closest to the cloth, never to the bell line",
+      "evidence_objects": [
+        "single watcher pallet",
+        "folded white cloth",
+        "two bowls, one kept inverted"
+      ],
+      "text_fragments": [
+        "Curtain closed means the cell is in use for substitute rite. Do not open it.",
+        "Curtain folded back and pinned: cell is empty and cleared. You may shelter here.",
+        "If the curtain is torn, the last occupant left in haste. Check the floor for dropped papers."
+      ],
+      "symbol_fragments": [
+        "one upright bowl, one downturned bowl",
+        "curtain knot tied in witness-count pattern"
+      ],
+      "absence_or_interruption": "the oil flask is warm-stained, but the pallet has not been smoothed since the last watch.",
+      "linked_motif": "watch beside sealed route",
+      "story_function": "hope_clue",
+      "location_hint": "on the roof lane behind torn curtain cloth and a broken lantern rail",
+      "voice_note": "A work captain's shorthand system for managing shared sanctuary space after formal room assignment collapsed."
+    },
+    {
+      "id": "hg2_np_07_substitute_offering_wall",
+      "nook_family": "shrine",
+      "former_use": "votive offering wall",
+      "survival_use": "substitution wall where impossible rites are answered with household objects and written exceptions",
+      "speaker_class": "penitent",
+      "dominant_verb": "prayed",
+      "material_context": "plaster pockets, child shoes, ration tokens, clipped vine, old saint niches with new chalk notes",
+      "survival_pressure": "the proper offerings no longer exist, but the need to answer grief and petition remains",
+      "taboo_or_rule": "if the proper thing is gone, offer the thing that cost you sleep",
+      "evidence_objects": [
+        "tiny domestic offerings",
+        "ration tokens tucked into saint niches",
+        "chalk exceptions beneath icon scars"
+      ],
+      "text_fragments": [
+        "If you have no proper offering, fold your name and press it flat against the lower course.",
+        "Folded names are not lesser. They are the record now. Do not remove another's fold.",
+        "Wall is full at the third course. Begin the fourth course left to right, no gaps."
+      ],
+      "symbol_fragments": [
+        "crossed saint halos with household marks beneath",
+        "same chalk line repeated under three empty niches"
+      ],
+      "absence_or_interruption": "one niche is polished bare, suggesting an object was taken back in desperation.",
+      "linked_motif": "ritual substitution",
+      "story_function": "doctrine_clue",
+      "location_hint": "along the inner shrine wall where votive shelves step upward",
+      "voice_note": "A penitent's instruction that has quietly become administrative policy, spoken in the voice of someone who had to make the rule themselves."
+    },
+    {
+      "id": "hg2_np_08_cistern_cap_table",
+      "nook_family": "repair",
+      "former_use": "cistern cap maintenance station",
+      "survival_use": "tool table for preparing a reopening attempt on the sealed water route",
+      "speaker_class": "work_captain",
+      "dominant_verb": "measured",
+      "material_context": "cap bolts, old wrench, chalk fit marks, vine-cut arrow tags, wrapped replacement washers",
+      "survival_pressure": "if the cistern route can be reopened, the district may escape both thirst and bell-law dependence",
+      "taboo_or_rule": "nothing is turned until the witness count matches the bolt count",
+      "evidence_objects": [
+        "numbered bolts",
+        "vine-cut directional tags",
+        "wrapped tool roll for a route not yet opened"
+      ],
+      "text_fragments": [
+        "Route papers for the cistern stair are held here. Do not take a paper without signing the ledger.",
+        "Cap is sealed. Papers are preparation only. Taking one is not permission to descend.",
+        "When the cap opens, the first ten names in the ledger go first. Add your name now."
+      ],
+      "symbol_fragments": [
+        "bolt numbers beside handprint circles",
+        "arrow slits cut toward the sealed stair"
+      ],
+      "absence_or_interruption": "the final washer is missing, but its cloth wrap is already laid open on the table.",
+      "linked_motif": "sealed cistern hope",
+      "story_function": "hope_clue",
+      "location_hint": "beside the capped cistern stair above the old wash channel",
+      "voice_note": "A refugee clerk managing hope as a queue, keeping the sealed route alive through bureaucratic anticipation rather than mystical promise."
+    },
+    {
+      "id": "hg2_np_09_handprint_count_panel",
+      "nook_family": "ration",
+      "former_use": "attendance and offering board",
+      "survival_use": "witness-count panel that doubles as ration and water priority order",
+      "speaker_class": "refugee_clerk",
+      "dominant_verb": "counted",
+      "material_context": "plaster panel, charcoal columns, handprints, bowl-hook pegs, wiped-off names",
+      "survival_pressure": "the district now allocates water and rite access by who can witness, carry, and survive the climb",
+      "taboo_or_rule": "a handprint can stand where a name cannot",
+      "evidence_objects": [
+        "ranked handprint rows",
+        "charcoal count columns",
+        "empty pegs where bowl tags once hung"
+      ],
+      "text_fragments": [
+        "Each white print is one witness present at a rite since the collapse. Count them yourself.",
+        "If your hand is smaller than the prints, press anyway. Size is not the measure.",
+        "Panel is full when prints overlap three deep. Start the second panel on the east wall."
+      ],
+      "symbol_fragments": [
+        "smallest handprints grouped beside lower water measures",
+        "one whole column scraped clean and re-counted"
+      ],
+      "absence_or_interruption": "an entire row is wiped away except for one thumb mark.",
+      "linked_motif": "handprints replacing names",
+      "story_function": "contradiction_clue",
+      "location_hint": "on the panel wall before the upper cistern queue once formed",
+      "voice_note": "A novice's copied instruction, preserving the witness-count system in the plainest possible terms after the original custodians were lost."
+    },
+    {
+      "id": "hg2_np_10_blind_choir_corner",
+      "nook_family": "shrine",
+      "former_use": "choir waiting corner",
+      "survival_use": "whisper-rite nook where children learn the rhythm of a bell they may not ring",
+      "speaker_class": "child",
+      "dominant_verb": "copied",
+      "material_context": "bench groove, chalk pulse marks, folded witness cloth strips, chipped pitch bowl",
+      "survival_pressure": "rite memory must survive after the instrument and permission are both gone",
+      "taboo_or_rule": "keep the rhythm in the hand, not the iron",
+      "evidence_objects": [
+        "pulse marks tapped into wood",
+        "child copy circles",
+        "pitch bowl used as silent tempo marker"
+      ],
+      "text_fragments": [
+        "Sing facing the wall. The corner carries the sound. That is why this spot was chosen.",
+        "No bell, no lead voice. Begin on the third breath. Stop when the echo stops.",
+        "This is not performance. Do not watch the one singing. Turn away or leave."
+      ],
+      "symbol_fragments": [
+        "even tap marks cut by small hands",
+        "tiny witness circles around a silent bowl"
+      ],
+      "absence_or_interruption": "the bowl lip is chipped where a clapper should have struck, but never did.",
+      "linked_motif": "silent bell memory",
+      "story_function": "origin_clue",
+      "location_hint": "in the blind choir corner behind the upper plaster screen",
+      "voice_note": "A penitent's rule for a substitute choir rite, insisting on the correct posture of witness even when the original choir structure is gone."
+    },
+    {
+      "id": "hg2_np_11_linen_name_drawer",
+      "nook_family": "burial",
+      "former_use": "ritual linen drawer",
+      "survival_use": "name concealment drawer where the dead are paired with witness cloth and age tags",
+      "speaker_class": "mourner",
+      "dominant_verb": "named",
+      "material_context": "linen bundles, age tags, ash dust, sealed slips, witness cloth tied in threes",
+      "survival_pressure": "names are preserved physically even when they cannot be spoken or displayed openly",
+      "taboo_or_rule": "the slip may be folded, never discarded",
+      "evidence_objects": [
+        "linen packets with age tags",
+        "sealed folded slips",
+        "three-knotted witness cloth"
+      ],
+      "text_fragments": [
+        "Names written on linen strips. One strip per person unaccounted since the collapse.",
+        "Do not add a name until three days have passed without word. That is the waiting rule.",
+        "Strips with a knot at the end: confirmed gone. Strips unknotted: still waiting."
+      ],
+      "symbol_fragments": [
+        "three-knot witness ties",
+        "age tags arranged by climb order instead of kin"
+      ],
+      "absence_or_interruption": "one drawer is open and empty except for ash where a folded slip should be.",
+      "linked_motif": "folded names and witness cloth",
+      "story_function": "taboo_clue",
+      "location_hint": "under the sanctuary shelf where linen once waited for feast days",
+      "voice_note": "A mourner's filing system that refuses to close grief prematurely, using the knot as the only honest marker of certainty."
+    },
+    {
+      "id": "hg2_np_12_sealed_stair_cache",
+      "nook_family": "ration",
+      "former_use": "stair-side lamp cache",
+      "survival_use": "reserve shelf for oil, dry cloth, and bitter-water bowls kept for the sealed cistern attempt",
+      "speaker_class": "scavenger",
+      "dominant_verb": "stored",
+      "material_context": "lamp recess, oil flask, wrapped bowl stack, hidden shelf behind broken plaster, vine-slit arrow",
+      "survival_pressure": "reopening the cistern route requires a staged cache and assumes some who start the climb will not finish it",
+      "taboo_or_rule": "reserve stock is counted by returns, not departures",
+      "evidence_objects": [
+        "oil flasks wrapped in cloth",
+        "bowls marked for bitter water",
+        "shelf concealed behind broken plaster"
+      ],
+      "text_fragments": [
+        "Vine cut points down and left. That is the stair direction. Mark it on your route paper.",
+        "Cache holds: two coils of rope, one lamp, four days of dry ration. Counted last at mid-season.",
+        "Do not open the cache for practice. It opens when the cap opens. Not before."
+      ],
+      "symbol_fragments": [
+        "vine-cut arrow toward hidden shelf",
+        "return-count notches deeper than departure marks"
+      ],
+      "absence_or_interruption": "the brightest flask is missing, but the return notch for it was never cut.",
+      "linked_motif": "return over departure",
+      "story_function": "hope_clue",
+      "location_hint": "behind broken plaster beside the sealed cistern stair",
+      "voice_note": "A quartermaster's terse field note, treating the sealed route as a logistical certainty rather than a hope, because someone has to believe it will open."
+    }
+  ],
+  "integrated_writing_pass": {
+    "source": "../thunder-brainstorm/generated/story_drafts/infinite_brutality_hanging_gardens_nook_story_02_claude.json",
+    "raw_source": "../thunder-brainstorm/generated/story_drafts/infinite_brutality_hanging_gardens_nook_story_02_claude_raw.txt",
+    "response_source": "../thunder-brainstorm/generated/story_drafts/infinite_brutality_hanging_gardens_nook_story_02_claude_response.json",
+    "date": "2026-06-11",
+    "method": "bounded Claude packet pass integrated by Codex",
+    "notes": "Replaced pilot II text_fragments with Claude-authored short environmental fragments and preserved voice notes per packet."
+  }
+}
