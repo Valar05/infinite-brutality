@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
-import { createDistrictGeometryApi } from './district-geometry.js';
-import { createMaterialResources } from './materials.js';
-import { createEnemyCombatApi } from './enemy-combat.js';
+import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.162';
+import { createMaterialResources } from './materials.js?v=0.8.163';
+import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js';
 import { createNookTtsApi } from './nook-tts.js';
+import { buildRockBridgeField, buildRockBridgeMeshData, queryVoxelTopY, queryVoxelIntersectsPrism } from './island-geometry.js?v=0.8.162';
+import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
   DISTRICT_ROOM_COUNT_PROFILES,
@@ -24,15 +26,19 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.125';
+const BUILD = '0.8.166';
+const ISLAND_ART_ONLY = true;
+const PLAYABLE_SLICE_ROOM_COUNT = 3;
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
 const DEBUG_RAGDOLL = new URLSearchParams(window.location.search).get('ragdebug') === '1';
 const DEBUG_ATTACK_SWEEP = new URLSearchParams(window.location.search).get('attackdebug') === '1';
+const DEBUG_UI = new URLSearchParams(window.location.search).get('debugui') === '1';
 const canvas = document.getElementById('game');
 const statusEl = document.getElementById('status');
 const readoutEl = document.getElementById('readout');
 const hintEl = document.getElementById('hint');
+if (readoutEl) readoutEl.hidden = !DEBUG_UI;
 const errorCopyButton = document.getElementById('errorCopyButton');
 const leftStick = document.getElementById('leftStick');
 const stickKnob = leftStick.querySelector('div');
@@ -69,12 +75,12 @@ renderer.shadowMap.enabled = USE_DYNAMIC_SHADOWS;
 renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.34;
+renderer.toneMappingExposure = 1.48;
 renderer.autoClear = false;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111722);
-scene.fog = new THREE.FogExp2(0x1a2230, 0.0068);
+scene.background = new THREE.Color(0x162329);
+scene.fog = new THREE.FogExp2(0x162329, 0.0058);
 
 const camera = new THREE.PerspectiveCamera(74, 1, 0.05, 160);
 camera.rotation.order = 'YXZ';
@@ -83,15 +89,51 @@ const armsScene = new THREE.Scene();
 const armsCamera = new THREE.PerspectiveCamera(82, 1, 0.01, 12);
 armsCamera.up.set(0, 1, 0);
 armsCamera.lookAt(0, 0, 1);
-armsScene.add(new THREE.HemisphereLight(0xf2e8d3, 0x1b1110, 1.25));
-const armsKey = new THREE.DirectionalLight(0xffffff, 1.4);
-armsKey.position.set(-1.5, 2.5, -2);
+armsScene.add(new THREE.HemisphereLight(0xe8ece8, 0x606868, 1.65));
+armsScene.add(new THREE.AmbientLight(0x788184, 1.55));
+const armsKey = new THREE.DirectionalLight(0xece8df, 2.0);
+armsKey.position.set(-0.4, 5.6, 3.4);
 armsScene.add(armsKey);
+const armsFill = new THREE.DirectionalLight(0xdfecef, 2.2);
+armsFill.position.set(2.8, 4.2, 2.0);
+armsScene.add(armsFill);
 
 const clock = new THREE.Clock();
 const loader = new GLTFLoader();
 const fbxLoader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
+const environmentPmrem = new THREE.PMREMGenerator(renderer);
+environmentPmrem.compileEquirectangularShader();
+function installMeshyEnvironmentLighting() {
+  const url = new URL('../assets/textures/ib-real-limbo-skybox-20260609.png', import.meta.url).href;
+  textureLoader.load(url, (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    const environmentMap = environmentPmrem.fromEquirectangular(texture).texture;
+    scene.environment = environmentMap;
+    armsScene.environment = environmentMap;
+    scene.environmentIntensity = 0.96;
+    armsScene.environmentIntensity = 1.28;
+    texture.dispose();
+    environmentPmrem.dispose();
+  }, undefined, (error) => {
+    console.warn('environment lighting texture failed; direct light rig remains', error);
+  });
+}
+installMeshyEnvironmentLighting();
+const FPSPLAYER_MESHY_VISUAL_OVERLAY = {
+  model: 'assets/models/fpsplayer_meshy/FPSPlayer_rigged_20260615.glb',
+  requiredTextures: ['baseColor', 'normal', 'roughness'],
+  textureTransform: { offset: [0.025, 0.475], repeat: [0.85, 0.65] },
+  textures: {
+    baseColor: 'Meshy_AI__0615135730_texture (1).png',
+    normal: 'Meshy_AI__0615135730_texture_normal.png',
+    roughness: 'Meshy_AI__0615135730_texture_roughness (1).png',
+    metallic: 'Meshy_AI__0615135730_texture_metallic (1).png',
+    emission: 'Meshy_AI__0615135730_texture_emission.png',
+  },
+  materialOptions: { color: 0xffffff, roughness: 1.0, metalness: 0.0, normalScale: 0.26, emissive: 0x000000, emissiveIntensity: 0.0, envMapIntensity: 0.72 },
+};
 const world = new THREE.Group();
 scene.add(world);
 let roomGroup = new THREE.Group();
@@ -180,6 +222,8 @@ const player = {
 
 const walkableSurfaces = [];
 const solidColliders = [];
+const meshSupportColliders = [];
+const voxelSupportColliders = [];
 const climbSurfaces = [];
 const diegeticLights = [];
 const bootParams = new URLSearchParams(window.location.search);
@@ -807,11 +851,42 @@ function worldOffset() {
   return makeVec(base.x + batchBuildOffset.x, base.y + batchBuildOffset.y, base.z + batchBuildOffset.z);
 }
 
+function computeOrientedBounds(centerX, centerZ, sizeX, sizeZ, yaw, margin = 0) {
+  const hx = sizeX * 0.5 + margin;
+  const hz = sizeZ * 0.5 + margin;
+  const c = Math.abs(Math.cos(yaw));
+  const s = Math.abs(Math.sin(yaw));
+  const extentX = c * hx + s * hz;
+  const extentZ = s * hx + c * hz;
+  return { minX: centerX - extentX, maxX: centerX + extentX, minZ: centerZ - extentZ, maxZ: centerZ + extentZ };
+}
+
+function toOrientedLocal(x, z, centerX, centerZ, yaw = 0) {
+  const dx = x - centerX;
+  const dz = z - centerZ;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return { x: dx * c - dz * s, z: dx * s + dz * c };
+}
+
+function horizontalContainsShape(entry, x, z, margin = 0) {
+  if (entry.shape === 'obb') {
+    const local = toOrientedLocal(x, z, entry.centerX, entry.centerZ, entry.yaw || 0);
+    return Math.abs(local.x) <= entry.sizeX * 0.5 - margin && Math.abs(local.z) <= entry.sizeZ * 0.5 - margin;
+  }
+  return x >= entry.minX + margin && x <= entry.maxX - margin && z >= entry.minZ + margin && z <= entry.maxZ - margin;
+}
+
 function registerWalkable(size, pos, margin = 0.12, options = {}) {
   const offset = worldOffset();
   const centerX = pos[0] + offset.x;
   const centerY = pos[1] + offset.y;
   const centerZ = pos[2] + offset.z;
+  const yaw = Number.isFinite(options.yaw) ? options.yaw : 0;
+  const shape = options.shape === 'obb' ? 'obb' : 'aabb';
+  const bounds = shape === 'obb'
+    ? computeOrientedBounds(centerX, centerZ, size[0], size[2], yaw, 0)
+    : { minX: centerX - size[0] / 2, maxX: centerX + size[0] / 2, minZ: centerZ - size[2] / 2, maxZ: centerZ + size[2] / 2 };
   walkableSurfaces.push({
     centerX,
     centerY,
@@ -819,13 +894,15 @@ function registerWalkable(size, pos, margin = 0.12, options = {}) {
     sizeX: size[0],
     sizeY: size[1],
     sizeZ: size[2],
-    minX: centerX - size[0] / 2 + margin,
-    maxX: centerX + size[0] / 2 - margin,
-    minZ: centerZ - size[2] / 2 + margin,
-    maxZ: centerZ + size[2] / 2 - margin,
+    minX: bounds.minX + margin,
+    maxX: bounds.maxX - margin,
+    minZ: bounds.minZ + margin,
+    maxZ: bounds.maxZ - margin,
     topY: centerY + size[1] / 2,
     source: options.source || '',
     traversalCritical: !!options.traversalCritical,
+    shape,
+    yaw,
   });
 }
 
@@ -834,6 +911,11 @@ function registerSolid(size, pos, margin = 0.0, options = {}) {
   const centerX = pos[0] + offset.x;
   const centerY = pos[1] + offset.y;
   const centerZ = pos[2] + offset.z;
+  const yaw = Number.isFinite(options.yaw) ? options.yaw : 0;
+  const shape = options.shape === 'obb' ? 'obb' : 'aabb';
+  const bounds = shape === 'obb'
+    ? computeOrientedBounds(centerX, centerZ, size[0], size[2], yaw, margin)
+    : { minX: centerX - size[0] / 2 - margin, maxX: centerX + size[0] / 2 + margin, minZ: centerZ - size[2] / 2 - margin, maxZ: centerZ + size[2] / 2 + margin };
   solidColliders.push({
     centerX,
     centerY,
@@ -841,14 +923,144 @@ function registerSolid(size, pos, margin = 0.0, options = {}) {
     sizeX: size[0],
     sizeY: size[1],
     sizeZ: size[2],
-    minX: centerX - size[0] / 2 - margin,
-    maxX: centerX + size[0] / 2 + margin,
+    minX: bounds.minX,
+    maxX: bounds.maxX,
     minY: centerY - size[1] / 2,
     maxY: centerY + size[1] / 2,
-    minZ: centerZ - size[2] / 2 - margin,
-    maxZ: centerZ + size[2] / 2 + margin,
+    minZ: bounds.minZ,
+    maxZ: bounds.maxZ,
     stepHeight: Number.isFinite(options.stepHeight) ? options.stepHeight : 0,
+    shape,
+    yaw,
   });
+}
+
+const meshSupportRaycaster = new THREE.Raycaster();
+const DOWN_VECTOR = new THREE.Vector3(0, -1, 0);
+
+function registerMeshSupportCollider(object, options = {}) {
+  if (!object) return null;
+  object.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(object);
+  const collider = { object, bounds, source: options.source || '' };
+  meshSupportColliders.push(collider);
+  return collider;
+}
+
+function registerVoxelSupportCollider(field, options = {}) {
+  if (!field) return null;
+  const origin = options.origin || [0, 0, 0];
+  const yaw = Number.isFinite(options.yaw) ? options.yaw : 0;
+  const centerX = origin[0];
+  const centerY = origin[1];
+  const centerZ = origin[2];
+  const minX = centerX + field.min.x;
+  const maxX = centerX + field.max.x;
+  const minY = centerY + field.min.y;
+  const maxY = centerY + field.max.y;
+  const minZ = centerZ + field.min.z;
+  const maxZ = centerZ + field.max.z;
+  const collider = { field, centerX, centerY, centerZ, yaw, minX, maxX, minY, maxY, minZ, maxZ, source: options.source || '' };
+  voxelSupportColliders.push(collider);
+  return collider;
+}
+
+function voxelLocalXZ(collider, x, z) {
+  return toOrientedLocal(x, z, collider.centerX, collider.centerZ, collider.yaw || 0);
+}
+
+function resolveVoxelSupportHeight(x, z, feetY, velocityY, stepUp = SUPPORT_SNAP_UP, stepDown = SUPPORT_SNAP_DOWN, prevFeetY = feetY) {
+  let best = null;
+  stepDown = effectiveSupportStepDown(feetY, prevFeetY, stepDown);
+  for (const collider of voxelSupportColliders) {
+    if (feetY > collider.maxY + stepUp || feetY < collider.minY - stepDown) continue;
+    if (x < collider.minX - PLAYER_SOLID_RADIUS || x > collider.maxX + PLAYER_SOLID_RADIUS) continue;
+    if (z < collider.minZ - PLAYER_SOLID_RADIUS || z > collider.maxZ + PLAYER_SOLID_RADIUS) continue;
+    const local = voxelLocalXZ(collider, x, z);
+    const topLocalY = queryVoxelTopY(collider.field, local.x, local.z, PLAYER_SOLID_RADIUS);
+    if (topLocalY == null) continue;
+    const topY = collider.centerY + topLocalY;
+    if (velocityY > 0.5 && feetY < topY - 0.14) continue;
+    if (feetY > topY + stepUp) continue;
+    if (feetY < topY - stepDown) continue;
+    if (!best || topY > best.topY) best = { topY, collider };
+  }
+  return best;
+}
+
+function voxelBodyBlockedAt(x, z, minY, maxY, radius = ENEMY_SOLID_RADIUS) {
+  for (const collider of voxelSupportColliders) {
+    if (maxY < collider.minY || minY > collider.maxY) continue;
+    if (x < collider.minX - radius || x > collider.maxX + radius) continue;
+    if (z < collider.minZ - radius || z > collider.maxZ + radius) continue;
+    const local = voxelLocalXZ(collider, x, z);
+    const localMinY = minY - collider.centerY;
+    const localMaxY = maxY - collider.centerY;
+    if (queryVoxelIntersectsPrism(collider.field, local.x, local.z, localMinY, localMaxY, radius)) return true;
+  }
+  return false;
+}
+
+function addIslandArtBridge(name, from, to, width = 4.4, options = {}) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const length = Math.hypot(dx, dz);
+  if (length < 0.4) return null;
+  const center = makeVec((from.x + to.x) * 0.5, (from.y + to.y) * 0.5, (from.z + to.z) * 0.5);
+  const yaw = Math.atan2(dx, dz);
+  const group = new THREE.Group();
+  group.name = name;
+  group.position.copy(center);
+  group.rotation.y = yaw;
+  roomGroup.add(group);
+  const thickness = options.thickness || 1.45;
+  const bridgeSeed = hashRoomKey(name + ':' + Math.round(length * 10));
+  const field = buildRockBridgeField(length, width, thickness, bridgeSeed);
+  const meshData = buildRockBridgeMeshData(length, width, thickness, bridgeSeed, MAT.islandRock?.userData?.uvScale ?? 0.12);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+  geometry.setIndex(meshData.indices);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geometry, options.material || MAT.islandRockDark);
+  group.add(mesh);
+  registerMeshSupportCollider(group, { source: options.source || name });
+  registerVoxelSupportCollider(field, { origin: [center.x, center.y, center.z], yaw, source: (options.source || name) + ':voxel' });
+  return group;
+}
+
+function addIslandArtSteppedRamp(name, from, to, options = {}) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const length = Math.max(0.001, Math.hypot(dx, dz));
+  const side = makeVec(-dz / length, 0, dx / length);
+  const seed = hashRoomKey(name + ':' + Math.round(length * 10));
+  const rng = rngFromSeed(seed);
+  const bendA = (rng() - 0.5) * 5.8;
+  const bendB = (rng() - 0.5) * 6.4;
+  const points = [
+    from.clone(),
+    makeVec(
+      from.x + dx * 0.36 + side.x * bendA,
+      from.y + (to.y - from.y) * 0.32,
+      from.z + dz * 0.36 + side.z * bendA,
+    ),
+    makeVec(
+      from.x + dx * 0.68 + side.x * bendB,
+      from.y + (to.y - from.y) * 0.66,
+      from.z + dz * 0.68 + side.z * bendB,
+    ),
+    to.clone(),
+  ];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    addIslandArtBridge(name + '-step-' + i, points[i], points[i + 1], options.width || 5.8, {
+      material: options.material || (i % 2 ? MAT.islandRock : MAT.islandRockDark),
+      thickness: options.thickness || 1.55,
+      source: (options.source || name) + ':step-' + i,
+    });
+  }
 }
 
 function registerClimbSurface(options) {
@@ -895,6 +1107,10 @@ function canStandOnClimbSurfaceTop(surface, x, z) {
 }
 
 function addWallBox(parent, name, size, pos, mat, cast = false) {
+  if (ISLAND_ART_ONLY) {
+    registerSolid(size, pos, 0.02);
+    return null;
+  }
   const mesh = addBox(parent, name, size, pos, mat, cast);
   registerSolid(size, pos, 0.02);
   return mesh;
@@ -971,6 +1187,7 @@ function addCeilingFrame(parent, prefix, width, depth, mat = MAT.wall) {
 }
 
 function addRoomShell(parent, width, depth, mat = MAT.stone, options = {}) {
+  if (ISLAND_ART_ONLY) return;
   const height = 10;
   const openSides = options.openSides || new Set(['north', 'south', 'west', 'east']);
   const isOpen = (side) => openSides === 'all' || openSides.has?.(side);
@@ -981,8 +1198,17 @@ function addRoomShell(parent, width, depth, mat = MAT.stone, options = {}) {
   addCeilingFrame(parent, 'ceiling-frame', width, depth, mat);
 }
 
+function islandRouteDisplayMaterial(mat) {
+  if (!ISLAND_ART_ONLY) return mat;
+  if (mat === MAT.bridge) return MAT.bridge;
+  if (mat === MAT.exit) return MAT.bridge;
+  if (mat === MAT.hazard || mat === MAT.bloodDark || mat === MAT.water) return MAT.islandRockDark;
+  return MAT.islandRock;
+}
+
 function addWalkableBox(parent, name, size, pos, mat, cast = true, margin = 0.12, options = null) {
-  const mesh = addBeveledBox(parent, name, size, pos, mat, cast, 0.04, 1);
+  const displayMat = islandRouteDisplayMaterial(mat);
+  const mesh = addBeveledBox(parent, name, size, pos, displayMat, cast, 0.04, 1);
   registerWalkable(size, pos, margin, options || {});
   return mesh;
 }
@@ -994,6 +1220,8 @@ function clearGroup(group) {
 function resetWalkableBounds() {
   walkableSurfaces.length = 0;
   solidColliders.length = 0;
+  meshSupportColliders.length = 0;
+  voxelSupportColliders.length = 0;
   climbSurfaces.length = 0;
   diegeticLights.length = 0;
 }
@@ -1230,7 +1458,7 @@ function applyBootNavigationTarget() {
     console.warn('boot district target not found', bootDistrictTarget);
   }
   if (bootParams.has('room')) {
-    const roomIndex = clamp(Number(bootParams.get('room') || 1) - 1, 0, GENERATED_ROOM_BATCH.length - 1);
+    const roomIndex = clamp(Number(bootParams.get('room') || 1) - 1, 0, playableRoomCount() - 1);
     roomState.nodeIndex = Math.floor(roomIndex);
     setNodeIndex(roomState.nodeIndex);
   }
@@ -1376,6 +1604,7 @@ function advanceLevelNode() {
 }
 
 function addMarker(parent, pos, color = MAT.green, scale = 1) {
+  if (ISLAND_ART_ONLY) return null;
   const orb = new THREE.Mesh(new THREE.OctahedronGeometry(0.26 * scale, 0), color);
   orb.position.copy(pos);
   parent.add(orb);
@@ -1402,6 +1631,7 @@ function addGlowPool(parent, prefix, pos, radius = 2.4, kind = 'flame') {
 }
 
 function addBrazier(parent, prefix, pos, options = {}) {
+  if (ISLAND_ART_ONLY) return null;
   const kind = options.kind || 'flame';
   const mat = kind === 'corpsefire' ? MAT.corpsefire : MAT.flame;
   const baseY = pos[1] || 0;
@@ -1805,6 +2035,15 @@ const MUTANT_ORC_CLIPS = {
   dying: 'assets/models/mutant_orc/mutant_dying.fbx',
 };
 const ORC_BERSERKER_MODEL = 'assets/models/orc_berserker/standing_idle.fbx';
+const ORC_BERSERKER_PBR = {
+  textures: {
+    baseColor: 'assets/models/orc_berserker/Meshy_AI_Orc_Berserker_0609121503_texture.png',
+    normal: 'assets/models/orc_berserker/Meshy_AI_Orc_Berserker_0609121503_texture_normal.png',
+    roughness: 'assets/models/orc_berserker/Meshy_AI_Orc_Berserker_0609121503_texture_roughness.png',
+    metallic: 'assets/models/orc_berserker/Meshy_AI_Orc_Berserker_0609121503_texture_metallic.png',
+  },
+  materialOptions: { roughness: 0.46, metalness: 0.18, normalScale: 0.18, emissiveIntensity: 0, envMapIntensity: 1.0 },
+};
 const ORC_BERSERKER_TARGET_HEIGHT = 1.7;
 const ORC_BERSERKER_GROUND_OFFSET = -0.32;
 const PRO_MELEE_AXE_CLIPS = {
@@ -1988,6 +2227,7 @@ const enemyCombat = createEnemyCombatApi({
     PLAYER_SOLID_RADIUS,
     PLAYER_MAX_HEALTH,
     ATTACK_LAB,
+    DEBUG_ATTACK_SWEEP,
   },
 });
 const {
@@ -2572,6 +2812,8 @@ function addBatchStairRun(parent, prefix, a, b, startTop, endTop, mat = MAT.plat
 }
 
 function addBatchShell(parent, spec, width, depth, height) {
+  if (ISLAND_ART_ONLY) return;
+
   const connectors = new Set((spec.horizontal_connectors || []).map(normalizeConnector));
   if (connectors.has('N')) addGoldPortalWall(parent, 'batch-north-portal', depth / 2, width, height, 6.4, 5.2);
   else addFullWall(parent, 'batch-north-wall', 'north', width, depth, height, MAT.wall);
@@ -2585,6 +2827,8 @@ function addBatchShell(parent, spec, width, depth, height) {
 }
 
 function addBatchVoidBoundary(parent, spec, width, depth, height, shellConnectors) {
+  if (ISLAND_ART_ONLY) return;
+
   const connectors = new Set((shellConnectors || []).map(normalizeConnector));
   const seed = hashRoomKey(spec.id || 'void-boundary');
   const missing = ['N', 'S', 'E', 'W'].filter((c) => !connectors.has(c));
@@ -2631,6 +2875,8 @@ function batchRoomDimensions(spec) {
 }
 
 function addBatchArchitecturalTemplate(parent, prefix, spec, width, depth, center, start, exit, options = {}) {
+  if (ISLAND_ART_ONLY) return;
+
   const role = spec.semantic_role || '';
   const routeText = (spec.route_sentence || []).join(' ');
   const routeAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
@@ -2784,6 +3030,8 @@ function addBatchConnectorLandmark(parent, name, point, connector, role, topY = 
 }
 
 function addBatchRoleLandmarks(parent, spec, start, exit, center, width, depth, exitTop) {
+  if (ISLAND_ART_ONLY) return;
+
   const role = spec.semantic_role || '';
   const seed = hashRoomKey(spec.id || role);
   const rng = rngFromSeed(seed);
@@ -2841,6 +3089,22 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
   const exit = connectorPoint(terminalExitConnector, width, depth, exitSurfaceTop, 4.5);
   const center = makeVec(0, Math.max(0.3, Math.min(1.05, (start.y + exit.y) * 0.5)), 0);
 
+  if (ISLAND_ART_ONLY) {
+    const sockets = {};
+    for (const connector of shellConnectors) {
+      const point = connectorPoint(connector, width, depth, 0.34, 4.6);
+      sockets[connector] = makeVec(point.x, point.y + PLAYER_EYE_HEIGHT, point.z);
+    }
+    return {
+      spawn: makeVec(start.x, start.y + PLAYER_EYE_HEIGHT, start.z),
+      exit: makeVec(exit.x, exit.y + PLAYER_EYE_HEIGHT, exit.z),
+      sockets,
+      exitRadius: 2.15,
+      enemyPositions: [makeVec(center.x, center.y, center.z), makeVec(exit.x, exit.y, exit.z)],
+      bounds: { minX: -width * 0.5 + 0.7, maxX: width * 0.5 - 0.7, minZ: -depth * 0.5 + 0.7, maxZ: depth * 0.5 - 0.7 },
+    };
+  }
+
   addBatchVoidBoundary(roomGroup, spec, width, depth, height, shellConnectors);
 
   // Build a carved chamber footprint first; pads and route pieces sit on top of this outline.
@@ -2849,7 +3113,7 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
   addWalkableTopBox(roomGroup, 'batch-exit-pad', [7.4, 5.4], exit, exit.y, MAT.platform, 0.08, 0.06, { source: 'batch-exit-pad', traversalCritical: true });
 
   // A narrow visual gutter gives movement focus without creating the giant side void from build 0.8.1.
-  if (wantsRiskLine) {
+  if (wantsRiskLine && !ISLAND_ART_ONLY) {
     const gutterAlongX = Math.abs(exit.x - start.x) > Math.abs(exit.z - start.z);
     const gutterSize = gutterAlongX ? [Math.max(8, width * 0.46), 1.25] : [1.25, Math.max(8, depth * 0.46)];
     addBeveledBox(roomGroup, 'batch-narrow-hazard-gutter', [gutterSize[0], 0.05, gutterSize[1]], [0, 0.035, 0], role.includes('hazard') ? MAT.hazard : MAT.bloodDark, false, 0.01, 1);
@@ -2990,10 +3254,22 @@ function buildGeneratedBatchRoom(spec, index, path = {}) {
 }
 
 function currentBatchSpec() {
-  const count = Math.max(1, GENERATED_ROOM_BATCH.length);
+  const count = playableRoomCount();
   const index = ((roomState.nodeIndex % count) + count) % count;
   roomState.nodeIndex = index;
   return GENERATED_ROOM_BATCH[index];
+}
+
+function playableRoomCount() {
+  return Math.max(1, Math.min(PLAYABLE_SLICE_ROOM_COUNT, GENERATED_ROOM_BATCH.length));
+}
+
+function playableRoomSpecs() {
+  return GENERATED_ROOM_BATCH.slice(0, playableRoomCount());
+}
+
+function playableRoomSpec(index) {
+  return GENERATED_ROOM_BATCH[clamp(index, 0, playableRoomCount() - 1)] || GENERATED_ROOM_BATCH[0];
 }
 
 const districtStory = createDistrictStoryApi({
@@ -3011,15 +3287,55 @@ const {
 } = districtStory;
 
 function generateDistrictPlan(levelIndex) {
-  const totalRooms = GENERATED_ROOM_BATCH.length;
+  const totalRooms = playableRoomCount();
   const seed = buildLevelSeed(levelIndex) ^ 0x5f3759df;
   const rng = rngFromSeed(seed);
-  const climbArchetype = pick(rng, [DISTRICT_ARCHETYPES.scaffolds, DISTRICT_ARCHETYPES.liftworks]);
-  const descentArchetype = pick(rng, [DISTRICT_ARCHETYPES.furnace, DISTRICT_ARCHETYPES.refuse]);
-  const archetypes = [DISTRICT_ARCHETYPES.intake, climbArchetype, descentArchetype, DISTRICT_ARCHETYPES.shrine];
-  const counts = [...pick(rng, DISTRICT_ROOM_COUNT_PROFILES)];
+  const archetypes = [DISTRICT_ARCHETYPES.intake, DISTRICT_ARCHETYPES.scaffolds, DISTRICT_ARCHETYPES.shrine];
+  const counts = [1, 1, 1];
   const templates = archetypes.map((archetype) => applyDefaultArchitecturalFamily(archetype, DISTRICT_ARCHETYPE_TEMPLATES[archetype.id] || DISTRICT_MACRO_TEMPLATES.intake));
-  const origins = buildDistrictMacroOrigins(rng, templates, { makeVec });
+  const sliceOrigins = [
+    makeVec((rng() - 0.5) * 5.0, 0.0, (rng() - 0.5) * 3.0),
+    makeVec(15.0 + (rng() - 0.5) * 5.5, 5.4 + rng() * 0.9, 23.0 + (rng() - 0.5) * 4.5),
+    makeVec(-8.0 + (rng() - 0.5) * 5.8, 11.8 + rng() * 1.1, 47.0 + (rng() - 0.5) * 5.0),
+  ];
+  const sliceNodeConfigs = [
+    {
+      name: 'Cistern Customs Terrace',
+      purpose: 'sort arrivals beside poisoned water measures and hidden household routes',
+      role: 'retaining_gate',
+      segmentRole: 'support_stair',
+      size: [30, 11, 26],
+      sourceA: 'intake terraces',
+      sourceB: 'bridge customs',
+      storyPilotId: 'hanging_gardens_absent_people_01',
+      storyPlacementSet: 'hg_market_intake_nooks',
+      silhouetteRule: 'low intake shelf cut into an organic cistern rock',
+    },
+    {
+      name: 'Graft Market Crown',
+      purpose: 'hold a compressed garden market where repair benches and graft tables replaced public stalls',
+      role: 'bath_court',
+      segmentRole: 'market_court',
+      size: [35, 13, 30],
+      sourceA: 'hanging market',
+      sourceB: 'terrace households',
+      storyPilotId: 'hanging_gardens_absent_people_01',
+      storyPlacementSet: 'hg_market_intake_nooks',
+      silhouetteRule: 'middle crown terrace with flat build pads and broken garden lips',
+    },
+    {
+      name: 'Witness Cistern Stair',
+      purpose: 'preserve silent bell law around the sealed route hope',
+      role: 'aqueduct_remnant',
+      segmentRole: 'roof_lane',
+      size: [28, 12, 27],
+      sourceA: 'shrine rim',
+      sourceB: 'sealed cistern stair',
+      storyPilotId: 'hanging_gardens_absent_people_02',
+      storyPlacementSet: 'hg_shrine_rim_nooks',
+      silhouetteRule: 'upper witness shelf pitched off-axis above the market crown',
+    },
+  ];
   const districts = [];
   const roomToDistrict = new Array(totalRooms).fill(0);
   let roomStart = 0;
@@ -3029,21 +3345,26 @@ function generateDistrictPlan(levelIndex) {
     const template = templates[i];
     const layout = pickDistrictLayout(template, rng, { pick });
     const roomCount = counts[i];
-    const baseElevation = origins[i]?.y ?? sampleRange(rng, template.baseRange);
-    const topElevation = Math.max(baseElevation + 4.0, sampleRange(rng, template.topRange));
+    const sliceConfig = sliceNodeConfigs[i];
+    const origin = sliceOrigins[i];
+    const baseElevation = origin.y;
+    const topElevation = baseElevation + sliceConfig.size[1] * 0.58;
+    const yaw = (rng() - 0.5) * 0.52 + i * 0.17;
+    const islandCenterY = baseElevation - sliceConfig.size[1] * 0.34;
+    const islandTopRel = sliceConfig.size[1] * 0.38;
     const district = {
       index: i,
       id: archetype.id + '-' + (i + 1),
       archetype: archetype.id,
-      name: pick(rng, template.familyNameSet || archetype.names),
-      purpose: archetype.purpose,
+      name: sliceConfig.name,
+      purpose: sliceConfig.purpose,
       signal: archetype.signal,
       roomStart,
       roomCount,
-      origin: origins[i] || makeVec(0, baseElevation, 0),
+      origin,
       baseElevation,
       topElevation,
-      elevationBand: template.elevationBand,
+      elevationBand: i === 0 ? 'low_terrace' : i === 1 ? 'middle_terrace' : 'upper_terrace',
       macroTemplateId: template.id,
       approachType: template.approachType,
       departureType: template.departureType,
@@ -3053,17 +3374,34 @@ function generateDistrictPlan(levelIndex) {
       requiresVisibleAbove: template.requiresVisibleAbove,
       layoutId: layout.id,
       layoutPoints: layout.points,
-      branchPairs: layout.branchPairs.filter(([a, b]) => a < roomCount && b < roomCount),
+      branchPairs: [],
       preferredRoles: [...archetype.preferredRoles],
-      realSourceA: template.realSourceA || null,
-      realSourceB: template.realSourceB || null,
-      skeletonType: template.skeletonType || null,
-      patchStyle: template.patchStyle || null,
-      silhouetteRule: template.silhouetteRule || null,
-      storyPilotId: template.storyPilotId || null,
-      storyPlacementSet: template.storyPlacementSet || null,
+      realSourceA: sliceConfig.sourceA,
+      realSourceB: sliceConfig.sourceB,
+      skeletonType: 'terraced_island_node',
+      patchStyle: 'organic_noise_terrace_cut',
+      silhouetteRule: sliceConfig.silhouetteRule,
+      storyPilotId: sliceConfig.storyPilotId,
+      storyPlacementSet: sliceConfig.storyPlacementSet,
     };
-    Object.assign(district, buildDistrictSkeletonMeta(district));
+    Object.assign(district, {
+      roomOffsets: [[0, 0, islandTopRel - 0.34]],
+      segmentRoles: [sliceConfig.segmentRole],
+      circulationBands: [
+        { id: 'lower_lip', y: baseElevation - 1.0, role: 'recovery_edge' },
+        { id: 'build_terrace', y: baseElevation + 0.1, role: sliceConfig.segmentRole },
+        { id: 'upper_lip', y: baseElevation + 2.6, role: 'future_read' },
+      ],
+      massAnchors: [{
+        id: 'terraced_node',
+        role: sliceConfig.role,
+        pos: [origin.x, islandCenterY, origin.z],
+        size: sliceConfig.size,
+        yaw,
+        terraced: true,
+      }],
+      landmarkAnchor: { x: origin.x, y: baseElevation + 2.6, z: origin.z, role: sliceConfig.role },
+    });
     Object.assign(district, buildDistrictDesignContract(district));
     district.storyNookPlacements = buildDistrictStoryPlacements(district);
     for (let j = 0; j < roomCount && roomStart + j < totalRooms; j += 1) roomToDistrict[roomStart + j] = i;
@@ -3138,7 +3476,7 @@ function ensureDistrictPlan() {
 }
 
 function districtInfoForRoomIndex(index, plan = roomState.districtPlan || ensureDistrictPlan()) {
-  const safeIndex = clamp(index, 0, GENERATED_ROOM_BATCH.length - 1);
+  const safeIndex = clamp(index, 0, playableRoomCount() - 1);
   const districtIndex = clamp(plan.roomToDistrict[safeIndex] || 0, 0, Math.max(0, plan.districts.length - 1));
   const district = plan.districts[districtIndex] || plan.districts[0];
   const localIndex = Math.max(0, safeIndex - (district?.roomStart || 0));
@@ -3161,7 +3499,7 @@ function connectorTowardOffset(fromOffset, toOffset) {
 }
 
 function roomWantsBranch(index) {
-  const spec = GENERATED_ROOM_BATCH[index] || {};
+  const spec = playableRoomSpec(index) || {};
   const text = [spec.id, spec.junction_class, spec.semantic_role, ...(spec.route_sentence || [])].join(' ');
   return /3c|4c|hub|junction|secret|shortcut|return|loop|reward|key|switch/.test(text);
 }
@@ -3172,7 +3510,7 @@ function buildDistrictBranchLinks(plan = roomState.districtPlan || ensureDistric
     for (const [fromLocal, toLocal] of district.branchPairs) {
       const a = district.roomStart + fromLocal;
       const b = district.roomStart + toLocal;
-      if (a >= GENERATED_ROOM_BATCH.length || b >= GENERATED_ROOM_BATCH.length) continue;
+      if (a >= playableRoomCount() || b >= playableRoomCount()) continue;
       const offsetA = batchRoomWorldOffset(a, plan);
       const offsetB = batchRoomWorldOffset(b, plan);
       links.push({
@@ -3197,10 +3535,20 @@ function addWorldConnector(index, from, to, options = {}) {
   const padClearance = options.branch ? 3.9 : 3.25;
   const fromRun = makeVec(from.x + ux * padClearance, from.y, from.z + uz * padClearance);
   const toRun = makeVec(to.x - ux * padClearance, to.y, to.z - uz * padClearance);
+  const heightDelta = Math.abs(toTop - fromTop);
+
+  if (ISLAND_ART_ONLY) {
+    addIslandArtSteppedRamp('slice-ramp-' + index, fromRun, toRun, {
+      width: options.branch ? 4.8 : 5.8,
+      thickness: options.branch ? 1.25 : 1.55,
+      source: 'slice-ramp-' + index,
+    });
+    return;
+  }
+
   const corner = Math.abs(dx) > Math.abs(dz)
     ? makeVec(toRun.x, fromRun.y, fromRun.z)
     : makeVec(fromRun.x, fromRun.y, toRun.z);
-  const heightDelta = Math.abs(toTop - fromTop);
   const routeTopA = Math.max(0.34, fromTop + 0.14);
   const routeTopB = Math.max(0.34, toTop + 0.14);
 
@@ -3250,6 +3598,121 @@ function snapEnemyPointToSupport(point) {
   if (!point) return null;
   const support = findEnemySupport(point.x, point.z, point.y, ENEMY_STEP_UP, ENEMY_STEP_DOWN);
   return support ? makeVec(point.x, support.topY, point.z) : point.clone();
+}
+
+function playerBlockedInBand(x, z, minY, maxY, radius) {
+  for (const solid of solidColliders) {
+    if (maxY < solid.minY || minY > solid.maxY) continue;
+    if (!horizontalContainsShape(solid, x, z, radius)) continue;
+    return true;
+  }
+  return voxelBodyBlockedAt(x, z, minY, maxY, radius);
+}
+
+function playerBodyBlockedAtPosition(x, z, positionY) {
+  const radius = PLAYER_SOLID_RADIUS;
+  const minY = positionY - PLAYER_EYE_HEIGHT + 0.15;
+  const maxY = positionY + 0.35;
+  return playerBlockedInBand(x, z, minY, maxY, radius);
+}
+
+function playerTorsoBlockedAtPosition(x, z, positionY) {
+  const radius = PLAYER_SOLID_RADIUS * 0.92;
+  const minY = positionY - PLAYER_EYE_HEIGHT + 0.58;
+  const maxY = positionY + 0.30;
+  return playerBlockedInBand(x, z, minY, maxY, radius);
+}
+
+function measurePlayerHeadroomAtPosition(x, z, positionY, maxProbe = 2.4) {
+  const radius = PLAYER_SOLID_RADIUS * 0.84;
+  const step = 0.18;
+  let clearance = 0;
+  for (let offset = step; offset <= maxProbe + 0.0001; offset += step) {
+    if (playerBlockedInBand(x, z, positionY + 0.08, positionY + offset, radius)) return clearance;
+    clearance = offset;
+  }
+  return maxProbe;
+}
+
+function supportAtPlayerFeet(x, z, feetY) {
+  return resolveSupportHeight(x, z, feetY, 0, feetY) || resolveSolidTopSupport(x, z, feetY, 0, feetY);
+}
+
+function evaluatePlayerAnchorCandidate(x, z, baseFeetY) {
+  return evaluateSpawnAnchorCandidate({
+    x,
+    z,
+    baseFeetY,
+    eyeHeight: PLAYER_EYE_HEIGHT,
+    solidRadius: PLAYER_SOLID_RADIUS,
+    supportAtFeet: supportAtPlayerFeet,
+    isTorsoBlocked: playerTorsoBlockedAtPosition,
+    measureHeadroom: measurePlayerHeadroomAtPosition,
+  });
+}
+
+function findClearPlayerAnchor(point, lookTarget = null) {
+  if (!point) return null;
+  const candidate = findBestSpawnAnchor({
+    point,
+    lookTarget,
+    eyeHeight: PLAYER_EYE_HEIGHT,
+    solidRadius: PLAYER_SOLID_RADIUS,
+    supportAtFeet: supportAtPlayerFeet,
+    isTorsoBlocked: playerTorsoBlockedAtPosition,
+    measureHeadroom: measurePlayerHeadroomAtPosition,
+  });
+  return candidate ? makeVec(candidate.x, candidate.y, candidate.z) : point.clone();
+}
+
+function findRoomIslandVoxelCollider(districtId, localIndex) {
+  const source = 'district-room-island-voxel:' + districtId + ':' + localIndex;
+  return voxelSupportColliders.find((collider) => collider.source === source) || null;
+}
+
+function voxelLocalToWorld(collider, localX, localY, localZ) {
+  const yaw = collider.yaw || 0;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return makeVec(
+    collider.centerX + localX * c + localZ * s,
+    collider.centerY + localY,
+    collider.centerZ - localX * s + localZ * c,
+  );
+}
+
+function findRoomIslandSpawnAnchor(districtId, localIndex, fallbackPoint, lookTarget = null) {
+  const collider = findRoomIslandVoxelCollider(districtId, localIndex);
+  if (!collider) return findClearPlayerAnchor(fallbackPoint, lookTarget);
+  const field = collider.field;
+  const fallback = fallbackPoint || makeVec(collider.centerX, collider.centerY + PLAYER_EYE_HEIGHT, collider.centerZ);
+  let best = null;
+  const step = Math.max(field.cell * 0.72, 0.34);
+  for (let localZ = field.min.z; localZ <= field.max.z; localZ += step) {
+    for (let localX = field.min.x; localX <= field.max.x; localX += step) {
+      const topLocalY = queryVoxelTopY(field, localX, localZ, PLAYER_SOLID_RADIUS);
+      if (topLocalY == null) continue;
+      const world = voxelLocalToWorld(collider, localX, topLocalY + PLAYER_EYE_HEIGHT, localZ);
+      const candidate = evaluateSpawnAnchorCandidate({
+        x: world.x,
+        z: world.z,
+        baseFeetY: collider.centerY + topLocalY,
+        eyeHeight: PLAYER_EYE_HEIGHT,
+        solidRadius: PLAYER_SOLID_RADIUS,
+        supportAtFeet: supportAtPlayerFeet,
+        isTorsoBlocked: playerTorsoBlockedAtPosition,
+        measureHeadroom: measurePlayerHeadroomAtPosition,
+        minHeadroom: 2.2,
+        maxHeadroomProbe: 3.8,
+      });
+      if (!candidate) continue;
+      const distanceBias = Math.hypot(candidate.x - fallback.x, candidate.z - fallback.z);
+      const score = candidate.variance * 20 + distanceBias * 0.04 - candidate.topY * 0.16 - candidate.headroom * 1.8;
+      if (!best || score < best.score) best = { ...candidate, score };
+    }
+  }
+  if (best) return makeVec(best.x, best.y, best.z);
+  return findClearPlayerAnchor(fallback, lookTarget);
 }
 
 function anchorFloorPoint(point) {
@@ -3782,6 +4245,10 @@ const districtGeometry = createDistrictGeometryApi({
   addBrakeLeverStand,
   addScreenWallSegment,
   addBeveledBox,
+  registerWalkable,
+  registerSolid,
+  registerMeshSupportCollider,
+  registerVoxelSupportCollider,
 });
 
 function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
@@ -3865,42 +4332,60 @@ function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
 function buildGeneratedGauntlet(startIndex = 0) {
   const districtPlan = ensureDistrictPlan();
   const rooms = [];
+  const rawRooms = [];
   const linkKeys = new Set();
   const branchLinks = buildDistrictBranchLinks(districtPlan);
-  const branchSides = Array.from({ length: GENERATED_ROOM_BATCH.length }, () => new Set());
+  const roomCount = playableRoomCount();
+  const branchSides = Array.from({ length: roomCount }, () => new Set());
   for (const link of branchLinks) {
     branchSides[link.a].add(link.sideA);
     branchSides[link.b].add(link.sideB);
   }
-  for (let i = 0; i < GENERATED_ROOM_BATCH.length; i += 1) {
+  for (let i = 0; i < roomCount; i += 1) {
     const offset = batchRoomWorldOffset(i, districtPlan);
     const prevOffset = i > 0 ? batchRoomWorldOffset(i - 1, districtPlan) : null;
-    const nextOffset = i < GENERATED_ROOM_BATCH.length - 1 ? batchRoomWorldOffset(i + 1, districtPlan) : null;
+    const nextOffset = i < roomCount - 1 ? batchRoomWorldOffset(i + 1, districtPlan) : null;
     const districtInfo = districtInfoForRoomIndex(i, districtPlan);
+    const roomSpec = playableRoomSpec(i);
     const path = {
       entryConnector: prevOffset ? connectorTowardOffset(offset, prevOffset) : null,
       exitConnector: nextOffset ? connectorTowardOffset(offset, nextOffset) : null,
       branchConnectors: [...branchSides[i]],
     };
-    const built = withBatchBuildOffset(offset, () => buildGeneratedBatchRoom(GENERATED_ROOM_BATCH[i], i, path));
-    const spawn = snapAnchorToSupport(built.spawn.clone().add(offset));
-    const exit = snapAnchorToSupport(built.exit.clone().add(offset));
-    const enemyPositions = built.enemyPositions.map((pos) => snapEnemyPointToSupport(pos.clone().add(offset)));
-    const sockets = Object.fromEntries(Object.entries(built.sockets).map(([key, pos]) => [key, snapAnchorToSupport(pos.clone().add(offset))]));
-    rooms.push({
-      spec: GENERATED_ROOM_BATCH[i],
+    const built = withBatchBuildOffset(offset, () => buildGeneratedBatchRoom(roomSpec, i, path));
+    rawRooms.push({
+      spec: roomSpec,
       district: districtInfo.district,
       districtIndex: districtInfo.districtIndex,
-      spawn,
-      exit,
-      enemyPositions,
-      sockets,
+      localIndex: districtInfo.localIndex,
+      offset: offset.clone(),
+      built,
       bounds: {
         minX: built.bounds.minX + offset.x,
         maxX: built.bounds.maxX + offset.x,
         minZ: built.bounds.minZ + offset.z,
         maxZ: built.bounds.maxZ + offset.z,
       },
+    });
+  }
+  for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
+  for (const room of rawRooms) {
+    const offset = room.offset;
+    const built = room.built;
+    const snappedSpawn = snapAnchorToSupport(built.spawn.clone().add(offset));
+    const spawn = findRoomIslandSpawnAnchor(room.district.id, room.localIndex, snappedSpawn, built.exit.clone().add(offset));
+    const exit = findClearPlayerAnchor(snapAnchorToSupport(built.exit.clone().add(offset)), built.spawn.clone().add(offset));
+    const enemyPositions = built.enemyPositions.map((pos) => snapEnemyPointToSupport(pos.clone().add(offset)));
+    const sockets = Object.fromEntries(Object.entries(built.sockets).map(([key, pos]) => [key, snapAnchorToSupport(pos.clone().add(offset))]));
+    rooms.push({
+      spec: room.spec,
+      district: room.district,
+      districtIndex: room.districtIndex,
+      spawn,
+      exit,
+      enemyPositions,
+      sockets,
+      bounds: room.bounds,
     });
   }
   const addUniqueConnector = (name, from, to, options = {}) => {
@@ -3925,7 +4410,6 @@ function buildGeneratedGauntlet(startIndex = 0) {
     const to = rooms[link.b]?.sockets?.[link.sideB];
     addUniqueConnector('branch-' + i, from, to, { branch: true, signal: true });
   }
-  for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
   const designRepairs = districtPlan.districts
     .filter((district) => district.repairsApplied?.length)
     .map((district) => ({ id: district.id, repairsApplied: district.repairsApplied }));
@@ -3971,7 +4455,7 @@ function updateCurrentGauntletRoom() {
   if (bestIndex !== roomState.nodeIndex) {
     roomState.nodeIndex = bestIndex;
     setNodeIndex(bestIndex);
-    const spec = GENERATED_ROOM_BATCH[bestIndex];
+    const spec = playableRoomSpec(bestIndex);
     const districtInfo = districtInfoForRoomIndex(bestIndex, roomState.districtPlan || ensureDistrictPlan());
     roomState.spec = {
       index: bestIndex,
@@ -3992,7 +4476,7 @@ function updateCurrentGauntletRoom() {
       districtSkeletonType: districtInfo.district.skeletonType,
       districtSegmentRole: districtInfo.district.segmentRoles?.[districtInfo.localIndex] || null,
     };
-    setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + (roomState.districtPlan?.districts.length || 0) + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (bestIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + spec.id);
+    setStatus('slice ' + (districtInfo.districtIndex + 1) + '/' + (roomState.districtPlan?.districts.length || 0) + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | island ' + (bestIndex + 1) + '/' + playableRoomCount() + ' | ' + districtInfo.district.name + ' | ' + spec.id);
   }
 }
 
@@ -4012,10 +4496,10 @@ function buildRoom(movePlayer = true) {
   clearGroup(rootGroup);
   resetWalkableBounds();
   roomState.transitionLock = 0.7;
-  const startIndex = Math.max(0, Math.min(roomState.nodeIndex, GENERATED_ROOM_BATCH.length - 1));
+  const startIndex = Math.max(0, Math.min(roomState.nodeIndex, playableRoomCount() - 1));
   const built = buildGeneratedGauntlet(startIndex);
   const districtPlan = built.plan;
-  const spec = GENERATED_ROOM_BATCH[startIndex] || GENERATED_ROOM_BATCH[0];
+  const spec = playableRoomSpec(startIndex);
   const districtInfo = districtInfoForRoomIndex(startIndex, districtPlan);
   roomState.districtPlan = districtPlan;
   roomState.plan = {
@@ -4065,7 +4549,7 @@ function buildRoom(movePlayer = true) {
     mainSpineEdges: districtPlan.mainSpineEdges.map((edge) => ({ ...edge })),
     returnEdges: districtPlan.returnEdges.map((edge) => ({ ...edge })),
     landmarkViews: districtPlan.landmarkViews.map((view) => ({ ...view })),
-    nodes: GENERATED_ROOM_BATCH.map((room, index) => {
+    nodes: playableRoomSpecs().map((room, index) => {
       const info = districtInfoForRoomIndex(index, districtPlan);
       return {
         index,
@@ -4088,7 +4572,7 @@ function buildRoom(movePlayer = true) {
     }),
   };
   roomState.gauntletRooms = built.rooms;
-  roomState.navGraph = buildRoomTraversalGraph(built.rooms, GENERATED_ROOM_BATCH, buildDistrictBranchLinks(districtPlan));
+  roomState.navGraph = buildRoomTraversalGraph(built.rooms, playableRoomSpecs(), buildDistrictBranchLinks(districtPlan));
   roomState.connectivityRepair = built.connectivity;
   refreshNavGraphDebug(roomState.navGraph);
   if (built.connectivity?.repairs?.length || built.connectivity?.unresolved?.length) {
@@ -4142,7 +4626,7 @@ function buildRoom(movePlayer = true) {
   }
   const repairNote = built.connectivity?.repairs?.length ? ' | repairs ' + built.connectivity.repairs.length : '';
   const unresolvedNote = built.connectivity?.unresolved?.length ? ' | unresolved ' + built.connectivity.unresolved.length : '';
-  setStatus('district ' + (districtInfo.districtIndex + 1) + '/' + districtPlan.districts.length + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | room ' + (startIndex + 1) + '/' + GENERATED_ROOM_BATCH.length + ' | ' + districtInfo.district.name + ' | ' + districtInfo.district.purpose + repairNote + unresolvedNote);
+  setStatus('slice ' + (districtInfo.districtIndex + 1) + '/' + districtPlan.districts.length + ' | ' + districtInfo.district.elevationBand + ' @' + districtInfo.district.baseElevation.toFixed(1) + ' | island ' + (startIndex + 1) + '/' + playableRoomCount() + ' | ' + districtInfo.district.name + ' | ' + districtInfo.district.purpose + repairNote + unresolvedNote);
 }
 
 
@@ -4197,13 +4681,18 @@ function buildEnemy() {
 }
 
 function buildLights() {
-  scene.add(new THREE.HemisphereLight(0xf2e8d6, 0x3a4654, 1.18));
-  const key = new THREE.DirectionalLight(0xfff1dc, 1.16);
-  key.position.set(-4, 8, -5);
+  scene.add(new THREE.HemisphereLight(0xeee8d8, 0x6b5b48, 0.96));
+  scene.add(new THREE.AmbientLight(0x66513c, 0.48));
+  const key = new THREE.DirectionalLight(0xffedcf, 2.82);
+  key.position.set(0, 38, 18);
   key.castShadow = false;
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x9bd4ff, 0.62);
-  rim.position.set(5, 3, 7);
+  const fill = new THREE.DirectionalLight(0xc5d2cb, 1.28);
+  fill.position.set(-14, 24, 8);
+  fill.castShadow = false;
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffa26f, 0.34);
+  rim.position.set(16, 20, -18);
   rim.castShadow = false;
   scene.add(rim);
 }
@@ -4246,6 +4735,199 @@ function collectBones(root) {
 
 function normalizeBoneName(name) {
   return String(name || '').trim().toLowerCase();
+}
+
+function normalizeRigNodeName(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function findMatchingRigBone(root, name) {
+  const target = normalizeRigNodeName(name);
+  if (!target) return null;
+  const bones = collectBones(root);
+  for (const bone of bones) {
+    if (normalizeRigNodeName(bone.name) === target) return bone;
+  }
+  for (const bone of bones) {
+    const candidate = normalizeRigNodeName(bone.name);
+    if (candidate.endsWith(target) || target.endsWith(candidate)) return bone;
+  }
+  for (const bone of bones) {
+    if (normalizeRigNodeName(bone.name).includes(target)) return bone;
+  }
+  return null;
+}
+
+async function loadVisualOverlayTextureSet(config = {}) {
+  const textureUrls = config?.textures || {};
+  const required = new Set(config?.requiredTextures || []);
+  const entries = await Promise.all(Object.entries(textureUrls).map(async ([key, url]) => {
+    if (!url) return [key, null];
+    try {
+      const texture = await textureLoader.loadAsync(url);
+      if (key === 'baseColor' || key === 'emission') texture.colorSpace = THREE.SRGBColorSpace;
+      else texture.colorSpace = THREE.NoColorSpace;
+      const transform = config?.textureTransform;
+      if (transform?.repeat) texture.repeat.fromArray(transform.repeat);
+      if (transform?.offset) texture.offset.fromArray(transform.offset);
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy?.() || 4);
+      texture.needsUpdate = true;
+      return [key, texture];
+    } catch (err) {
+      console.warn('visual overlay texture failed', url, err);
+      if (required.has(key)) throw err;
+      return [key, null];
+    }
+  }));
+  const textureSet = Object.fromEntries(entries);
+  for (const key of required) {
+    if (!textureSet[key]) throw new Error(`required visual overlay texture missing: ${key}`);
+  }
+  return textureSet;
+}
+
+function buildVisualOverlayMaterial(existing, textureSet = {}, options = {}) {
+  return new THREE.MeshStandardMaterial({
+    name: existing?.name || 'visual-overlay',
+    color: options.color != null ? new THREE.Color(options.color) : (existing?.color?.clone?.() || new THREE.Color(0xffffff)),
+    map: textureSet.baseColor || null,
+    normalMap: textureSet.normal || null,
+    roughnessMap: textureSet.roughness || null,
+    metalnessMap: textureSet.metallic || null,
+    emissiveMap: textureSet.emission || null,
+    emissive: options.emissive != null ? new THREE.Color(options.emissive) : (textureSet.emission ? new THREE.Color(0xffffff) : new THREE.Color(0x000000)),
+    emissiveIntensity: Number(options.emissiveIntensity ?? (textureSet.emission ? 0.08 : 0)),
+    roughness: Number(options.roughness ?? (textureSet.roughness ? 0.62 : 0.82)),
+    metalness: Number(options.metalness ?? (textureSet.metallic ? 0.32 : 0.08)),
+    normalScale: new THREE.Vector2(Number(options.normalScale ?? 0.24), Number(options.normalScale ?? 0.24)),
+    envMapIntensity: Number(options.envMapIntensity ?? 0.64),
+    flatShading: Boolean(options.flatShading ?? false),
+    transparent: Boolean(existing?.transparent),
+    opacity: existing?.opacity ?? 1,
+    side: existing?.side ?? THREE.FrontSide,
+  });
+}
+
+function applyVisualOverlayMaterials(root, textureSet = {}, options = {}) {
+  function smoothMeshyOverlayGeometry(node) {
+    const geometry = node?.geometry;
+    const position = geometry?.attributes?.position;
+    if (!geometry || !position || geometry.userData?.meshyOverlayNormalsPrepared) return;
+    geometry.computeVertexNormals();
+    const normal = geometry.attributes.normal;
+    if (!normal) return;
+    const index = geometry.index;
+    const faceA = new THREE.Vector3();
+    const faceB = new THREE.Vector3();
+    const faceC = new THREE.Vector3();
+    const edgeAB = new THREE.Vector3();
+    const edgeAC = new THREE.Vector3();
+    const faceNormal = new THREE.Vector3();
+    const accum = new Map();
+    const keyFor = (vertexIndex) => `${Math.round(position.getX(vertexIndex) * 1000)}|${Math.round(position.getY(vertexIndex) * 1000)}|${Math.round(position.getZ(vertexIndex) * 1000)}`;
+    const addNormal = (vertexIndex, sourceNormal) => {
+      const key = keyFor(vertexIndex);
+      let entry = accum.get(key);
+      if (!entry) {
+        entry = new THREE.Vector3();
+        accum.set(key, entry);
+      }
+      entry.add(sourceNormal);
+    };
+    const visitTriangle = (a, b, c) => {
+      faceA.fromBufferAttribute(position, a);
+      faceB.fromBufferAttribute(position, b);
+      faceC.fromBufferAttribute(position, c);
+      edgeAB.subVectors(faceB, faceA);
+      edgeAC.subVectors(faceC, faceA);
+      faceNormal.crossVectors(edgeAB, edgeAC);
+      if (faceNormal.lengthSq() <= 1e-10) return;
+      faceNormal.normalize();
+      addNormal(a, faceNormal);
+      addNormal(b, faceNormal);
+      addNormal(c, faceNormal);
+    };
+    if (index) {
+      for (let i = 0; i < index.count; i += 3) visitTriangle(index.getX(i), index.getX(i + 1), index.getX(i + 2));
+    } else {
+      for (let i = 0; i < position.count; i += 3) visitTriangle(i, i + 1, i + 2);
+    }
+    for (let i = 0; i < position.count; i += 1) {
+      const averaged = accum.get(keyFor(i));
+      if (!averaged || averaged.lengthSq() <= 1e-10) continue;
+      averaged.normalize();
+      normal.setXYZ(i, averaged.x, averaged.y, averaged.z);
+    }
+    normal.needsUpdate = true;
+    geometry.userData.meshyOverlayNormalsPrepared = true;
+  }
+
+  root?.traverse?.((node) => {
+    if (!node?.isMesh && !node?.isSkinnedMesh) return;
+    smoothMeshyOverlayGeometry(node);
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    const upgraded = materials.map((material) => buildVisualOverlayMaterial(material, textureSet, options));
+    node.material = Array.isArray(node.material) ? upgraded : upgraded[0];
+    node.frustumCulled = false;
+    node.castShadow = false;
+    node.receiveShadow = false;
+    node.renderOrder = 11;
+  });
+}
+
+function rebindVisualOverlayToRig(visualRoot, rigRoot) {
+  const meshes = [];
+  visualRoot?.traverse?.((node) => {
+    if (node?.isSkinnedMesh && node.skeleton?.bones?.length) meshes.push(node);
+  });
+  let matchedBones = 0;
+  let totalBones = 0;
+  let reboundMeshes = 0;
+  for (const mesh of meshes) {
+    const bones = mesh.skeleton?.bones || [];
+    totalBones += bones.length;
+    let meshHits = 0;
+    const mapped = bones.map((bone) => {
+      const target = findMatchingRigBone(rigRoot, bone.name);
+      if (target) {
+        meshHits += 1;
+        matchedBones += 1;
+      }
+      return target || bone;
+    });
+    if (meshHits < Math.max(3, Math.floor(bones.length * 0.35))) continue;
+    mesh.bind(new THREE.Skeleton(mapped, mesh.skeleton.boneInverses), mesh.bindMatrix.clone());
+    mesh.normalizeSkinWeights?.();
+    reboundMeshes += 1;
+  }
+  return { reboundMeshes, matchedBones, totalBones };
+}
+
+function loadFbxScene(url) {
+  return new Promise((resolve, reject) => {
+    fbxLoader.load(url, resolve, undefined, reject);
+  });
+}
+
+function attachArmsVisualOverlay(overlayRoot, config = {}, textureSet = {}) {
+  if (!armsModel || !overlayRoot) return null;
+  applyVisualOverlayMaterials(overlayRoot, textureSet, config.materialOptions || {});
+  const bindStats = rebindVisualOverlayToRig(overlayRoot, armsModel);
+  if (config.requireRebind !== false && (!bindStats || bindStats.reboundMeshes < 1)) {
+    throw new Error(`FPSPlayer Meshy overlay did not rebind to runtime rig: ${JSON.stringify(bindStats)}`);
+  }
+  const hideBaseNodes = new Set(config.hideBaseNodes || []);
+  if (hideBaseNodes.size) {
+    armsModel.traverse((node) => {
+      if (hideBaseNodes.has(node.name)) node.visible = false;
+    });
+  }
+  if (config.transform?.position) overlayRoot.position.fromArray(config.transform.position);
+  if (config.transform?.rotationDeg) overlayRoot.rotation.set(...config.transform.rotationDeg.map((value) => THREE.MathUtils.degToRad(value)));
+  if (config.transform?.scale != null) overlayRoot.scale.setScalar(Number(config.transform.scale || 1));
+  overlayRoot.name = 'fpsplayer-meshy-visual-overlay';
+  armsModel.add(overlayRoot);
+  return bindStats;
 }
 
 function findBone(root, name) {
@@ -5272,11 +5954,27 @@ function resolvePlayerSolids(position, velocity) {
       const feetY = position.y - PLAYER_EYE_HEIGHT;
       const topDelta = solid.maxY - feetY;
       const canStepUp = topDelta >= -0.04 && topDelta <= SUPPORT_SNAP_UP
-        && solid.maxX - solid.minX >= PLAYER_SOLID_RADIUS * 2
-        && solid.maxZ - solid.minZ >= PLAYER_SOLID_RADIUS * 2;
+        && solid.sizeX >= PLAYER_SOLID_RADIUS * 2
+        && solid.sizeZ >= PLAYER_SOLID_RADIUS * 2
+        && horizontalContainsShape(solid, position.x, position.z, -radius);
       if (canStepUp) {
         position.y = Math.max(position.y, solid.maxY + PLAYER_EYE_HEIGHT);
         velocity.y = Math.max(0, velocity.y);
+        continue;
+      }
+      if (solid.shape === 'obb') {
+        const local = toOrientedLocal(position.x, position.z, solid.centerX, solid.centerZ, solid.yaw || 0);
+        const halfX = solid.sizeX * 0.5 + radius;
+        const halfZ = solid.sizeZ * 0.5 + radius;
+        const dxFace = halfX - Math.abs(local.x);
+        const dzFace = halfZ - Math.abs(local.z);
+        if (dxFace <= dzFace) local.x = (local.x < 0 ? -halfX : halfX);
+        else local.z = (local.z < 0 ? -halfZ : halfZ);
+        const c = Math.cos(solid.yaw || 0);
+        const s = Math.sin(solid.yaw || 0);
+        position.x = solid.centerX + local.x * c + local.z * s;
+        position.z = solid.centerZ - local.x * s + local.z * c;
+        if (dxFace <= dzFace) velocity.x = 0; else velocity.z = 0;
         continue;
       }
       const centerX = (solid.minX + solid.maxX) * 0.5;
@@ -5302,16 +6000,21 @@ function solidTopWalkable(solid) {
   return solid && solid.sizeY >= CLIMB_MIN_HEIGHT && Math.min(solid.sizeX, solid.sizeZ) >= CLIMB_MIN_TOP_SIZE;
 }
 
-function resolveSolidTopSupport(x, z, feetY, velocityY) {
+function effectiveSupportStepDown(feetY, prevFeetY, baseStepDown) {
+  const sweepDrop = Number.isFinite(prevFeetY) ? Math.max(0, prevFeetY - feetY) : 0;
+  return Math.max(baseStepDown, sweepDrop + 0.2);
+}
+
+function resolveSolidTopSupport(x, z, feetY, velocityY, prevFeetY = feetY) {
   let best = null;
+  const stepDown = effectiveSupportStepDown(feetY, prevFeetY, SUPPORT_SNAP_DOWN);
   for (const solid of solidColliders) {
     if (!solidTopWalkable(solid)) continue;
-    if (x < solid.minX + PLAYER_SOLID_RADIUS || x > solid.maxX - PLAYER_SOLID_RADIUS) continue;
-    if (z < solid.minZ + PLAYER_SOLID_RADIUS || z > solid.maxZ - PLAYER_SOLID_RADIUS) continue;
+    if (!horizontalContainsShape(solid, x, z, PLAYER_SOLID_RADIUS)) continue;
     const topY = solid.maxY;
     if (velocityY > 0.5 && feetY < topY - 0.14) continue;
     if (feetY > topY + SUPPORT_SNAP_UP) continue;
-    if (feetY < topY - SUPPORT_SNAP_DOWN) continue;
+    if (feetY < topY - stepDown) continue;
     if (!best || topY > best.topY) best = { topY, solid };
   }
   return best;
@@ -5319,12 +6022,33 @@ function resolveSolidTopSupport(x, z, feetY, velocityY) {
 
 function canStandOnSolidTop(solid, x, z) {
   if (!solidTopWalkable(solid)) return false;
-  const feetY = solid.maxY;
-  return x >= solid.minX + PLAYER_SOLID_RADIUS
-    && x <= solid.maxX - PLAYER_SOLID_RADIUS
-    && z >= solid.minZ + PLAYER_SOLID_RADIUS
-    && z <= solid.maxZ - PLAYER_SOLID_RADIUS
-;
+  return horizontalContainsShape(solid, x, z, PLAYER_SOLID_RADIUS);
+}
+
+function resolveMeshSupportHeight(x, z, feetY, velocityY, stepUp = SUPPORT_SNAP_UP, stepDown = SUPPORT_SNAP_DOWN, prevFeetY = feetY) {
+  let best = null;
+  stepDown = effectiveSupportStepDown(feetY, prevFeetY, stepDown);
+  const originY = Math.max(feetY, prevFeetY) + stepUp + 6.0;
+  meshSupportRaycaster.set(new THREE.Vector3(x, originY, z), DOWN_VECTOR);
+  meshSupportRaycaster.far = stepUp + stepDown + 12.0;
+  for (const collider of meshSupportColliders) {
+    const box = collider.bounds;
+    if (!box) continue;
+    if (x < box.min.x - PLAYER_SOLID_RADIUS || x > box.max.x + PLAYER_SOLID_RADIUS) continue;
+    if (z < box.min.z - PLAYER_SOLID_RADIUS || z > box.max.z + PLAYER_SOLID_RADIUS) continue;
+    const hits = meshSupportRaycaster.intersectObject(collider.object, true);
+    for (const hit of hits) {
+      const worldNormal = hit.face?.normal?.clone?.().transformDirection(hit.object.matrixWorld);
+      if (!worldNormal || worldNormal.y < 0.2) continue;
+      const topY = hit.point.y;
+      if (velocityY > 0.5 && feetY < topY - 0.14) continue;
+      if (feetY > topY + stepUp) continue;
+      if (feetY < topY - stepDown) continue;
+      if (!best || topY > best.topY) best = { topY, collider, point: hit.point.clone() };
+      break;
+    }
+  }
+  return best;
 }
 
 function faceYawFromNormal(normal) {
@@ -5375,16 +6099,21 @@ function finalizePlayerFrame(dt, now, stickMagnitude) {
   camera.rotation.x = player.pitch + input.gyroPitch + (shake?.pitch || 0);
 }
 
-function resolveSupportHeight(x, z, feetY, velocityY) {
+function resolveSupportHeight(x, z, feetY, velocityY, prevFeetY = feetY) {
   let best = null;
   for (const surface of walkableSurfaces) {
     if (x < surface.minX - SUPPORT_RADIUS || x > surface.maxX + SUPPORT_RADIUS) continue;
     if (z < surface.minZ - SUPPORT_RADIUS || z > surface.maxZ + SUPPORT_RADIUS) continue;
+    if (!horizontalContainsShape(surface, x, z, -SUPPORT_RADIUS)) continue;
     if (velocityY > 0.5 && feetY < surface.topY - 0.14) continue;
     if (feetY > surface.topY + SUPPORT_SNAP_UP) continue;
     if (feetY < surface.topY - SUPPORT_SNAP_DOWN) continue;
     if (!best || surface.topY > best.topY) best = surface;
   }
+  const voxelSupport = resolveVoxelSupportHeight(x, z, feetY, velocityY, SUPPORT_SNAP_UP, SUPPORT_SNAP_DOWN, prevFeetY);
+  if (voxelSupport && (!best || voxelSupport.topY > best.topY)) best = voxelSupport;
+  const meshSupport = resolveMeshSupportHeight(x, z, feetY, velocityY, SUPPORT_SNAP_UP, SUPPORT_SNAP_DOWN, prevFeetY);
+  if (meshSupport && (!best || meshSupport.topY > best.topY)) best = meshSupport;
   return best;
 }
 
@@ -5396,23 +6125,19 @@ function findWalkableStepSurface(position, direction, feetY) {
   for (const surface of walkableSurfaces) {
     const deltaY = surface.topY - feetY;
     if (deltaY < 0.04 || deltaY > SUPPORT_SNAP_UP) continue;
-    const standMinX = surface.minX + PLAYER_SOLID_RADIUS * 0.18;
-    const standMaxX = surface.maxX - PLAYER_SOLID_RADIUS * 0.18;
-    const standMinZ = surface.minZ + PLAYER_SOLID_RADIUS * 0.18;
-    const standMaxZ = surface.maxZ - PLAYER_SOLID_RADIUS * 0.18;
-    if (standMaxX <= standMinX || standMaxZ <= standMinZ) continue;
-    const nearX = clamp(position.x, standMinX, standMaxX);
-    const nearZ = clamp(position.z, standMinZ, standMaxZ);
-    const dx = nearX - position.x;
-    const dz = nearZ - position.z;
-    const along = dx * dir.x + dz * dir.z;
-    const lateral = Math.abs(dx * perp.x + dz * perp.z);
-    if (along < -0.06 || along > WALKABLE_STEP_FORWARD_REACH) continue;
-    if (lateral > SUPPORT_RADIUS + 0.18) continue;
-    const targetX = clamp(nearX + dir.x * 0.06, standMinX, standMaxX);
-    const targetZ = clamp(nearZ + dir.z * 0.06, standMinZ, standMaxZ);
-    const score = (surface.traversalCritical ? -0.2 : 0) + along + deltaY * 0.35 + lateral * 0.25;
-    if (!best || score < best.score) best = { surface, targetX, targetZ, score };
+    const samples = surface.shape === 'obb'
+      ? [new THREE.Vector3(surface.centerX, 0, surface.centerZ)]
+      : [new THREE.Vector3(clamp(position.x, surface.minX, surface.maxX), 0, clamp(position.z, surface.minZ, surface.maxZ))];
+    for (const sample of samples) {
+      const dx = sample.x - position.x;
+      const dz = sample.z - position.z;
+      const along = dx * dir.x + dz * dir.z;
+      const lateral = Math.abs(dx * perp.x + dz * perp.z);
+      if (along < -0.06 || along > WALKABLE_STEP_FORWARD_REACH) continue;
+      if (lateral > SUPPORT_RADIUS + 0.18) continue;
+      const score = (surface.traversalCritical ? -0.2 : 0) + along + deltaY * 0.35 + lateral * 0.25;
+      if (!best || score < best.score) best = { surface, targetX: sample.x, targetZ: sample.z, score };
+    }
   }
   return best;
 }
@@ -5422,10 +6147,15 @@ function findEnemySupport(x, z, referenceY, stepUp = ENEMY_STEP_UP, stepDown = E
   for (const surface of walkableSurfaces) {
     if (x < surface.minX - ENEMY_FLOOR_RADIUS || x > surface.maxX + ENEMY_FLOOR_RADIUS) continue;
     if (z < surface.minZ - ENEMY_FLOOR_RADIUS || z > surface.maxZ + ENEMY_FLOOR_RADIUS) continue;
+    if (!horizontalContainsShape(surface, x, z, -ENEMY_FLOOR_RADIUS)) continue;
     const deltaY = surface.topY - referenceY;
     if (deltaY > stepUp || deltaY < -stepDown) continue;
     if (!best || surface.topY > best.topY) best = surface;
   }
+  const voxelSupport = resolveVoxelSupportHeight(x, z, referenceY, 0, stepUp, stepDown);
+  if (voxelSupport && (!best || voxelSupport.topY > best.topY)) best = voxelSupport;
+  const meshSupport = resolveMeshSupportHeight(x, z, referenceY, 0, stepUp, stepDown);
+  if (meshSupport && (!best || meshSupport.topY > best.topY)) best = meshSupport;
   return best;
 }
 
@@ -5493,8 +6223,10 @@ function enemyBodyBlockedAt(x, z, floorY) {
     if (maxY < solid.minY || minY > solid.maxY) continue;
     if (x < solid.minX - ENEMY_SOLID_RADIUS || x > solid.maxX + ENEMY_SOLID_RADIUS) continue;
     if (z < solid.minZ - ENEMY_SOLID_RADIUS || z > solid.maxZ + ENEMY_SOLID_RADIUS) continue;
+    if (!horizontalContainsShape(solid, x, z, -ENEMY_SOLID_RADIUS)) continue;
     return true;
   }
+  if (voxelBodyBlockedAt(x, z, minY, maxY, ENEMY_SOLID_RADIUS)) return true;
   return false;
 }
 
@@ -6281,7 +7013,7 @@ function rebuildEnemyRoute(force = false) {
   nav.mode = enemy.userData.mode || 'approach';
 
   const rooms = roomState.gauntletRooms || [];
-  const specs = GENERATED_ROOM_BATCH || [];
+  const specs = playableRoomSpecs();
   const graph = roomState.navGraph;
   const enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
   const playerRoomIndex = findNearestGauntletRoomIndex(player.position);
@@ -6738,10 +7470,11 @@ function syncEnemyDissolveToRagdollState(state) {
   if (state.settled && enemyRagdollDebugGroup) enemyRagdollDebugGroup.visible = false;
 }
 
-function configureOrcBerserkerModel(model) {
+function configureOrcBerserkerModel(model, textureSet = null) {
   model.name = 'orc-berserker-model';
   model.rotation.y = Math.PI;
   model.position.set(0, 0, 0);
+  if (textureSet) applyVisualOverlayMaterials(model, textureSet, ORC_BERSERKER_PBR.materialOptions || {});
   applyEnemyDissolveMaterials(model);
   model.traverse((node) => {
     if (!node.isMesh && !node.isSkinnedMesh) return;
@@ -6752,7 +7485,8 @@ function configureOrcBerserkerModel(model) {
     for (const mat of mats) {
       if (!mat) continue;
       mat.flatShading = true;
-      mat.roughness = Math.max(mat.roughness ?? 0.9, 0.82);
+      if (!mat.roughnessMap) mat.roughness = Math.max(mat.roughness ?? 0.72, 0.62);
+      if (!mat.metalnessMap) mat.metalness = Math.max(mat.metalness ?? 0.12, 0.12);
       mat.needsUpdate = true;
     }
   });
@@ -6762,14 +7496,15 @@ function configureOrcBerserkerModel(model) {
 }
 
 function loadOrcBerserkerEnemy() {
-  fbxLoader.load(ORC_BERSERKER_MODEL, (asset) => {
+  fbxLoader.load(ORC_BERSERKER_MODEL, async (asset) => {
     try {
       if (!enemy) return;
       if (enemyRuntime.model?.parent) enemyRuntime.model.parent.remove(enemyRuntime.model);
       enemyRuntime.actions.clear();
       enemyRuntime.currentAction = null;
       enemyRuntime.model = asset;
-      const scale = configureOrcBerserkerModel(enemyRuntime.model);
+      const orcTextures = await loadVisualOverlayTextureSet(ORC_BERSERKER_PBR);
+      const scale = configureOrcBerserkerModel(enemyRuntime.model, orcTextures);
       cacheEnemyHitBox();
       buildEnemyRagdollProfile();
       enemyRuntime.mixer = asset.animations?.length ? new THREE.AnimationMixer(enemyRuntime.model) : null;
@@ -6906,7 +7641,7 @@ function loadMutantOrcEnemy() {
 
 
 function loadArms() {
-  loader.load('assets/models/FPSPlayer.glb', (gltf) => {
+  loader.load(FPSPLAYER_MESHY_VISUAL_OVERLAY.model, async (gltf) => {
     armsModel = gltf.scene;
     armsModel.traverse((node) => {
       if (node.isMesh) {
@@ -6917,11 +7652,27 @@ function loadArms() {
         const mats = Array.isArray(node.material) ? node.material : [node.material];
         for (const mat of mats) {
           if (!mat) continue;
-          mat.flatShading = true;
+          mat.flatShading = false;
           mat.needsUpdate = true;
         }
       }
     });
+    let meshyOverlayReady = false;
+    try {
+      const overlayTextures = await loadVisualOverlayTextureSet(FPSPLAYER_MESHY_VISUAL_OVERLAY);
+      applyVisualOverlayMaterials(armsModel, overlayTextures, FPSPLAYER_MESHY_VISUAL_OVERLAY.materialOptions || {});
+      meshyOverlayReady = true;
+      console.info('fpsplayer rigged meshy GLB materialized');
+    } catch (err) {
+      console.warn('fpsplayer meshy texture overlay failed', err);
+      const summary = rememberError('FPSPlayer Meshy overlay failed', err);
+      armsModel.visible = false;
+      fallbackArms.visible = false;
+      setStatus(summary.toLowerCase());
+      hintEl.textContent = summary;
+      hintEl.style.opacity = '1';
+    }
+    if (!meshyOverlayReady) return;
     armsScene.add(armsModel);
     armsCameraBone = findBone(armsModel, 'Camera');
     armsMixer = new THREE.AnimationMixer(armsModel);
@@ -7427,12 +8178,22 @@ function updatePlayer(dt) {
       player.attack.dashDone += step;
     }
   }
+  const previousFeetY = player.position.y - PLAYER_EYE_HEIGHT;
   player.velocity.y -= 14.4 * dt;
   player.position.addScaledVector(player.velocity, dt);
   resolvePlayerSolids(player.position, player.velocity);
+  if (playerBodyBlockedAtPosition(player.position.x, player.position.z, player.position.y)) {
+    const cleared = findClearPlayerAnchor(player.position.clone(), roomState.exit);
+    if (cleared && cleared.distanceToSquared(player.position) > 0.0001) {
+      player.position.copy(cleared);
+      player.velocity.x = 0;
+      player.velocity.z = 0;
+      if (player.velocity.y < 0) player.velocity.y = 0;
+    }
+  }
   resolvePlayerEnemyOverlapForPlayer(player.position, player.velocity);
   const feetY = player.position.y - PLAYER_EYE_HEIGHT;
-  let support = player.velocity.y <= 0 ? (resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y) || resolveSolidTopSupport(player.position.x, player.position.z, feetY, player.velocity.y)) : null;
+  let support = player.velocity.y <= 0 ? (resolveSupportHeight(player.position.x, player.position.z, feetY, player.velocity.y, previousFeetY) || resolveSolidTopSupport(player.position.x, player.position.z, feetY, player.velocity.y, previousFeetY)) : null;
   const stepDirection = desired.lengthSq() > 0.0001 ? desired : new THREE.Vector3(player.velocity.x, 0, player.velocity.z);
   if (!support && player.velocity.y <= 0 && stepDirection.lengthSq() > 0.0001) {
     const stepSurface = findWalkableStepSurface(player.position, stepDirection, feetY);
@@ -7558,7 +8319,7 @@ function render() {
     refreshEnemyRouteDebug(enemyNav);
     refreshPlayerHealthHud();
     refreshAttackDebugHud();
-    readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${hurtText}${navText}${ragText}${attackText} | ${input.gyro ? 'gyro' : 'touch'}`;
+    if (DEBUG_UI) readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${hurtText}${navText}${ragText}${attackText} | ${input.gyro ? 'gyro' : 'touch'}`;
   } catch (err) {
     console.error(err);
     const summary = rememberError('Runtime error', err);

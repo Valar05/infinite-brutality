@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const source = fs.readFileSync(path.resolve('src/main.js'), 'utf8');
+assert.match(source, /function effectiveSupportStepDown\(feetY, prevFeetY, baseStepDown\)/, 'support logic must compute effective step-down from actual downward travel');
+assert.match(source, /const previousFeetY = player\.position\.y - PLAYER_EYE_HEIGHT;/, 'player update must capture pre-move feet height for swept landing');
+assert.match(source, /resolveSupportHeight\(player\.position\.x, player\.position\.z, feetY, player\.velocity\.y, previousFeetY\)/, 'player support query must use previous feet height');
+assert.match(source, /resolveSolidTopSupport\(player\.position\.x, player\.position\.z, feetY, player\.velocity\.y, previousFeetY\)/, 'solid-top fallback must use previous feet height');
+assert.match(source, /function resolveVoxelSupportHeight\(x, z, feetY, velocityY, stepUp = SUPPORT_SNAP_UP, stepDown = SUPPORT_SNAP_DOWN, prevFeetY = feetY\)/, 'voxel support must accept previous feet height');
+assert.match(source, /function resolveMeshSupportHeight\(x, z, feetY, velocityY, stepUp = SUPPORT_SNAP_UP, stepDown = SUPPORT_SNAP_DOWN, prevFeetY = feetY\)/, 'mesh support must accept previous feet height');
+assert.match(source, /stepDown = effectiveSupportStepDown\(feetY, prevFeetY, stepDown\);/, 'support resolvers must widen step-down by sweep distance');
+
+const buildOrderSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8');
+const geometryIndex = buildOrderSource.indexOf('for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);');
+const spawnIndex = buildOrderSource.indexOf('const spawn = findRoomIslandSpawnAnchor(room.district.id, room.localIndex, snappedSpawn, built.exit.clone().add(offset));');
+assert.ok(geometryIndex >= 0 && spawnIndex >= 0 && geometryIndex < spawnIndex, 'spawn snapping must happen after district island geometry is emitted');
+assert.match(source, /function playerBodyBlockedAtPosition\(x, z, positionY\)/, 'player runtime must expose a full body-overlap check for voxel rock');
+assert.match(source, /function playerBlockedInBand\(x, z, minY, maxY, radius\)/, 'spawn logic must expose a reusable vertical overlap check');
+assert.match(source, /function measurePlayerHeadroomAtPosition\(x, z, positionY, maxProbe = 2\.4\)/, 'spawn logic must measure headroom above the camera');
+assert.match(source, /function supportAtPlayerFeet\(x, z, feetY\)/, 'spawn logic must sample support directly from the runtime support map');
+assert.match(source, /function evaluatePlayerAnchorCandidate\(x, z, baseFeetY\)/, 'spawn logic must evaluate candidate top surfaces');
+assert.match(source, /measureHeadroom: measurePlayerHeadroomAtPosition/, 'spawn candidate evaluation must wire headroom into the chooser');
+assert.match(source, /findSpawnAnchor as findBestSpawnAnchor/, 'main runtime must use the shared spawn-anchor helper');
+assert.match(source, /function findRoomIslandSpawnAnchor\(districtId, localIndex, fallbackPoint, lookTarget = null\)/, 'spawn logic must derive room start points from the room island voxel field');
+assert.match(source, /if \(playerBodyBlockedAtPosition\(player\.position\.x, player\.position\.z, player\.position\.y\)\) \{/, 'player update must recover from embedded voxel overlap');
+console.log(JSON.stringify({ ok: true, contract: 'support-sweep' }));

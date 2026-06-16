@@ -1,5 +1,108 @@
 import * as THREE from 'three';
 
+
+const EDGE_DEFAULTS = {
+  edgeColor: 0xb8afa0,
+  edgeStrength: 0.025,
+  edgePower: 2.4,
+  edgeTintMix: 0.18,
+  topReadabilityColor: 0xd8d0bc,
+  topReadabilityLift: 0.0,
+  topReadabilityPower: 1.45,
+};
+
+function installWorldPosVarying(shader) {
+  shader.vertexShader = shader.vertexShader
+    .replace(
+      '#include <common>',
+      `#include <common>
+      varying vec3 vWorldGridPos;`,
+    )
+    .replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      vWorldGridPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+    );
+
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <common>',
+    `#include <common>
+      varying vec3 vWorldGridPos;`,
+  );
+}
+
+function faceWorldNormalFragmentBlock() {
+  return `
+    vec3 faceWorldNormal(vec3 worldPos) {
+      vec3 dx = dFdx(worldPos);
+      vec3 dy = dFdy(worldPos);
+      vec3 n = normalize(cross(dx, dy));
+      return gl_FrontFacing ? n : -n;
+    }
+  `;
+}
+
+function applyEdgeOutlineOverlay(material, options = {}) {
+  const settings = { ...EDGE_DEFAULTS, ...options };
+  const edgeColor = new THREE.Color(settings.edgeColor);
+  const priorOnBeforeCompile = material.onBeforeCompile;
+  const priorCacheKey = material.customProgramCacheKey?.bind(material);
+
+  material.onBeforeCompile = (shader) => {
+    priorOnBeforeCompile?.(shader);
+
+    shader.uniforms.worldEdgeColor = { value: edgeColor };
+    shader.uniforms.worldEdgeStrength = { value: settings.edgeStrength };
+    shader.uniforms.worldEdgePower = { value: settings.edgePower };
+    shader.uniforms.worldEdgeTintMix = { value: settings.edgeTintMix };
+    shader.uniforms.worldTopReadabilityColor = { value: new THREE.Color(settings.topReadabilityColor) };
+    shader.uniforms.worldTopReadabilityLift = { value: settings.topReadabilityLift };
+    shader.uniforms.worldTopReadabilityPower = { value: settings.topReadabilityPower };
+
+    installWorldPosVarying(shader);
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        ${faceWorldNormalFragmentBlock()}
+        uniform vec3 worldEdgeColor;
+        uniform float worldEdgeStrength;
+        uniform float worldEdgePower;
+        uniform float worldEdgeTintMix;
+        uniform vec3 worldTopReadabilityColor;
+        uniform float worldTopReadabilityLift;
+        uniform float worldTopReadabilityPower;
+
+        vec3 applyWorldEdge(vec3 baseColor, vec3 worldPos) {
+          vec3 worldNormal = faceWorldNormal(worldPos);
+          vec3 viewDir = normalize(cameraPosition - worldPos);
+          float edge = pow(max(0.0, 1.0 - abs(dot(worldNormal, viewDir))), worldEdgePower);
+          float intensity = clamp(edge * worldEdgeStrength, 0.0, 0.75);
+          vec3 tint = mix(baseColor, worldEdgeColor, worldEdgeTintMix);
+          vec3 edged = mix(baseColor, tint, intensity);
+          float topFace = pow(clamp(worldNormal.y, 0.0, 1.0), worldTopReadabilityPower);
+          vec3 readableTop = mix(edged, worldTopReadabilityColor, 0.32);
+          return mix(edged, max(edged, readableTop), clamp(topFace * worldTopReadabilityLift, 0.0, 0.58));
+        }`,
+      )
+      .replace(
+        '#include <dithering_fragment>',
+        `outgoingLight = applyWorldEdge(outgoingLight, vWorldGridPos);
+        #include <dithering_fragment>`,
+      );
+  };
+
+  material.customProgramCacheKey = () => {
+    const prior = priorCacheKey ? priorCacheKey() : '';
+    return `${prior}|world-edge:${JSON.stringify(settings)}`;
+  };
+
+  material.needsUpdate = true;
+  return material;
+}
+
+
 export function createMaterialResources(deps) {
   const { textureLoader, renderer, rngFromSeed } = deps;
 
@@ -10,6 +113,21 @@ export function createMaterialResources(deps) {
         emissive: new THREE.Color(color).multiplyScalar(lift),
         flatShading: true,
       });
+    }
+
+    function makeRockMat(color, options = {}) {
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        fog: true,
+        emissive: new THREE.Color(options.emissive ?? 0x11100f),
+        emissiveIntensity: options.emissiveIntensity ?? 0.035,
+        roughness: options.roughness ?? 0.88,
+        metalness: options.metalness ?? 0.02,
+        flatShading: false,
+      });
+      material.userData.isIslandRock = true;
+      material.userData.normalScale = options.normalScale ?? 0.46;
+      return applyEdgeOutlineOverlay(material, options.edgeOptions || {});
     }
 
     function makeGlowMat(color, intensity = 1.8) {
@@ -68,6 +186,8 @@ export function createMaterialResources(deps) {
       rope: makeMat(0x9e7d52, 0.84, 0.01, 0.045),
       crystal: makeMat(0x7ac9c0, 0.68, 0.03, 0.09),
       crystalDark: makeMat(0x3f6f73, 0.78, 0.02, 0.055),
+      islandRock: makeRockMat(0xffffff, { edgeOptions: { edgeColor: 0xe1d6bd, edgeStrength: 0.014, edgePower: 2.05, edgeTintMix: 0.1, topReadabilityLift: 0.26, topReadabilityColor: 0xe1d6bd, topReadabilityPower: 1.18 } }),
+      islandRockDark: makeRockMat(0xe3ddd1, { emissive: 0x18120d, emissiveIntensity: 0.025, roughness: 0.8, metalness: 0.02, edgeOptions: { edgeColor: 0xe3d4b6, edgeStrength: 0.014, edgePower: 1.95, edgeTintMix: 0.16, topReadabilityLift: 0.34, topReadabilityColor: 0xe3d4b6, topReadabilityPower: 1.08 } }),
     };
 
     function setMaterialUvScale(mat, scale) {
@@ -86,6 +206,8 @@ export function createMaterialResources(deps) {
     setMaterialUvScale(MAT.rope, 0.065);
     setMaterialUvScale(MAT.crystal, 0.082);
     setMaterialUvScale(MAT.crystalDark, 0.078);
+    setMaterialUvScale(MAT.islandRock, 0.125);
+    setMaterialUvScale(MAT.islandRockDark, 0.125);
 
     function makeVoronoiTexture(seed, options = {}) {
       const size = options.size ?? 96;
@@ -210,6 +332,54 @@ export function createMaterialResources(deps) {
       }
     }
 
+
+    function loadPbrTextureSet(config = {}) {
+      const result = {
+        albedo: null,
+        normal: null,
+        roughness: null,
+        metalness: null,
+        height: null,
+      };
+      const entries = [
+        ['albedo', config.albedo, THREE.SRGBColorSpace],
+        ['normal', config.normal, THREE.NoColorSpace],
+        ['roughness', config.roughness, THREE.NoColorSpace],
+        ['metalness', config.metalness, THREE.NoColorSpace],
+        ['height', config.height, THREE.NoColorSpace],
+      ];
+      for (const [key, path, colorSpace] of entries) {
+        if (!path) continue;
+        const url = new URL(path, import.meta.url).href;
+        const texture = textureLoader.load(url);
+        texture.colorSpace = colorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 1);
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy?.() || 1);
+        texture.needsUpdate = true;
+        result[key] = texture;
+      }
+      return result;
+    }
+
+    function applyRockPbrSet(material, maps, options = {}) {
+      if (!material || !maps?.albedo) return;
+      material.map = maps.albedo;
+      material.normalMap = maps.normal || null;
+      material.roughnessMap = maps.roughness || null;
+      material.metalnessMap = maps.metalness || null;
+      material.bumpMap = maps.height || null;
+      const normalScale = options.normalScale ?? material.userData?.normalScale ?? 0.46;
+      material.normalScale = new THREE.Vector2(normalScale, normalScale);
+      material.bumpScale = options.bumpScale ?? 0.035;
+      material.envMapIntensity = options.envMapIntensity ?? 0.56;
+      material.color.setHex(0xffffff);
+      material.needsUpdate = true;
+    }
+
     function applyGeneratedSurfaceTextures() {
       loadWrappedTexture('../assets/textures/ib-vector-stone-20260608.svg', 1, 1, (texture) => {
         applyTextureToMaterials(texture, [MAT.floor, MAT.wall, MAT.platform, MAT.connectorFloor, MAT.connectorWall, MAT.stone, MAT.stone2], 0xffffff);
@@ -257,6 +427,15 @@ export function createMaterialResources(deps) {
 
     applyProceduralSurfaceTextures();
     applyGeneratedSurfaceTextures();
+    const meshyRockMaps = loadPbrTextureSet({
+      albedo: '../assets/textures/openai-meshy-rock-albedo-20260615-readable.png',
+      normal: '../assets/textures/openai-meshy-rock-normal-20260615-readable.png',
+      roughness: '../assets/textures/openai-meshy-rock-roughness-20260615-readable.png',
+      metalness: '../assets/textures/openai-meshy-rock-metalness-20260615-readable.png',
+      height: '../assets/textures/openai-meshy-rock-height-20260615-readable.png',
+    });
+    applyRockPbrSet(MAT.islandRock, meshyRockMaps, { normalScale: 0.16, bumpScale: 0.01, envMapIntensity: 0.92 });
+    applyRockPbrSet(MAT.islandRockDark, meshyRockMaps, { normalScale: 0.12, bumpScale: 0.008, envMapIntensity: 0.9 });
 
     function loadSkyDomeTexture(material) {
       const url = new URL('../assets/textures/ib-real-limbo-skybox-20260609.png', import.meta.url).href;

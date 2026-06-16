@@ -68,6 +68,7 @@ export function createEnemyCombatApi(deps) {
     PLAYER_SOLID_RADIUS,
     PLAYER_MAX_HEALTH,
     ATTACK_LAB,
+    DEBUG_ATTACK_SWEEP,
   } = constants;
 
 function chooseEnemyHitReaction(attack) {

@@ -46,6 +46,14 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 
 Render the world normally, then render FPS arms in a separate camera-space pass so the player never sees chest/body intrusion. Keep the low-poly hard-edged source asset as the art direction seed rather than forcing a full-body textured rig into first person.
 
+
+## PBR Rendering Contract
+
+- First-person arms render in a separate camera-space `armsScene`, but their Meshy PBR maps are still authoritative. Do not hide a flat-looking arm problem by weakening the normal, roughness, or metalness maps.
+- The current FPSPlayer overlay uses `FPSPLAYER_MESHY_VISUAL_OVERLAY` in `src/main.js`: external albedo, normal, roughness, metallic, and emission textures, plus a UV transform that targets the usable atlas region.
+- The island rocks use the readable Meshy-derived rock PBR set in `src/materials.js`; if rocks read correctly but arms look flat, compare lighting/material response before blaming the texture files.
+- Screenshot validation is required for foreground arms because parse checks cannot prove visible PBR response.
+
 ## Thunder Brainstorm
 
 Durable design/runtime context is linked from `THUNDER_LINKS.md`. The main Thunder note is `../thunder-brainstorm/generated/session_learnings/2026-06-08_infinite_brutality_prototype_lessons.md`. Read it before changing level generation, movement feel, visual language, or lighting.

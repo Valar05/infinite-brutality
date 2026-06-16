@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildIslandBridgeSpec, buildIslandVoxelField, buildGreedyVoxelMeshData, buildSurfaceNetMeshData, buildRoomIslandField, buildRoomIslandMeshData, buildRockBridgeField, buildRockBridgeMeshData } from './island-geometry.js?v=0.8.162';
 
 export function createDistrictGeometryApi(deps) {
   const {
@@ -43,6 +44,8 @@ export function createDistrictGeometryApi(deps) {
     addBrakeLeverStand,
     addScreenWallSegment,
     addBeveledBox,
+    registerMeshSupportCollider,
+    registerVoxelSupportCollider,
   } = deps;
 
   function addDistrictCrystalGrowths(district) {
@@ -88,6 +91,134 @@ export function createDistrictGeometryApi(deps) {
           crystalIndex += 1;
         }
       }
+    }
+  }
+
+
+
+  function beginDistrictVisualCollisionContract(district) {
+    const contract = {
+      districtId: district?.id || 'unknown',
+      visibleIslandCount: 0,
+      islandMeshCount: 0,
+      visibleBridgeCount: 0,
+      bridgeMeshCount: 0,
+      failures: [],
+    };
+    if (district) district.visualCollisionContract = contract;
+    return contract;
+  }
+
+  function finalizeDistrictVisualCollisionContract(contract) {
+    if (!contract) return;
+    if (contract.visibleIslandCount > 0 && contract.islandMeshCount < contract.visibleIslandCount) {
+      contract.failures.push('visible islands missing mesh support colliders');
+    }
+    if (contract.visibleBridgeCount > 0 && contract.bridgeMeshCount < contract.visibleBridgeCount) {
+      contract.failures.push('visible bridges missing mesh support colliders');
+    }
+    if (contract.failures.length) {
+      throw new Error('District visual-collision contract failed for ' + contract.districtId + ': ' + contract.failures.join('; '));
+    }
+  }
+
+  function buildRuntimeIslandMesh(meshData, material) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+    geometry.setIndex(meshData.indices);
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    return new THREE.Mesh(geometry, material);
+  }
+
+  function routeIslandSizeForRole(role) {
+    switch (role) {
+      case 'support_stair': return [7.6, 5.0, 7.6];
+      case 'market_court':
+      case 'kill_court':
+      case 'bath_court':
+      case 'execution_court': return [10.8, 7.2, 10.8];
+      case 'bridge_landing':
+      case 'cargo_stage':
+      case 'roof_lane':
+      case 'winch_gallery': return [8.8, 5.4, 8.2];
+      case 'underdeck_pass':
+      case 'undercroft_pass':
+      case 'recovery_return':
+      case 'undercroft_run': return [8.4, 5.0, 8.4];
+      default: return [8.8, 5.2, 8.8];
+    }
+  }
+
+  function addDistrictRouteIslands(district, contract) {
+    return;
+    const offsets = district?.roomOffsets || [];
+    const roles = district?.segmentRoles || [];
+    for (let i = 0; i < offsets.length; i += 1) {
+      const point = offsets[i];
+      if (!point) continue;
+      const role = roles[i] || 'route';
+      const size = routeIslandSizeForRole(role);
+      const worldPos = [district.origin.x + point[0], district.origin.y + (point[2] || 0), district.origin.z + point[1]];
+      const field = buildRoomIslandField(size, hashRoomKey('district-room-island:' + district.id + ':' + i + ':' + role));
+      const meshData = buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
+      const group = new THREE.Group();
+      group.name = 'district-' + district.id + '-room-island-' + i;
+      group.position.set(worldPos[0], worldPos[1], worldPos[2]);
+      roomGroup.add(group);
+      const mesh = buildRuntimeIslandMesh(meshData, i % 2 === 0 ? MAT.islandRock : MAT.islandRockDark);
+      group.add(mesh);
+      registerMeshSupportCollider(group, { source: 'district-room-island-mesh:' + district.id + ':' + i });
+      registerVoxelSupportCollider(field, { origin: worldPos, source: 'district-room-island-voxel:' + district.id + ':' + i });
+      contract.visibleIslandCount += 1;
+      contract.islandMeshCount += 1;
+    }
+  }
+
+  function addDistrictIslandMasses(district, contract) {
+    const anchors = district?.massAnchors || [];
+    if (!anchors.length) return;
+    for (let i = 0; i < anchors.length; i += 1) {
+      const anchor = anchors[i];
+      const group = new THREE.Group();
+      group.name = 'district-' + district.id + '-island-' + anchor.id;
+      group.position.set(anchor.pos[0], anchor.pos[1], anchor.pos[2]);
+      group.rotation.y = anchor.yaw || 0;
+      roomGroup.add(group);
+      const field = anchor.terraced
+        ? buildRoomIslandField(anchor.size, hashRoomKey('district-terraced-island:' + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)), true)
+        : buildIslandVoxelField(anchor, hashRoomKey('district-island:' + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)));
+      const meshData = buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
+      const mesh = buildRuntimeIslandMesh(meshData, i % 2 === 0 ? MAT.islandRock : MAT.islandRockDark);
+      group.add(mesh);
+      registerMeshSupportCollider(group, { source: 'district-island-mesh:' + anchor.id });
+      registerVoxelSupportCollider(field, { origin: anchor.pos, yaw: anchor.yaw || 0, source: 'district-island-voxel:' + anchor.id });
+      contract.visibleIslandCount += 1;
+      contract.islandMeshCount += 1;
+    }
+  }
+
+  function addDistrictIslandBridges(district, contract) {
+    const anchors = district?.massAnchors || [];
+    if (anchors.length < 2) return;
+    for (let i = 0; i < anchors.length - 1; i += 1) {
+      const spec = buildIslandBridgeSpec(anchors[i], anchors[i + 1]);
+      if (!spec.visible) continue;
+      const group = new THREE.Group();
+      group.name = 'district-' + district.id + '-island-bridge-' + i;
+      group.position.set(spec.center.x, spec.center.y, spec.center.z);
+      group.rotation.y = spec.yaw;
+      roomGroup.add(group);
+      const field = buildRockBridgeField(spec.horizontalLength, spec.deckSize[0], 1.6, hashRoomKey('district-island-bridge:' + district.id + ':' + i));
+      const meshData = buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
+      const mesh = buildRuntimeIslandMesh(meshData, MAT.islandRockDark);
+      group.add(mesh);
+      registerMeshSupportCollider(group, { source: 'district-island-bridge-mesh:' + district.id + ':' + i });
+      registerVoxelSupportCollider(field, { origin: [spec.center.x, spec.center.y, spec.center.z], yaw: spec.yaw, source: 'district-island-bridge-voxel:' + district.id + ':' + i });
+      contract.visibleBridgeCount += 1;
+      contract.bridgeMeshCount += 1;
     }
   }
 
@@ -328,10 +459,11 @@ export function createDistrictGeometryApi(deps) {
 
   function addDistrictSkeletonGeometry(district) {
     if (!district) return;
-    if (district.skeletonType === 'hanging_market_hybrid') addHangingMarketDistrictSkeleton(district);
-    if (district.skeletonType === 'lift_court_hybrid') addLiftCourtDistrictSkeleton(district);
-    addDistrictStoryNooks(district);
-    addDistrictCrystalGrowths(district);
+    const contract = beginDistrictVisualCollisionContract(district);
+    addDistrictIslandMasses(district, contract);
+    addDistrictIslandBridges(district, contract);
+    addDistrictRouteIslands(district, contract);
+    finalizeDistrictVisualCollisionContract(contract);
   }
 
   return {

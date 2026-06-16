@@ -7,6 +7,58 @@
       "notes": "Copied from the Pose Lab FPSPlayer export. Used as the initial Infinite Brutality FPV rig and animation trove."
     },
     {
+      "path": "assets/models/fpsplayer_meshy/FPSPlayer_rigged_20260615.glb",
+      "source": "/storage/emulated/0/Download/FPSPlayer.glb (3)",
+      "role": "selected rigged FPSPlayer GLB for first-person visible body/arms mesh",
+      "processing": "copied unchanged into project runtime assets; external Meshy PBR maps are applied at runtime because the GLB contains no embedded textures",
+      "notes": "Two skinned meshes, two skins, UVs/normals, Camera bone, and 38 imported animation clips."
+    },
+    {
+      "path": "Meshy_AI__0615135730_texture*.png",
+      "source": "Project-root texture files supplied by the user from the 0615135730 Meshy export: albedo, normal, roughness, metallic, and emission.",
+      "role": "external PBR texture set for FPSPlayer_rigged_20260615.glb",
+      "processing": "left in the project root and loaded directly by src/main.js; textureTransform offset [0.025, 0.475] and repeat [0.85, 0.65] remap the rig UVs into the flesh-painted atlas region",
+      "notes": "The asset-folder copies are byte-identical, but runtime intentionally points at the root files the user supplied for this correction pass."
+    },
+    {
+      "path": "assets/source/fpsplayer_meshy/Meshy_AI__0615041256_texture_fbx.zip",
+      "source": "/storage/emulated/0/Download/Meshy_AI__0615041256_texture_fbx.zip",
+      "role": "source archive for the updated Meshy FPSPlayer body and PBR maps",
+      "processing": "copied unchanged into project source assets; extracted runtime FBX and textures into assets/models/fpsplayer_meshy/",
+      "notes": "Preserved separately from the older GLB so the runtime can keep the original FPSPlayer skeleton and embedded action set."
+    },
+    {
+      "path": "assets/models/fpsplayer_meshy/*",
+      "source": "Mixed project-owned FPSPlayer Meshy runtime assets: older 061504 static FBX archive plus the selected /storage/emulated/0/Download/FPSPlayer.glb (3) and 0615135730 PBR texture set.",
+      "role": "Runtime FPSPlayer rig and external PBR texture set for first-person body/arms rendering.",
+      "processing": "FPSPlayer.glb (3) copied as FPSPlayer_rigged_20260615.glb; 0615135730 root albedo/normal/roughness/metallic/emission maps loaded directly and transformed at runtime before applying to the skinned GLB.",
+      "notes": "The selected GLB has two skinned meshes, UVs, normals, and 38 animations, but no embedded images/textures. The root texture files are the canonical texture source for the visible player material."
+    },
+    {
+      "path": "assets/textures/expedition-rock-albedo-0.1.83.png",
+      "source": "../driftfield/assets/textures/expedition-rock-albedo-0.1.83.png",
+      "role": "Driftfield expedition rock albedo reused for Infinite Brutality floating island masses",
+      "processing": "copied unchanged from the local Driftfield repo and loaded as the albedo channel for island rock PBR materials"
+    },
+    {
+      "path": "assets/textures/expedition-rock-normal-0.1.83.png",
+      "source": "../driftfield/assets/textures/expedition-rock-normal-0.1.83.png",
+      "role": "Driftfield expedition rock normal map reused for Infinite Brutality floating island masses",
+      "processing": "copied unchanged from the local Driftfield repo and loaded as the normal channel for island rock PBR materials"
+    },
+    {
+      "path": "assets/textures/expedition-rock-roughness-0.1.83.png",
+      "source": "../driftfield/assets/textures/expedition-rock-roughness-0.1.83.png",
+      "role": "Driftfield expedition rock roughness map reused for Infinite Brutality floating island masses",
+      "processing": "copied unchanged from the local Driftfield repo and loaded as the roughness channel for island rock PBR materials"
+    },
+    {
+      "path": "assets/textures/expedition-rock-metalness-0.1.83.png",
+      "source": "../driftfield/assets/textures/expedition-rock-metalness-0.1.83.png",
+      "role": "Driftfield expedition rock metalness map reused for Infinite Brutality floating island masses",
+      "processing": "copied unchanged from the local Driftfield repo and loaded as the metalness channel for island rock PBR materials"
+    },
+    {
       "path": "assets/textures/dalle-gothic-stone-20260608.png",
       "source": "/data/data/com.termux/files/home/.codex/generated_images/019ea50d-8a89-7c91-92cd-e3dfc4646185/ig_0c4c5783b84bd60b016a2756d72054819aa01c61744f43b0af.png",
       "role": "repeat-wrapped gothic stone texture for walls, floors, platforms, and connector architecture",
@@ -460,6 +512,94 @@
       "tool": "Python local SVG generation",
       "processing": "SVG review sheet referencing the new project-owned prop material assets for quick inspection",
       "prompt_summary": "not AI-generated; review sheet for timber, cloth, plaster, ceramic, garden, water, and rope materials"
+    },
+    {
+      "path": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ecc51-f856-7ae1-aa12-30ad9d8631da/ig_04ae1fd107be0d8f016a307445f4f48194a7ad563720cfd12a.png",
+      "role": "OpenAI generated source image for Meshy-derived island rock texture style",
+      "tool": "built-in image_gen",
+      "processing": "Generated from a prompt based on the Meshy-lit FPSPlayer and orc material style; final runtime maps are static PNG files loaded from assets/textures.",
+      "prompt_summary": "seamless tileable stylized dark fantasy rock albedo, Meshy-like painterly PBR, warm dark browns, olive-gray stone, tan worn-edge highlights, no text, no grid"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-albedo-20260615.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "Meshy-derived stylized rock albedo for floating island terrain",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Generated from a prompt based on the Meshy-lit FPSPlayer and orc material style; final runtime maps are static PNG files loaded from assets/textures.",
+      "prompt_summary": "seamless tileable stylized dark fantasy rock albedo, Meshy-like painterly PBR, warm dark browns, olive-gray stone, tan worn-edge highlights, no text, no grid"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-height-20260615.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "Offline-derived height map aligned to the Meshy-derived rock albedo",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Generated from a prompt based on the Meshy-lit FPSPlayer and orc material style; final runtime maps are static PNG files loaded from assets/textures.",
+      "prompt_summary": "seamless tileable stylized dark fantasy rock albedo, Meshy-like painterly PBR, warm dark browns, olive-gray stone, tan worn-edge highlights, no text, no grid"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-normal-20260615.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "Offline-derived tangent normal map aligned to the Meshy-derived rock albedo",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Generated from a prompt based on the Meshy-lit FPSPlayer and orc material style; final runtime maps are static PNG files loaded from assets/textures.",
+      "prompt_summary": "seamless tileable stylized dark fantasy rock albedo, Meshy-like painterly PBR, warm dark browns, olive-gray stone, tan worn-edge highlights, no text, no grid"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-roughness-20260615.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "Offline-derived roughness map aligned to the Meshy-derived rock albedo",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Generated from a prompt based on the Meshy-lit FPSPlayer and orc material style; final runtime maps are static PNG files loaded from assets/textures.",
+      "prompt_summary": "seamless tileable stylized dark fantasy rock albedo, Meshy-like painterly PBR, warm dark browns, olive-gray stone, tan worn-edge highlights, no text, no grid"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-metalness-20260615.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "Offline-derived near-black metalness map for non-metal rock material",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Generated from a prompt based on the Meshy-lit FPSPlayer and orc material style; final runtime maps are static PNG files loaded from assets/textures.",
+      "prompt_summary": "seamless tileable stylized dark fantasy rock albedo, Meshy-like painterly PBR, warm dark browns, olive-gray stone, tan worn-edge highlights, no text, no grid"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-albedo-20260615-readable.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "readability-tuned Meshy-derived rock albedo for floating islands",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Shadow-lifted and grime-compressed variant made after screenshot review showed the first rock pass was too dark and dingy; saved as static project PNG maps.",
+      "prompt_summary": "inherits the OpenAI Meshy-derived rock source but prioritizes visible detail under mobile game lighting"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-height-20260615-readable.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "readability-tuned static height map aligned to Meshy-derived rock albedo",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Shadow-lifted and grime-compressed variant made after screenshot review showed the first rock pass was too dark and dingy; saved as static project PNG maps.",
+      "prompt_summary": "inherits the OpenAI Meshy-derived rock source but prioritizes visible detail under mobile game lighting"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-normal-20260615-readable.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "readability-tuned normal map aligned to Meshy-derived rock albedo",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Shadow-lifted and grime-compressed variant made after screenshot review showed the first rock pass was too dark and dingy; saved as static project PNG maps.",
+      "prompt_summary": "inherits the OpenAI Meshy-derived rock source but prioritizes visible detail under mobile game lighting"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-roughness-20260615-readable.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "readability-tuned roughness map aligned to Meshy-derived rock albedo",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Shadow-lifted and grime-compressed variant made after screenshot review showed the first rock pass was too dark and dingy; saved as static project PNG maps.",
+      "prompt_summary": "inherits the OpenAI Meshy-derived rock source but prioritizes visible detail under mobile game lighting"
+    },
+    {
+      "path": "assets/textures/openai-meshy-rock-metalness-20260615-readable.png",
+      "source": "assets/source/generated_textures/openai-meshy-rock-source-20260615.png",
+      "role": "readability-tuned near-black metalness map for Meshy-derived rock",
+      "tool": "Pillow offline asset processing derived from built-in image_gen source",
+      "processing": "Shadow-lifted and grime-compressed variant made after screenshot review showed the first rock pass was too dark and dingy; saved as static project PNG maps.",
+      "prompt_summary": "inherits the OpenAI Meshy-derived rock source but prioritizes visible detail under mobile game lighting"
     }
   ]
 }

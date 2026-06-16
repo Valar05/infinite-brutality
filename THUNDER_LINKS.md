@@ -12,6 +12,8 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 - District graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
 - Project links: `../thunder-brainstorm/generated/project_links/infinite_brutality_project_links.md`
 - Project links JSON: `../thunder-brainstorm/generated/project_links/infinite_brutality_project_links.json`
+- Meshy/PBR rendering handoff: `../thunder-brainstorm/generated/session_learnings/2026-06-15_infinite_brutality_meshy_pbr_rendering_handoff.md`
+- Meshy/PBR rendering source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_meshy_pbr_rendering_source_refs.jsonl`
 - Manual source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_source_refs.jsonl`
 - Nook story / absent-people writing note: `../thunder-brainstorm/generated/session_learnings/2026-06-11_infinite_brutality_nook_story_brainstorm.md`
 - Nook story source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_nook_story_source_refs.jsonl`

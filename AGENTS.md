@@ -30,6 +30,7 @@ Read extra docs only when the change actually touches that area:
 - Preserve the single-family Hanging Gardens world policy unless the user explicitly changes it.
 - If a task crosses runtime-contract boundaries, update the relevant contract doc in the same pass.
 - If a new durable prop family, district rule, or validation rule is introduced, update the matching manifest or doc instead of leaving it implicit in code.
+- For first-person arms and Meshy characters, preserve PBR map authority: diagnose lighting, UV transform, material scalars, and render-pass setup before reducing normal/roughness/metalness contribution.
 
 ## Validation
 

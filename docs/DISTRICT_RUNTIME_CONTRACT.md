@@ -251,6 +251,8 @@ Room and traversal systems use these support concepts:
 
 - `walkableSurfaces`
 - `solidColliders`
+- `visualCollisionContract`
+  For island-mode district visuals, every visible island cluster must register at least one coarse solid envelope plus one top walkable envelope, and every visible bridge span must register one solid envelope plus one walkable deck envelope. The envelope may be summarized and low poly, but visible traversal-facing geometry must never be non-colliding decoration. Builder code should fail fast if this contract is not met.
 - `climbSurfaces`
 - `findEnemySupport(...)`
 - `findEnemyCapsuleSupport(...)`
@@ -410,3 +412,15 @@ Do not convert multiple districts at once until the runtime contract holds for o
 `storyNookPlacements` is the resolved runtime placement plan: packet IDs, cluster IDs, target roles, and world positions chosen from district anchors and segment roles before any later prose or prop rendering.
 
 District crystal growths may also be derived from the same segment-role basis at runtime. They are allowed to add cheap recovery shelves and `climbSurfaces`, but they must stay offset from the main route and must not replace the canonical room bundle or district spine.
+
+
+## Screenshot-Visible Surface Contract
+
+Recent screenshot passes proved the rock textures were correct and that bad foreground read came from rendering response, not texture source quality.
+
+Rules:
+
+- Camera-space FPS arms are allowed to use a separate scene and light rig, but they must still render supplied Meshy PBR maps visibly.
+- If arms look like flat clay while rocks show roughness/normal detail, inspect material scalar values, environment intensity, UV transform, and per-pass lighting before changing source maps.
+- Do not reduce normal-map contribution as a first response to a flat-looking foreground model. The correct first response is to verify that roughness, metalness, normals, and environment lighting are all participating.
+- Keep rock and arm material paths documented together because screenshots compare them in the same frame.
