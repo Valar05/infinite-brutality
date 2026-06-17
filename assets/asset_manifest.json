@@ -600,6 +600,22 @@
       "tool": "Pillow offline asset processing derived from built-in image_gen source",
       "processing": "Shadow-lifted and grime-compressed variant made after screenshot review showed the first rock pass was too dark and dingy; saved as static project PNG maps.",
       "prompt_summary": "inherits the OpenAI Meshy-derived rock source but prioritizes visible detail under mobile game lighting"
+    },
+    {
+      "path": "assets/textures/openai-sedimentary-mesa-height-20260616.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ed0c0-3127-74b3-96b3-d330cccb162f/ig_0d8be3003c7c4921016a3171ff83e881949fce31ab9e352f3f.png",
+      "role": "generated grayscale height source for sedimentary mesa terrain material; intended normal-map source",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped if needed, resized to 1024x1024, converted to 8-bit grayscale PNG; not currently sampled by runtime material",
+      "prompt_summary": "seamless grayscale height map with horizontal sediment layers, eroded ledges, chipped undercuts, long cracks, and sparse fine chips; avoided pebbles, bricks, grid cells, and all-over noise"
+    },
+    {
+      "path": "assets/textures/openai-sedimentary-mesa-albedo-20260616.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019ed0c0-3127-74b3-96b3-d330cccb162f/ig_0d8be3003c7c4921016a317252029481948f8810e44c2253f2.png",
+      "role": "runtime diffuse/albedo texture for sedimentary mesa islands and connector bridge fragments",
+      "tool": "built-in image_gen",
+      "processing": "center-cropped if needed, resized to 1024x1024 RGB PNG, loaded on dedicated lightweight sedimentary terrain materials",
+      "prompt_summary": "seamless muted ancient sedimentary rock albedo with warm gray, dirty tan, pale limestone, ochre, charcoal cracks, sparse rust seams, and horizontal strata; avoided old vector tile, bricks, cobbles, and random Voronoi patches"
     }
   ]
 }

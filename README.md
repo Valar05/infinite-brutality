@@ -18,7 +18,7 @@ Use `sh ./tools/status_local_server.sh` to check it and `sh ./tools/stop_local_s
 
 ## Current Build
 
-Build `0.8.30` adds an explicit room-traversal graph for the district spine so enemy pursuit and room-to-room movement follow authored sockets and route kinds instead of trying to infer the level from collision alone. It keeps the seeded elevation bands, 3D macro spine, vector material pass, and descent silhouette fix.
+Build `0.8.175` keeps sedimentary meshes manifold while adding deterministic visual weathering so sandstone corners shear off the cube grid without changing collision.
 
 ## Validation
 

@@ -7,6 +7,7 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 - Prototype lessons: `../thunder-brainstorm/generated/session_learnings/2026-06-08_infinite_brutality_prototype_lessons.md`
 - General level-design workflow: `../thunder-brainstorm/generated/skills/level_design_environment_grammar.md`
 - Project-specific level-design workflow: `docs/LEVEL_DESIGN_WORKFLOW.md`
+- Rock shape grammar: `docs/ROCK_SHAPE_GRAMMAR.md`
 - Project combat bring-up plan: `docs/COMBAT_BRINGUP_PLAN.md`
 - Vertical district realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
 - District graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
@@ -14,6 +15,8 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 - Project links JSON: `../thunder-brainstorm/generated/project_links/infinite_brutality_project_links.json`
 - Meshy/PBR rendering handoff: `../thunder-brainstorm/generated/session_learnings/2026-06-15_infinite_brutality_meshy_pbr_rendering_handoff.md`
 - Meshy/PBR rendering source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_meshy_pbr_rendering_source_refs.jsonl`
+- Rock shape grammar handoff: `../thunder-brainstorm/generated/session_learnings/2026-06-15_infinite_brutality_rock_shape_grammar.md`
+- Rock shape grammar source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_rock_shape_grammar_source_refs.jsonl`
 - Manual source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_source_refs.jsonl`
 - Nook story / absent-people writing note: `../thunder-brainstorm/generated/session_learnings/2026-06-11_infinite_brutality_nook_story_brainstorm.md`
 - Nook story source refs: `../thunder-brainstorm/generated/source_refs_manual/infinite_brutality_nook_story_source_refs.jsonl`
@@ -33,7 +36,7 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 ## Local Runtime
 
 - Play URL: `http://127.0.0.1:8798/infinite-brutality/index.html`
-- Current documented build: `0.8.30`
+- Current documented build: `0.8.175`
 - Entry: `index.html`
 - Runtime: `src/main.js`
 - Styles: `src/styles.css`

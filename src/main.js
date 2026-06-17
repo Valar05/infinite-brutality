@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
-import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.162';
-import { createMaterialResources } from './materials.js?v=0.8.163';
+import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.175';
+import { createMaterialResources } from './materials.js?v=0.8.175';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js';
 import { createNookTtsApi } from './nook-tts.js';
-import { buildRockBridgeField, buildRockBridgeMeshData, queryVoxelTopY, queryVoxelIntersectsPrism } from './island-geometry.js?v=0.8.162';
+import { buildRockBridgeField, buildRockBridgeMeshData, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData, queryVoxelTopY, queryVoxelIntersectsPrism } from './island-geometry.js?v=0.8.175';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
@@ -26,7 +26,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.166';
+const BUILD = '0.8.175';
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;
 const USE_DYNAMIC_SHADOWS = false;
@@ -70,7 +70,7 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(1.35, window.devicePixelRatio || 1));
+renderer.setPixelRatio(Math.min(1.0, window.devicePixelRatio || 1));
 renderer.shadowMap.enabled = USE_DYNAMIC_SHADOWS;
 renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1015,8 +1015,12 @@ function addIslandArtBridge(name, from, to, width = 4.4, options = {}) {
   roomGroup.add(group);
   const thickness = options.thickness || 1.45;
   const bridgeSeed = hashRoomKey(name + ':' + Math.round(length * 10));
-  const field = buildRockBridgeField(length, width, thickness, bridgeSeed);
-  const meshData = buildRockBridgeMeshData(length, width, thickness, bridgeSeed, MAT.islandRock?.userData?.uvScale ?? 0.12);
+  const field = options.slabBridge === false
+    ? buildRockBridgeField(length, width, thickness, bridgeSeed)
+    : buildSedimentaryMesaBridgeField(length, width, thickness, bridgeSeed);
+  const meshData = options.slabBridge === false
+    ? buildRockBridgeMeshData(length, width, thickness, bridgeSeed, MAT.islandRock?.userData?.uvScale ?? 0.12)
+    : buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
@@ -1024,7 +1028,7 @@ function addIslandArtBridge(name, from, to, width = 4.4, options = {}) {
   geometry.setIndex(meshData.indices);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geometry, options.material || MAT.islandRockDark);
+  const mesh = new THREE.Mesh(geometry, options.material || (options.slabBridge === false ? MAT.islandRockDark : MAT.sedimentaryRockDark));
   group.add(mesh);
   registerMeshSupportCollider(group, { source: options.source || name });
   registerVoxelSupportCollider(field, { origin: [center.x, center.y, center.z], yaw, source: (options.source || name) + ':voxel' });
@@ -1056,7 +1060,7 @@ function addIslandArtSteppedRamp(name, from, to, options = {}) {
   ];
   for (let i = 0; i < points.length - 1; i += 1) {
     addIslandArtBridge(name + '-step-' + i, points[i], points[i + 1], options.width || 5.8, {
-      material: options.material || (i % 2 ? MAT.islandRock : MAT.islandRockDark),
+      material: options.material || MAT.sedimentaryRockDark,
       thickness: options.thickness || 1.55,
       source: (options.source || name) + ':step-' + i,
     });
@@ -3399,6 +3403,8 @@ function generateDistrictPlan(levelIndex) {
         size: sliceConfig.size,
         yaw,
         terraced: true,
+        rockGrammar: 'sedimentary_mesa',
+        rockSilhouette: 'mesa',
       }],
       landmarkAnchor: { x: origin.x, y: baseElevation + 2.6, z: origin.z, role: sliceConfig.role },
     });

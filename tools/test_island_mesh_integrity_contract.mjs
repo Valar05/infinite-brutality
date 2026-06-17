@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildRoomIslandField, buildRockBridgeField, buildSurfaceNetMeshData } from '../src/island-geometry.js';
+import { buildRoomIslandField, buildRockBridgeField, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData, buildSurfaceNetMeshData } from '../src/island-geometry.js';
 
 function voxelDensity(field, x, y, z) {
   const gx = (x - field.min.x) / field.cell - 0.5;
@@ -33,18 +33,22 @@ function voxelDensity(field, x, y, z) {
 
 function triangleStats(field, mesh) {
   const p = mesh.positions;
+  const indices = mesh.indices?.length ? mesh.indices : Array.from({ length: p.length / 3 }, (_, i) => i);
   const edges = new Map();
   let badFacing = 0;
-  for (let i = 0; i < p.length; i += 9) {
-    const ax = p[i], ay = p[i + 1], az = p[i + 2];
-    const bx = p[i + 3], by = p[i + 4], bz = p[i + 5];
-    const cx = p[i + 6], cy = p[i + 7], cz = p[i + 8];
-    const key = (x, y, z) => `${x.toFixed(4)},${y.toFixed(4)},${z.toFixed(4)}`;
-    const verts = [key(ax, ay, az), key(bx, by, bz), key(cx, cy, cz)];
+  const keyForIndex = (index) => p[index * 3].toFixed(4) + ',' + p[index * 3 + 1].toFixed(4) + ',' + p[index * 3 + 2].toFixed(4);
+  for (let i = 0; i < indices.length; i += 3) {
+    const ai = indices[i];
+    const bi = indices[i + 1];
+    const ci = indices[i + 2];
+    const ax = p[ai * 3], ay = p[ai * 3 + 1], az = p[ai * 3 + 2];
+    const bx = p[bi * 3], by = p[bi * 3 + 1], bz = p[bi * 3 + 2];
+    const cx = p[ci * 3], cy = p[ci * 3 + 1], cz = p[ci * 3 + 2];
+    const verts = [keyForIndex(ai), keyForIndex(bi), keyForIndex(ci)];
     for (let e = 0; e < 3; e += 1) {
       const a = verts[e];
       const b = verts[(e + 1) % 3];
-      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      const k = a < b ? a + '|' + b : b + '|' + a;
       edges.set(k, (edges.get(k) || 0) + 1);
     }
     const ux = bx - ax;
@@ -83,7 +87,7 @@ function triangleStats(field, mesh) {
     if (count === 1) openEdges += 1;
     if (count !== 2) nonManifoldEdges += 1;
   }
-  return { triangleCount: p.length / 9, openEdges, nonManifoldEdges, badFacing };
+  return { triangleCount: indices.length / 3, openEdges, nonManifoldEdges, badFacing };
 }
 
 function countEnclosedAir(field) {
@@ -133,19 +137,21 @@ function countEnclosedAir(field) {
 }
 
 const cases = [
-  ['room', buildRoomIslandField([8.8, 5.2, 8.8], 1)],
-  ['bridge', buildRockBridgeField(28, 4.8, 1.6, 1)],
+  ['legacy-room', buildRoomIslandField([8.8, 5.2, 8.8], 1), buildSurfaceNetMeshData],
+  ['legacy-bridge', buildRockBridgeField(28, 4.8, 1.6, 1), buildSurfaceNetMeshData],
+  ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' }), buildSedimentaryMesaMeshData],
+  ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1), buildSedimentaryMesaMeshData],
 ];
 
 const failures = [];
-for (const [label, field] of cases) {
-  const mesh = buildSurfaceNetMeshData(field);
+for (const [label, field, meshFactory] of cases) {
+  const mesh = meshFactory(field);
   const stats = triangleStats(field, mesh);
   const enclosedAir = countEnclosedAir(field);
-  if (enclosedAir > 0) failures.push(`${label} field encloses ${enclosedAir} air voxels; no interior cavities are allowed`);
-  if (stats.openEdges > 0) failures.push(`${label} mesh has ${stats.openEdges} open edges; mesh must be watertight`);
-  if (stats.nonManifoldEdges > 0) failures.push(`${label} mesh has ${stats.nonManifoldEdges} non-manifold edges`);
-  if (stats.badFacing > 0) failures.push(`${label} mesh has ${stats.badFacing}/${stats.triangleCount} triangles facing the wrong solid/air side`);
+  if (enclosedAir > 0) failures.push(label + ' field encloses ' + enclosedAir + ' air voxels; no interior cavities are allowed');
+  if (stats.openEdges > 0) failures.push(label + ' mesh has ' + stats.openEdges + ' open edges; mesh must be watertight');
+  if (stats.nonManifoldEdges > 0) failures.push(label + ' mesh has ' + stats.nonManifoldEdges + ' non-manifold edges');
+  if (stats.badFacing > 0) failures.push(label + ' mesh has ' + stats.badFacing + '/' + stats.triangleCount + ' triangles facing the wrong solid/air side');
 }
 
 assert.deepEqual(failures, [], 'island meshes must be watertight, cavity-free, and consistently face solid vs air');

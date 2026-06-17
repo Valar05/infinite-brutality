@@ -163,6 +163,8 @@ export function createMaterialResources(deps) {
       exit: makeMat(0x8de2b5, 0.66, 0.04, 0.08),
       stone: makeMat(0x657382, 0.86, 0.04, 0.07),
       stone2: makeMat(0x83909b, 0.82, 0.04, 0.065),
+      sedimentaryRock: makeMat(0x948873, 0.9, 0.01, 0.035),
+      sedimentaryRockDark: makeMat(0x6f685b, 0.92, 0.01, 0.028),
       bronze: makeMat(0x9a7937, 0.74, 0.12, 0.06),
       blood: makeMat(0x8a2020, 0.8, 0.02, 0.055),
       bloodDark: makeMat(0x3c0b0e, 0.88, 0.01, 0.035),
@@ -208,6 +210,8 @@ export function createMaterialResources(deps) {
     setMaterialUvScale(MAT.crystalDark, 0.078);
     setMaterialUvScale(MAT.islandRock, 0.125);
     setMaterialUvScale(MAT.islandRockDark, 0.125);
+    setMaterialUvScale(MAT.sedimentaryRock, 0.072);
+    setMaterialUvScale(MAT.sedimentaryRockDark, 0.072);
 
     function makeVoronoiTexture(seed, options = {}) {
       const size = options.size ?? 96;
@@ -425,8 +429,16 @@ export function createMaterialResources(deps) {
       });
     }
 
+    function applySedimentaryTerrainTexture() {
+      loadWrappedTexture('../assets/textures/openai-sedimentary-mesa-albedo-20260616.png', 1, 1, (texture) => {
+        texture.anisotropy = 1;
+        applyTextureToMaterials(texture, [MAT.sedimentaryRock, MAT.sedimentaryRockDark], 0xffffff);
+      });
+    }
+
     applyProceduralSurfaceTextures();
     applyGeneratedSurfaceTextures();
+    applySedimentaryTerrainTexture();
     const meshyRockMaps = loadPbrTextureSet({
       albedo: '../assets/textures/openai-meshy-rock-albedo-20260615-readable.png',
       normal: '../assets/textures/openai-meshy-rock-normal-20260615-readable.png',

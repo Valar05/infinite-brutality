@@ -621,6 +621,177 @@ export function buildSurfaceNetMeshData(field, uvScale = 0.12) {
   };
 }
 
+
+function columnSpan(field, x, z) {
+  let bottom = null;
+  let top = null;
+  for (let y = 0; y < field.ny; y += 1) {
+    if (!getVoxel(field, x, y, z)) continue;
+    if (bottom == null) bottom = field.min.y + y * field.cell;
+    top = field.min.y + (y + 1) * field.cell;
+  }
+  if (top == null || bottom == null) return null;
+  return { top, bottom };
+}
+
+function addProjectedUv(uvs, verts, normal, uvScale) {
+  const anx = Math.abs(normal[0]);
+  const any = Math.abs(normal[1]);
+  const anz = Math.abs(normal[2]);
+  for (const vert of verts) {
+    if (any >= anx && any >= anz) uvs.push(vert[0] * uvScale, vert[2] * uvScale);
+    else if (anx >= anz) uvs.push(vert[2] * uvScale, vert[1] * uvScale);
+    else uvs.push(vert[0] * uvScale, vert[1] * uvScale);
+  }
+}
+
+function emitIndexedQuad(positions, normals, uvs, indices, verts, normal, uvScale) {
+  const start = positions.length / 3;
+  for (const vert of verts) {
+    positions.push(vert[0], vert[1], vert[2]);
+    normals.push(normal[0], normal[1], normal[2]);
+  }
+  addProjectedUv(uvs, verts, normal, uvScale);
+  const ux = verts[1][0] - verts[0][0];
+  const uy = verts[1][1] - verts[0][1];
+  const uz = verts[1][2] - verts[0][2];
+  const vx = verts[2][0] - verts[0][0];
+  const vy = verts[2][1] - verts[0][1];
+  const vz = verts[2][2] - verts[0][2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const aligned = nx * normal[0] + ny * normal[1] + nz * normal[2] >= 0;
+  if (aligned) indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  else indices.push(start, start + 2, start + 1, start, start + 3, start + 2);
+}
+
+function emitSedimentarySide(positions, normals, uvs, indices, a0, a1, top, bottom, axis, sign, uvScale) {
+  const bands = 1;
+  const normal = axis === 'x' ? [sign, 0, 0] : [0, 0, sign];
+  for (let band = 0; band < bands; band += 1) {
+    const y0 = lerp(bottom, top, band / bands);
+    const y1 = lerp(bottom, top, (band + 1) / bands);
+    let verts;
+    if (axis === 'x') {
+      const x = a0[0];
+      const z0 = a0[1];
+      const z1 = a1[1];
+      verts = sign > 0
+        ? [[x, y0, z0], [x, y0, z1], [x, y1, z1], [x, y1, z0]]
+        : [[x, y0, z1], [x, y0, z0], [x, y1, z0], [x, y1, z1]];
+    } else {
+      const z = a0[1];
+      const x0 = a0[0];
+      const x1 = a1[0];
+      verts = sign > 0
+        ? [[x1, y0, z], [x0, y0, z], [x0, y1, z], [x1, y1, z]]
+        : [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]];
+    }
+    emitIndexedQuad(positions, normals, uvs, indices, verts, normal, uvScale);
+  }
+}
+
+function signedGridNoise(x, y, z, seed) {
+  return hash2(x * 0.37 + y * 0.19 + seed * 0.011, z * 0.41 - y * 0.23 - seed * 0.017, seed) * 2 - 1;
+}
+
+function weatherSedimentaryVertex(field, vert) {
+  const cell = field.cell;
+  const gx = Math.round((vert[0] - field.min.x) / cell);
+  const gy = Math.round((vert[1] - field.min.y) / cell);
+  const gz = Math.round((vert[2] - field.min.z) / cell);
+  const layerShear = Math.sin(gy * 1.73 + gx * 0.37) * cell * 0.045;
+  const fractureShear = signedGridNoise(gx, gy, gz, 701) * cell * 0.075;
+  const erosion = signedGridNoise(gx, gy, gz, 733) * cell * 0.055;
+  const verticalChip = signedGridNoise(gx, gy, gz, 761) * cell * 0.038;
+  return [
+    vert[0] + fractureShear + layerShear,
+    vert[1] + verticalChip,
+    vert[2] + erosion - layerShear * 0.65,
+  ];
+}
+
+function triangleNormalFromVerts(a, b, c) {
+  const ux = b[0] - a[0];
+  const uy = b[1] - a[1];
+  const uz = b[2] - a[2];
+  const vx = c[0] - a[0];
+  const vy = c[1] - a[1];
+  const vz = c[2] - a[2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  const length = Math.hypot(nx, ny, nz) || 1;
+  return [nx / length, ny / length, nz / length];
+}
+
+function emitWeatheredTriangle(positions, normals, uvs, indices, verts, desiredNormal, uvScale) {
+  const tri = verts.map((vert) => vert.slice());
+  let normal = triangleNormalFromVerts(tri[0], tri[1], tri[2]);
+  if (normal[0] * desiredNormal[0] + normal[1] * desiredNormal[1] + normal[2] * desiredNormal[2] < 0) {
+    [tri[1], tri[2]] = [tri[2], tri[1]];
+    normal = triangleNormalFromVerts(tri[0], tri[1], tri[2]);
+  }
+  const start = positions.length / 3;
+  for (const vert of tri) {
+    positions.push(vert[0], vert[1], vert[2]);
+    normals.push(normal[0], normal[1], normal[2]);
+  }
+  addProjectedUv(uvs, tri, desiredNormal, uvScale);
+  indices.push(start, start + 1, start + 2);
+}
+
+function emitWeatheredQuad(field, positions, normals, uvs, indices, verts, normal, uvScale) {
+  const weathered = verts.map((vert) => weatherSedimentaryVertex(field, vert));
+  emitWeatheredTriangle(positions, normals, uvs, indices, [weathered[0], weathered[1], weathered[2]], normal, uvScale);
+  emitWeatheredTriangle(positions, normals, uvs, indices, [weathered[0], weathered[2], weathered[3]], normal, uvScale);
+}
+
+function buildExposedVoxelFaceMeshData(field, uvScale = 0.072) {
+  const positions = [];
+  const normals = [];
+  const uvs = [];
+  const indices = [];
+  let quadCount = 0;
+  const cell = field.cell;
+  const emitFace = (verts, normal) => {
+    emitWeatheredQuad(field, positions, normals, uvs, indices, verts, normal, uvScale);
+    quadCount += 1;
+  };
+  for (let z = 0; z < field.nz; z += 1) {
+    for (let y = 0; y < field.ny; y += 1) {
+      for (let x = 0; x < field.nx; x += 1) {
+        if (!getVoxel(field, x, y, z)) continue;
+        const x0 = field.min.x + x * cell;
+        const x1 = x0 + cell;
+        const y0 = field.min.y + y * cell;
+        const y1 = y0 + cell;
+        const z0 = field.min.z + z * cell;
+        const z1 = z0 + cell;
+        if (!getVoxel(field, x, y + 1, z)) emitFace([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
+        if (!getVoxel(field, x, y - 1, z)) emitFace([[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], [0, -1, 0]);
+        if (!getVoxel(field, x - 1, y, z)) emitFace([[x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1]], [-1, 0, 0]);
+        if (!getVoxel(field, x + 1, y, z)) emitFace([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], [1, 0, 0]);
+        if (!getVoxel(field, x, y, z - 1)) emitFace([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [0, 0, -1]);
+        if (!getVoxel(field, x, y, z + 1)) emitFace([[x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1]], [0, 0, 1]);
+      }
+    }
+  }
+  return {
+    positions,
+    normals,
+    uvs,
+    indices,
+    quadCount,
+    triangleCount: indices.length / 3,
+  };
+}
+
+export function buildSedimentaryMesaMeshData(field, uvScale = 0.072) {
+  return buildExposedVoxelFaceMeshData(field, uvScale);
+}
+
 export function buildGreedyVoxelMeshData(field, uvScale = 0.12) {
   const dims = [field.nx, field.ny, field.nz];
   const positions = [];
@@ -776,7 +947,49 @@ function buildFieldFromVerticalSpan(cell, min, max, spanFn) {
   return field;
 }
 
-export function buildRoomIslandField(size, seed, terraced = false) {
+function closeVoxelDiagonalEdgeGaps(field) {
+  let changed = true;
+  let passes = 0;
+  while (changed && passes < field.nx + field.nz) {
+    changed = false;
+    passes += 1;
+    for (let z = 0; z < field.nz - 1; z += 1) {
+      for (let y = 0; y < field.ny; y += 1) {
+        for (let x = 0; x < field.nx - 1; x += 1) {
+          const a = getVoxel(field, x, y, z);
+          const b = getVoxel(field, x + 1, y, z);
+          const c = getVoxel(field, x, y, z + 1);
+          const d = getVoxel(field, x + 1, y, z + 1);
+          if (a && d && !b && !c) {
+            setVoxel(field, x + 1, y, z, 1);
+            changed = true;
+          } else if (b && c && !a && !d) {
+            setVoxel(field, x, y, z, 1);
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+  return field;
+}
+
+function normalizeRoomIslandOptions(optionsOrTerraced = false) {
+  if (optionsOrTerraced && typeof optionsOrTerraced === 'object') {
+    return {
+      grammar: optionsOrTerraced.grammar || 'legacy_room_island',
+      terraced: Boolean(optionsOrTerraced.terraced),
+      role: optionsOrTerraced.role || 'generic',
+    };
+  }
+  return {
+    grammar: 'legacy_room_island',
+    terraced: Boolean(optionsOrTerraced),
+    role: 'generic',
+  };
+}
+
+function buildLegacyRoomIslandField(size, seed, options) {
   const [sx, sy, sz] = size;
   const cell = Math.min(DRIFTFIELD_TERRAIN_CELL, Math.max(MIN_PLAYABLE_ISLAND_CELL, Math.min(sx, sy, sz) / 2.8));
   const min = vec3(-sx * 0.56, -sy * 1.08, -sz * 0.56);
@@ -811,7 +1024,7 @@ export function buildRoomIslandField(size, seed, terraced = false) {
       - smoothstep(0.0, 1.0, Math.abs(nx * nz)) * 0.05
     );
     if (topPocketNoise > 0.84) top -= sy * (topPocketNoise - 0.84) * 0.16;
-    if (terraced) {
+    if (options.terraced) {
       const terraceStep = sy * 0.095;
       top = Math.round(top / terraceStep) * terraceStep;
     }
@@ -831,8 +1044,118 @@ export function buildRoomIslandField(size, seed, terraced = false) {
   });
 }
 
+function buildSedimentaryMesaField(size, seed, options) {
+  const [sx, sy, sz] = size;
+  const cell = Math.min(DRIFTFIELD_TERRAIN_CELL, Math.max(MIN_PLAYABLE_ISLAND_CELL, Math.min(sx, sy, sz) / 5.4));
+  const min = vec3(-sx * 0.56, -sy * 1.08, -sz * 0.56);
+  const max = vec3(sx * 0.56, sy * 0.38, sz * 0.56);
+  const phaseA = (seed & 255) * 0.031;
+  const phaseB = ((seed >>> 8) & 255) * 0.027;
+  const field = buildFieldFromVerticalSpan(cell, min, max, (p) => {
+    const nx = p.x / Math.max(0.001, sx * 0.5);
+    const nz = p.z / Math.max(0.001, sz * 0.5);
+    const ax = Math.abs(nx);
+    const az = Math.abs(nz);
+    const angle = Math.atan2(nz, nx);
+    const slabX = ax / 0.94;
+    const slabZ = az / 0.78;
+    const rectRadial = Math.max(slabX, slabZ);
+    const cornerCrowding = Math.max(0, slabX - 0.76) * Math.max(0, slabZ - 0.68);
+    const edgeWave = Math.sin(angle * 4 + phaseA) * 0.035 + Math.sin(angle * 7 - phaseB) * 0.025;
+    const fractureBias = (valueNoise2(nx * 2.4 + 19.1, nz * 2.4 - 4.2, seed + 211) - 0.5) * 0.055;
+    const radius = 0.98 + edgeWave + fractureBias;
+    if (rectRadial + cornerCrowding * 0.62 > radius) return null;
+    const rim = clamp01(rectRadial / Math.max(radius, 0.001));
+    const chipNoise = valueNoise2(nx * 7.4 - 3.2, nz * 7.4 + 5.8, seed + 223);
+    if (rim > 0.90 && chipNoise > 0.76 + (rim - 0.90) * 0.62) return null;
+    const core = clamp01(1 - rim);
+    const shelfNoise = valueNoise2(nx * 3.0 + 6.3, nz * 3.0 - 10.8, seed + 229) - 0.5;
+    const crackNoise = valueNoise2(nx * 10.5 - 8.7, nz * 5.6 + 13.4, seed + 233);
+    let top = sy * (
+      0.30
+      + core * 0.08
+      - smoothstep(0.66, 1.0, rim) * 0.26
+      + shelfNoise * 0.045
+      - Math.max(0, crackNoise - 0.80) * 0.10
+    );
+    if (options.terraced) {
+      const terraceStep = sy * 0.065;
+      top = Math.round(top / terraceStep) * terraceStep;
+    }
+    const undercutNoise = valueNoise2(nx * 5.1 + 11.7, nz * 5.1 - 8.9, seed + 241);
+    const verticalGroove = Math.max(0, valueNoise2(Math.cos(angle) * 5.3 + 2.2, Math.sin(angle) * 5.3 - 5.5, seed + 251) - 0.54);
+    const strataStep = Math.floor((rim * 5.0 + undercutNoise * 2.0) % 4) * 0.035;
+    const bottom = -sy * (
+      0.64
+      + rim * 0.10
+      + Math.abs(undercutNoise - 0.5) * (0.08 + rim * 0.18)
+      + verticalGroove * rim * 0.22
+      + strataStep
+    );
+    const thickness = top - bottom;
+    if (thickness < sy * 0.56) return null;
+    if (rim > 0.78 && thickness < sy * 0.62) return null;
+    return { top, bottom };
+  });
+  closeVoxelDiagonalEdgeGaps(field);
+  field.rockGrammar = {
+    grammar: 'sedimentary_mesa',
+    silhouette: 'mesa',
+    process: 'sediment_layers_erosion_fracture',
+    role: options.role,
+  };
+  return field;
+}
+
+export function buildRoomIslandField(size, seed, optionsOrTerraced = false) {
+  const options = normalizeRoomIslandOptions(optionsOrTerraced);
+  if (options.grammar === 'sedimentary_mesa') return buildSedimentaryMesaField(size, seed, options);
+  return buildLegacyRoomIslandField(size, seed, options);
+}
+
 export function buildRoomIslandMeshData(size, seed, uvScale = 0.12) {
   return buildSurfaceNetMeshData(buildRoomIslandField(size, seed), uvScale);
+}
+
+
+export function buildSedimentaryMesaBridgeField(length, width = 5.8, thickness = 1.55, seed = 1) {
+  const cell = STAIR_RAMP_CELL;
+  const min = vec3(-width * 0.62, -thickness * 1.65, -length * 0.52);
+  const max = vec3(width * 0.62, thickness * 0.84, length * 0.52);
+  const phaseA = (seed & 255) * 0.041;
+  const field = buildFieldFromVerticalSpan(cell, min, max, (p) => {
+    const nz = p.z / Math.max(0.001, length * 0.5);
+    if (Math.abs(nz) > 1.04) return null;
+    const nx = p.x / Math.max(0.001, width * 0.5);
+    const lateral = Math.abs(nx);
+    if (lateral > 1.04) return null;
+    const endTaper = smoothstep(0.86, 1.04, Math.abs(nz));
+    const edgeChip = valueNoise2(nx * 5.0 + 12.4, nz * 3.2 - 8.1, seed + 317);
+    if (lateral > 0.92 && edgeChip > 0.84 + (lateral - 0.92) * 0.7) return null;
+    const strata = Math.floor((lateral * 4.0 + valueNoise2(nz * 2.4, nx * 1.8, seed + 331) * 2.0) % 3) * 0.035;
+    let top = thickness * (
+      0.30
+      - lateral * 0.06
+      - endTaper * 0.08
+      + Math.sin(nz * 2.0 + phaseA) * 0.025
+    );
+    top = Math.round(top / Math.max(0.001, thickness * 0.18)) * thickness * 0.18;
+    const bottom = -thickness * (
+      1.02
+      + lateral * 0.12
+      + Math.abs(valueNoise2(nx * 3.1 - 4.6, nz * 3.1 + 9.2, seed + 347) - 0.5) * 0.10
+      + strata
+    );
+    return { top, bottom };
+  });
+  closeVoxelDiagonalEdgeGaps(field);
+  field.rockGrammar = {
+    grammar: 'sedimentary_mesa',
+    silhouette: 'bridge_fragment',
+    process: 'sediment_layers_sheared_collapse',
+    role: 'connector',
+  };
+  return field;
 }
 
 export function buildRockBridgeField(length, width = 4.8, thickness = 1.4, seed = 1) {

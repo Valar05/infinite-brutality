@@ -30,16 +30,17 @@ const districtGeometrySource = fs.readFileSync(path.resolve('src/district-geomet
 assert.match(districtGeometrySource, /const field = buildRoomIslandField\(size,/, 'district room traversal must come from voxel room-island fields');
 assert.match(districtGeometrySource, /registerVoxelSupportCollider\(field, \{ origin: worldPos, source: 'district-room-island-voxel:' \+ district\.id \+ ':' \+ i \}\);/, 'district room islands must register voxel support from the same generated field');
 assert.match(districtGeometrySource, /const spec = buildIslandBridgeSpec\(anchors\[i\], anchors\[i \+ 1\]\);/, 'district landmark bridges must still come from the shared bridge spec');
-assert.match(districtGeometrySource, /const field = buildRockBridgeField\(spec\.horizontalLength, spec\.deckSize\[0\], 1\.6,/, 'district bridges must build visible voxel rock bridges from the shared bridge spec');
+assert.match(districtGeometrySource, /const field = buildSedimentaryMesaBridgeField\(spec\.horizontalLength, spec\.deckSize\[0\], 1\.6,/, 'district bridges must build visible sedimentary slab fields from the shared bridge spec');
+assert.ok(!districtGeometrySource.includes('buildRockBridgeField(spec.horizontalLength'), 'district bridges must not fall back to the old lumpy rock bridge generator');
 assert.match(districtGeometrySource, /group\.position\.set\(spec\.center\.x, spec\.center\.y, spec\.center\.z\);/, 'district bridge visual must use the shared bridge center');
 assert.match(districtGeometrySource, /group\.rotation\.y = spec\.yaw;/, 'district bridge visual must use the shared bridge yaw');
 assert.match(districtGeometrySource, /registerVoxelSupportCollider\(field, \{ origin: \[spec\.center\.x, spec\.center\.y, spec\.center\.z\], yaw: spec\.yaw, source: 'district-island-bridge-voxel:' \+ district\.id \+ ':' \+ i \}\);/, 'district bridge support must come from the same generated bridge voxel field');
-assert.match(districtGeometrySource, /anchor\.terraced[\s\S]*buildRoomIslandField\(anchor\.size,[\s\S]*true\)[\s\S]*buildIslandVoxelField\(anchor,/, 'district landmark islands must build smooth or terraced voxel fields from shared helpers');
-assert.match(districtGeometrySource, /const meshData = buildSurfaceNetMeshData\(field,/, 'district islands and bridges must use surface-net extraction for visible support meshes');
+assert.match(districtGeometrySource, /anchor\.terraced[\s\S]*buildRoomIslandField\(anchor\.size,[\s\S]*grammar: anchor\.rockGrammar \|\| 'sedimentary_mesa'[\s\S]*terraced: true[\s\S]*buildIslandVoxelField\(anchor,/, 'district landmark islands must build sedimentary mesa or fallback voxel fields from shared helpers');
+assert.match(districtGeometrySource, /const meshData = isSedimentaryMesa[\s\S]*buildSedimentaryMesaMeshData\(field, MAT\.sedimentaryRock/, 'district islands must use dedicated layered slab meshes with sedimentary rock materials');
 assert.match(districtGeometrySource, /registerVoxelSupportCollider\(field, \{ origin: anchor\.pos, yaw: anchor\.yaw \|\| 0, source: 'district-island-voxel:' \+ anchor\.id \}\);/, 'district landmark islands must register oriented voxel support from the same generated field');
 const mainSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8');
-assert.match(mainSource, /const field = buildRockBridgeField\(length, width, thickness, bridgeSeed\);/, 'world connector bridges must build a shared bridge voxel field');
-assert.match(mainSource, /registerVoxelSupportCollider\(field, \{ origin: \[center\.x, center\.y, center\.z\], yaw, source: \(options\.source \|\| name\) \+ ':voxel' \}\);/, 'world connector bridges must register voxel support from the same generated bridge field');
+assert.match(mainSource, /const field = options\.slabBridge === false[\s\S]*buildRockBridgeField\(length, width, thickness, bridgeSeed\)[\s\S]*buildSedimentaryMesaBridgeField\(length, width, thickness, bridgeSeed\);/, 'world connector bridges must default to shared sedimentary slab voxel fields');
+assert.match(mainSource, /registerVoxelSupportCollider\(field, \{ origin: \[center\.x, center\.y, center\.z\], yaw, source: \(options\.source \|\| name\) \+ ':voxel' \}\);/, 'world connector bridges must register voxel support from the same generated slab bridge field');
 
 console.log(JSON.stringify({
   bridgeLength: bridge.horizontalLength,

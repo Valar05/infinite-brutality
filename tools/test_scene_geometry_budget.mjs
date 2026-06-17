@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildRoomIslandField, buildRockBridgeField, buildSurfaceNetMeshData } from '../src/island-geometry.js';
+import { buildRoomIslandField, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData } from '../src/island-geometry.js';
 
 // This test intentionally measures only procedural slice geometry. It excludes
 // imported actors, sky, HUD, and textures so lag from the procedural generator
@@ -33,9 +33,13 @@ const MOBILE_PROCEDURAL_BUDGET = {
 function uniqueEdgeCount(mesh) {
   const positions = mesh.positions;
   const edges = new Set();
-  const keyAt = (i) => `${positions[i].toFixed(3)},${positions[i + 1].toFixed(3)},${positions[i + 2].toFixed(3)}`;
-  for (let i = 0; i < positions.length; i += 9) {
-    const verts = [keyAt(i), keyAt(i + 3), keyAt(i + 6)];
+  const keyAtVertex = (vertexIndex) => {
+    const i = vertexIndex * 3;
+    return `${positions[i].toFixed(3)},${positions[i + 1].toFixed(3)},${positions[i + 2].toFixed(3)}`;
+  };
+  const indices = mesh.indices?.length ? mesh.indices : Array.from({ length: positions.length / 3 }, (_, index) => index);
+  for (let i = 0; i < indices.length; i += 3) {
+    const verts = [keyAtVertex(indices[i]), keyAtVertex(indices[i + 1]), keyAtVertex(indices[i + 2])];
     for (let edgeIndex = 0; edgeIndex < 3; edgeIndex += 1) {
       const a = verts[edgeIndex];
       const b = verts[(edgeIndex + 1) % 3];
@@ -58,16 +62,36 @@ function meshStats(label, field, kind) {
   };
 }
 
-const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => meshStats(
-  entry.label,
-  buildRoomIslandField(entry.size, entry.seed, true),
-  'island',
-));
-const rampStats = CURRENT_SLICE_RAMP_SEGMENTS.map((entry) => meshStats(
-  entry.label,
-  buildRockBridgeField(entry.length, entry.width, entry.thickness, entry.seed),
-  'ramp',
-));
+const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => {
+  const field = buildRoomIslandField(entry.size, entry.seed, {
+    grammar: 'sedimentary_mesa',
+    terraced: true,
+    role: 'arena',
+  });
+  const mesh = buildSedimentaryMesaMeshData(field, 0.072);
+  return {
+    kind: 'island',
+    label: entry.label,
+    cell: Number(field.cell.toFixed(3)),
+    dims: [field.nx, field.ny, field.nz],
+    triangles: mesh.triangleCount,
+    emittedVertices: mesh.positions.length / 3,
+    uniqueEdges: uniqueEdgeCount(mesh),
+  };
+});
+const rampStats = CURRENT_SLICE_RAMP_SEGMENTS.map((entry) => {
+  const field = buildSedimentaryMesaBridgeField(entry.length, entry.width, entry.thickness, entry.seed);
+  const mesh = buildSedimentaryMesaMeshData(field, 0.072);
+  return {
+    kind: 'ramp',
+    label: entry.label,
+    cell: Number(field.cell.toFixed(3)),
+    dims: [field.nx, field.ny, field.nz],
+    triangles: mesh.triangleCount,
+    emittedVertices: mesh.positions.length / 3,
+    uniqueEdges: uniqueEdgeCount(mesh),
+  };
+});
 const allStats = [...islandStats, ...rampStats];
 const total = allStats.reduce((sum, stats) => ({
   triangles: sum.triangles + stats.triangles,

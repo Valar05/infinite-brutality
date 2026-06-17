@@ -6,6 +6,8 @@ Current qualitative source of truth: `docs/LEVEL_DESIGN_BIBLE.md`.
 
 Current authoritative realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`.
 
+Current terrain shape contract: `docs/ROCK_SHAPE_GRAMMAR.md`.
+
 General workflow lives in Thunder at `../thunder-brainstorm/generated/skills/level_design_environment_grammar.md`. This local note is the tailored version for the suspended shanty-settlement over the abyss.
 
 ## Environment Thesis
@@ -46,6 +48,31 @@ Current archetype direction:
 - corpsefire kilns or furnace tier
 - refuse underworks or waste chutes
 - shrine rim or abyss chapel
+
+## Rock Shape Grammar
+
+The terrain layer should read as fragments of a broken continent, not asteroids or procedural blobs. Every floating island or rock mass needs an implied shaping force before it is accepted.
+
+Use `docs/ROCK_SHAPE_GRAMMAR.md` as the local contract for rock generation. The short version:
+
+- name the macro silhouette first: mesa, cliff, slab, pillar, arch, bridge fragment, fortress foundation, canyon wall, or broken stair mass
+- choose the geological process: sediment, erosion, fracture, collapse, volcanic cooling, shearing, impact, gravity, water flow, or ancient construction damage
+- preserve a macro/meso/micro hierarchy: far silhouette, playable traversal shape, then close surface detail
+- prefer sedimentary mesas, canyon walls, basalt columns, hoodoos, and fractured fortress fragments over smooth lumpy forms
+- fuse architecture into terrain as swallowed or torn-out history, not decoration placed on top
+- reject any chunk that cannot answer where the player stands, moves next, fights, recovers, or reads a landmark
+
+This does not replace the Hanging Gardens settlement grammar. It gives the terrain underneath and around that settlement a geological logic so future variants can mix human-worked architecture with believable broken landforms.
+
+Screenshot-driven correction from build `0.8.171`: when old lumpy rocks persist, audit every active terrain render path, not only the named island generator. District connector bridges were still using the legacy rock-bridge field after the island anchors had moved to sedimentary mesas. Active terrain acceptance now requires both islands and connector bridges to use sedimentary grammar metadata and continuous surface meshes, with the old lumpy bridge generator reserved for explicit legacy calls.
+
+Screenshot-driven correction from build `0.8.172`: correct geometry can still read wrong if sedimentary terrain shares the architecture material. The first sedimentary surface pass used `MAT.stone`/`MAT.stone2`, so the islands inherited the old vector wall/floor tile and looked like tiled blocks instead of rock strata. Sedimentary terrain now needs its own texture/material lane, sourced from a height-map-first sedimentary texture set, while architecture keeps the vector stone family.
+
+Mesh correction from build `0.8.173`: surface-net extraction is useful for organic rocks, but it rounds sedimentary mesas back toward blob language and costs extra triangles. Active sedimentary terrain now uses a dedicated layered slab mesh extractor: top/bottom faces and boundary/riser faces are generated from the same voxel field used for collision, so the visual read is flatter, more sheared, and cheaper while support queries remain unchanged.
+
+Mesh correction from build `0.8.174`: the first layered slab rewrite produced broken sandstone even though the older blob-era integrity harness still passed, because the harness only tested legacy surface-net meshes. Active sedimentary terrain now emits literal exposed voxel faces from the same collision field, runs iterative diagonal-gap cleanup to remove edge-only voxel contacts, and `tools/test_island_mesh_integrity_contract.mjs` checks the actual sedimentary island and bridge mesh paths for watertightness, manifold edges, and outward normal winding.
+
+Mesh correction from build `0.8.175`: a manifold exposed-voxel repair still read as kitbashed cubes because every visible sandstone vertex sat on the voxel grid. The weathering pass now applies deterministic, shared-vertex sediment shear and erosion offsets to the visual mesh only, preserving voxel collision and manifold tests while `tools/test_rock_grammar_contract.mjs` requires the active sedimentary mesh to move most vertices off the exact cube grid.
 
 ## Route Rule
 
