@@ -34,6 +34,7 @@ Read extra docs only when the change actually touches that area:
 - For first-person arms and Meshy characters, preserve PBR map authority: diagnose lighting, UV transform, material scalars, and render-pass setup before reducing normal/roughness/metalness contribution.
 - For sandstone, cliff, island, or bridge terrain screenshots, treat crisp cube-grid silhouettes as a geometry failure even when manifold tests pass. Preserve the collision field, but add deterministic visual weathering/shear to the emitted mesh before trying texture-only fixes.
 - Do not accept browser screenshots with stale build labels. Hard-refresh or bump the cache token until the screenshot proves it is rendering the current build.
+- For browser-visible visual regressions, use the workspace visual QA harness before diagnosis when possible: `node ../tools/visual_qa.mjs --project infinite-brutality --url /infinite-brutality/index.html --frames 12 --interval-ms 500`. Treat harness failures as capture failures, not visual proof.
 
 ## Validation
 
@@ -48,5 +49,6 @@ Run the smallest relevant checks after edits:
 - Rock grammar: `node tools/test_rock_grammar_contract.mjs`
 - Island mesh integrity: `node tools/test_island_mesh_integrity_contract.mjs`
 - Scene geometry budget: `node tools/test_scene_geometry_budget.mjs`
+- Visual QA dry-run: `node ../tools/visual_qa.mjs --project infinite-brutality --dry-run`
 
 Run only the checks that match the files you changed, unless the user asks for a broader sweep. For terrain silhouette or sandstone-weathering changes, run the three terrain checks above together.

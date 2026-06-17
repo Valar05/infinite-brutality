@@ -53,7 +53,7 @@ Render the world normally, then render FPS arms in a separate camera-space pass 
 - First-person arms render in a separate camera-space `armsScene`, but their Meshy PBR maps are still authoritative. Do not hide a flat-looking arm problem by weakening the normal, roughness, or metalness maps.
 - The current FPSPlayer overlay uses `FPSPLAYER_MESHY_VISUAL_OVERLAY` in `src/main.js`: external albedo, normal, roughness, metallic, and emission textures, plus a UV transform that targets the usable atlas region.
 - The island rocks use the readable Meshy-derived rock PBR set in `src/materials.js`; if rocks read correctly but arms look flat, compare lighting/material response before blaming the texture files.
-- Screenshot validation is required for foreground arms because parse checks cannot prove visible PBR response.
+- Screenshot validation is required for foreground arms because parse checks cannot prove visible PBR response. For browser-visible regressions, the workspace visual QA harness can launch a no-store Android capture run and collect frame sheets via `node ../tools/visual_qa.mjs --project infinite-brutality --url /infinite-brutality/index.html`.
 
 ## Thunder Brainstorm
 

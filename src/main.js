@@ -27,13 +27,18 @@ import {
 } from './district-plan.js';
 
 const BUILD = '0.8.175';
+const URL_PARAMS = new URLSearchParams(window.location.search);
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;
 const USE_DYNAMIC_SHADOWS = false;
 const USE_DYNAMIC_DIEGETIC_LIGHTS = false;
-const DEBUG_RAGDOLL = new URLSearchParams(window.location.search).get('ragdebug') === '1';
-const DEBUG_ATTACK_SWEEP = new URLSearchParams(window.location.search).get('attackdebug') === '1';
-const DEBUG_UI = new URLSearchParams(window.location.search).get('debugui') === '1';
+const DEBUG_RAGDOLL = URL_PARAMS.get('ragdebug') === '1';
+const DEBUG_ATTACK_SWEEP = URL_PARAMS.get('attackdebug') === '1';
+const DEBUG_UI = URL_PARAMS.get('debugui') === '1';
+const VISUAL_QA_BEACON = URL_PARAMS.has('beacon');
+const VISUAL_QA_CAPTURE = URL_PARAMS.has('capture');
+const VISUAL_QA_CAPTURE_FRAMES = Math.max(1, Math.min(24, Number(URL_PARAMS.get('captureFrames') || 1)));
+const VISUAL_QA_CAPTURE_INTERVAL_MS = Math.max(100, Math.min(10000, Number(URL_PARAMS.get('captureIntervalMs') || 500)));
 const canvas = document.getElementById('game');
 const statusEl = document.getElementById('status');
 const readoutEl = document.getElementById('readout');
@@ -387,6 +392,98 @@ let airAttackDef = null;
 let airForwardAttackDef = null;
 let crouchAttackDef = null;
 let lastErrorClipboardText = '';
+let visualQaCapturedFrames = 0;
+let visualQaLastCaptureMs = -Infinity;
+let visualQaRenderedBeaconSent = false;
+
+function publishVisualQaBeacon(stage, values = {}) {
+  if (!VISUAL_QA_BEACON) return;
+  try {
+    const params = new URLSearchParams({
+      stage,
+      build: BUILD,
+      t: String(Math.round(performance.now())),
+    });
+    for (const [key, value] of Object.entries(values)) {
+      if (value === undefined || value === null) continue;
+      params.set(key, String(value));
+    }
+    const image = new Image();
+    image.src = '/__visual_qa_smoke?' + params.toString();
+  } catch (_err) {}
+}
+
+function publishVisualQaCapture(stage, values = {}) {
+  if (!VISUAL_QA_CAPTURE || !canvas?.toBlob) return;
+  try {
+    const params = new URLSearchParams({
+      stage,
+      build: BUILD,
+      t: String(Math.round(performance.now())),
+    });
+    for (const [key, value] of Object.entries(values)) {
+      if (value === undefined || value === null) continue;
+      params.set(key, String(value));
+    }
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      fetch('/__visual_qa_capture?' + params.toString(), { method: 'POST', body: blob }).catch(() => {});
+    }, 'image/png');
+  } catch (_err) {}
+}
+
+function visualQaBeaconFields(extra = {}) {
+  const node = extra.node || roomState?.spec || null;
+  const district = node?.districtName || '';
+  const enemyNav = extra.enemyNav || null;
+  return {
+    width: canvas?.width || 0,
+    height: canvas?.height || 0,
+    status: statusEl?.textContent || '',
+    level: (roomState?.levelIndex ?? 0) + 1,
+    nodeIndex: (roomState?.nodeIndex ?? 0) + 1,
+    connector: node?.connector || '',
+    district,
+    districtIndex: node?.districtIndex == null ? '' : node.districtIndex + 1,
+    districtElevationBand: node?.districtElevationBand || '',
+    playerMode: player?.mode || '',
+    playerHealth: Math.round(player?.health ?? 0),
+    playerGrounded: !!player?.grounded,
+    playerRunning: !!player?.isRunning,
+    playerX: Number(player?.position?.x || 0).toFixed(2),
+    playerY: Number(player?.position?.y || 0).toFixed(2),
+    playerZ: Number(player?.position?.z || 0).toFixed(2),
+    enemyVisible: !!enemy?.visible,
+    enemyHealth: Math.round(enemy?.userData?.health ?? 0),
+    enemyMode: enemy?.userData?.mode || '',
+    enemyNavMode: extra.navMode || '',
+    enemyWaypoints: enemyNav?.waypoints?.length ?? '',
+    triangles: renderer?.info?.render?.triangles ?? 0,
+    calls: renderer?.info?.render?.calls ?? 0,
+    ...extra,
+    node: undefined,
+    enemyNav: undefined,
+  };
+}
+
+function maybePublishVisualQaFrame(values = {}) {
+  if (!VISUAL_QA_BEACON && !VISUAL_QA_CAPTURE) return;
+  const now = performance.now();
+  const shouldCapture = VISUAL_QA_CAPTURE
+    && visualQaCapturedFrames < VISUAL_QA_CAPTURE_FRAMES
+    && (visualQaCapturedFrames === 0 || now - visualQaLastCaptureMs >= VISUAL_QA_CAPTURE_INTERVAL_MS);
+  const stage = visualQaRenderedBeaconSent ? 'frame' : 'rendered';
+  if (!visualQaRenderedBeaconSent || shouldCapture) {
+    const fields = visualQaBeaconFields({ ...values, frame: visualQaCapturedFrames });
+    publishVisualQaBeacon(stage, fields);
+    visualQaRenderedBeaconSent = true;
+    if (shouldCapture) {
+      publishVisualQaCapture(stage, fields);
+      visualQaCapturedFrames += 1;
+      visualQaLastCaptureMs = now;
+    }
+  }
+}
 
 function setStatus(text) {
   statusEl.textContent = 'build ' + BUILD + ' | ' + text;
@@ -8321,6 +8418,7 @@ function render() {
     const navText = enemyNav ? ` | nav ${navMode} w${enemyNav.waypoints.length} e${enemyNav.routePath.length}` : '';
     const ragText = summarizeEnemyRagdollDebug();
     const attackText = summarizeEnemyAttackDebug();
+    maybePublishVisualQaFrame({ mode, node, enemyNav, navMode });
     const hurtText = ` | hurt ${Number(player.damageTaken || 0).toFixed(1)}`;
     refreshEnemyRouteDebug(enemyNav);
     refreshPlayerHealthHud();
@@ -8341,6 +8439,7 @@ function init() {
     buildLights();
     buildEnemy();
     buildRoom();
+    publishVisualQaBeacon('reset', visualQaBeaconFields());
     setupTouch();
     resize();
     window.addEventListener('resize', resize);
