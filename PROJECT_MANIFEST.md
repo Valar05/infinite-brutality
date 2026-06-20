@@ -1,6 +1,6 @@
 # Project Manifest: infinite-brutality
 
-- Generated: 2026-06-20T17:00:50-05:00
+- Generated: 2026-06-20T17:47:30-05:00
 - Workspace path: `/storage/emulated/0/Documents/GodotProjects/infinite-brutality`
 - Git repository: yes
 - Git remote: `https://github.com/Valar05/infinite-brutality.git`
@@ -19,6 +19,13 @@
 > ## Run
 > From `/storage/emulated/0/Documents/GodotProjects`, serve the workspace root and open:
 > `http://127.0.0.1:8798/infinite-brutality/index.html`
+> The prototype expects to be served from the GodotProjects workspace root.
+> ## Validation
+> ```sh
+> node --input-type=module --check < src/main.js
+> python3 -m json.tool assets/asset_manifest.json >/dev/null
+> ```
+> ## Current World Policy
 
 ## Entrypoints And Validation Clues
 - `src/main.js`
@@ -39,6 +46,7 @@
 - `Meshy_AI__0615135730_texture_normal.png`
 - `Meshy_AI__0615135730_texture_roughness (1).png`
 - `node_modules/`
+- `PROJECT_MANIFEST.md`
 - `PROJECT_ORIENTATION.md`
 - `README.md`
 - `src/`
@@ -49,4 +57,3 @@
 - `.gitignore` contains a Codex workspace hygiene block for credentials, caches, and local build outputs.
 - `.gitattributes` contains a Codex Git LFS block for common binary assets, models, audio, video, archives, fonts, and PDFs.
 - `git lfs install --local` was attempted for this repository during the manifest pass.
-
