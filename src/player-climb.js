@@ -10,6 +10,7 @@ export function createPlayerClimbApi(deps) {
     faceYawFromNormal,
     canStandOnClimbSurfaceTop,
     canStandOnSolidTop,
+    findMantleTopSupport,
     clamp,
     makeVec,
     constants,
@@ -29,6 +30,7 @@ export function createPlayerClimbApi(deps) {
   } = constants;
 
 function tryBeginClimb(attachForward = true) {
+  if (player.climbRegrabUntil && performance.now() < player.climbRegrabUntil) return false;
   if (player.mode === 'climb' || player.mode === 'mantle') return false;
   if (player.attack) return false;
   const chestY = player.position.y - PLAYER_EYE_HEIGHT + 1.1;
@@ -160,12 +162,28 @@ function startMantleFromClimb() {
     const relX = player.position.x - climb.center.x;
     const relZ = player.position.z - climb.center.z;
     const lateral = clamp(relX * climb.right.x + relZ * climb.right.z, -climb.topWidth * 0.5 + PLAYER_SOLID_RADIUS, climb.topWidth * 0.5 - PLAYER_SOLID_RADIUS);
-    const end = climb.topCenter.clone().addScaledVector(climb.right, lateral);
-    if (!canStandOnClimbSurfaceTop(climb, end.x, end.z)) return false;
+    const candidates = [
+      climb.topCenter.clone().addScaledVector(climb.right, lateral),
+      climb.topCenter.clone().addScaledVector(climb.right, lateral + PLAYER_SOLID_RADIUS * 0.55),
+      climb.topCenter.clone().addScaledVector(climb.right, lateral - PLAYER_SOLID_RADIUS * 0.55),
+      climb.topCenter.clone().addScaledVector(climb.right, lateral).addScaledVector(climb.normal, -PLAYER_SOLID_RADIUS * 0.65),
+    ];
+    let target = null;
+    for (const candidate of candidates) {
+      if (!canStandOnClimbSurfaceTop(climb, candidate.x, candidate.z)) continue;
+      const support = findMantleTopSupport?.(candidate.x, candidate.z, climb.topY);
+      target = {
+        x: candidate.x,
+        z: candidate.z,
+        topY: support?.topY ?? climb.topY,
+      };
+      break;
+    }
+    if (!target) return false;
     player.mode = 'mantle';
     player.mantle = {
       start: player.position.clone(),
-      end: makeVec(end.x, climb.topY + PLAYER_EYE_HEIGHT, end.z),
+      end: makeVec(target.x, target.topY + PLAYER_EYE_HEIGHT, target.z),
       elapsed: 0,
       duration: CLIMB_MANTLE_DURATION,
       faceYaw: player.yaw,
@@ -187,11 +205,29 @@ function startMantleFromClimb() {
   const endZ = climb.planeAxis === 'z'
     ? clamp(climb.plane + climb.normal.z * (PLAYER_SOLID_RADIUS + CLIMB_MANTLE_FORWARD), solid.minZ + PLAYER_SOLID_RADIUS, solid.maxZ - PLAYER_SOLID_RADIUS)
     : topZ;
-  if (!canStandOnSolidTop(solid, endX, endZ)) return false;
+  const supportCandidates = [
+    [endX, endZ],
+    [endX - climb.normal.x * PLAYER_SOLID_RADIUS * 0.9, endZ - climb.normal.z * PLAYER_SOLID_RADIUS * 0.9],
+    [endX + climb.right.x * PLAYER_SOLID_RADIUS * 0.8, endZ + climb.right.z * PLAYER_SOLID_RADIUS * 0.8],
+    [endX - climb.right.x * PLAYER_SOLID_RADIUS * 0.8, endZ - climb.right.z * PLAYER_SOLID_RADIUS * 0.8],
+  ];
+  let target = null;
+  for (const [x, z] of supportCandidates) {
+    if (canStandOnSolidTop(solid, x, z)) {
+      target = { x, z, topY: solid.maxY };
+      break;
+    }
+    const support = findMantleTopSupport?.(x, z, solid.maxY);
+    if (support) {
+      target = { x, z, topY: support.topY };
+      break;
+    }
+  }
+  if (!target) target = { x: endX, z: endZ, topY: solid.maxY };
   player.mode = 'mantle';
   player.mantle = {
     start: player.position.clone(),
-    end: makeVec(endX, solid.maxY + PLAYER_EYE_HEIGHT, endZ),
+    end: makeVec(target.x, target.topY + PLAYER_EYE_HEIGHT, target.z),
     elapsed: 0,
     duration: CLIMB_MANTLE_DURATION,
     faceYaw: player.yaw,

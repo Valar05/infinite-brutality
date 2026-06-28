@@ -35,6 +35,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 ## Level Generation
 
 - `LEVEL_GENERATION_CONTRACT.md`: current route-grammar rules for Quake-style level generation without copied Quake layouts.
+- `docs/QUAKE_M1E1_FORTRESS_SLICE.md`: default first playable fortress-rock slice, with the old generated gauntlet preserved by `?slice=generated`.
 - `data/level_route_templates.json`: generator-facing route template contract.
 - `data/room_junction_batch.json`: overnight batch list of room prompts by connector topology.
 - `docs/ROOM_JUNCTION_BATCH_LIST.md`: human-readable room junction build list.
@@ -44,6 +45,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 - `docs/ROCK_SHAPE_GRAMMAR.md`: terrain shape grammar for floating geological fragments, readable island silhouettes, and rock/architecture fusion.
 - `docs/TERRAIN_GENERATION_TECHNIQUES.md`: implementation map of current and historical terrain generators still present in code.
 - `docs/IMPERIAL_FLOATING_STRATA_GRAMMAR.md`: Napoleon's Floating Kingdom terrain grammar, district archetypes, forbidden outputs, mobile constraints, and TerrainLayer ownership notes.
+- `docs/TOOL_FIRST_ENGINEERING_DOCTRINE.md`: tool-first engineering rule for hard domains; propose proven tools before hand-rolling physics, collision, profiling, visual QA, procedural validation, asset import, animation, deployment, or content validation infrastructure.
 
 ## Direction
 

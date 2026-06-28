@@ -5,6 +5,8 @@ This project should use Quake-style route grammar as an abstraction, not copy Qu
 ## Current State
 
 - Current reference room: authored skull guillotine triple-bridge hall.
+- Current default first playable slice: `quake_m1e1_slice`, a compact fortress-rock route using `start casemate -> battery court -> locked gate face -> key trench branch -> upper overlook -> optional secret ledge -> final gun room -> exit`.
+- Previous broad generated gauntlet remains available with `?slice=generated`.
 - Current training artifact: `data/level_route_templates.json`.
 - Thunder curriculum: `../thunder-brainstorm/generated/quake_route_grammar/quake_route_grammar_curriculum.json`.
 - Levels processed from legal Quake map-source archive: 63 total sources; 41 playable maps trained; 22 item/prefab sources retained as metadata only.

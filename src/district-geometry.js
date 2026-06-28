@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { buildIslandBridgeSpec } from './island-geometry.js?v=0.8.179';
+import {
+  buildSpawnCisternCustomsPlan,
+  validateSpawnCisternCustomsPlan,
+} from './spawn-building-plan.js?v=0.8.182';
 
 export function createDistrictGeometryApi(deps) {
   const {
@@ -102,10 +106,44 @@ export function createDistrictGeometryApi(deps) {
       islandMeshCount: 0,
       visibleBridgeCount: 0,
       bridgeMeshCount: 0,
+      primitiveArchitecture: {
+        typedPrimitiveCount: 0,
+        supportPrimitiveCount: 0,
+        routePrimitiveCount: 0,
+        structuralVisualOnlyCount: 0,
+        kinds: {},
+      },
+      spawnAreaArchitecture: null,
       failures: [],
     };
     if (district) district.visualCollisionContract = contract;
     return contract;
+  }
+
+  function notePrimitiveArchitecture(contract, kind, options = {}) {
+    if (!contract?.primitiveArchitecture) return;
+    const primitive = contract.primitiveArchitecture;
+    primitive.typedPrimitiveCount += 1;
+    primitive.kinds[kind] = (primitive.kinds[kind] || 0) + 1;
+    if (options.support) primitive.supportPrimitiveCount += 1;
+    if (options.route) primitive.routePrimitiveCount += 1;
+    if (options.structural && options.visualOnly) primitive.structuralVisualOnlyCount += 1;
+  }
+
+  function beginSpawnAreaArchitectureContract(contract) {
+    if (!contract) return null;
+    contract.spawnAreaArchitecture = {
+      retainingGate: false,
+      cisternCourt: false,
+      stairRoute: false,
+      supportLanguage: false,
+      edgeTreatment: false,
+      buildingPlanValid: false,
+      roomCount: 0,
+      connectorCount: 0,
+      primitiveCount: 0,
+    };
+    return contract.spawnAreaArchitecture;
   }
 
   function finalizeDistrictVisualCollisionContract(contract) {
@@ -115,6 +153,14 @@ export function createDistrictGeometryApi(deps) {
     }
     if (contract.visibleBridgeCount > 0 && contract.bridgeMeshCount < contract.visibleBridgeCount) {
       contract.failures.push('visible bridges missing mesh support colliders');
+    }
+    if (contract.primitiveArchitecture?.structuralVisualOnlyCount > 0) {
+      contract.failures.push('structural primitives marked visual-only');
+    }
+    if (contract.spawnAreaArchitecture) {
+      for (const [key, present] of Object.entries(contract.spawnAreaArchitecture)) {
+        if (!present) contract.failures.push('spawn area missing ' + key);
+      }
     }
     if (contract.failures.length) {
       throw new Error('District visual-collision contract failed for ' + contract.districtId + ': ' + contract.failures.join('; '));
@@ -262,9 +308,10 @@ export function createDistrictGeometryApi(deps) {
 
     addGroundedBeveledBox(roomGroup, prefix + '-parade-road-cap', [7.2, 0.18, 18.0], [x, roadY, z + 2.4], MAT.connectorFloor, false, 0.025, 1);
     addGroundedBeveledBox(roomGroup, prefix + '-road-bronze-spine', [0.26, 0.08, 17.4], [x, roadY + 0.16, z + 2.4], MAT.bronze, false, 0.01, 1);
-    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-a', [7.4, 0.08, 0.18], [x, roadY + 0.18, z - 3.4], MAT.iron, false, 0.008, 1);
-    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-b', [7.4, 0.08, 0.18], [x, roadY + 0.18, z + 4.2], MAT.iron, false, 0.008, 1);
-    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-c', [7.4, 0.08, 0.18], [x, roadY + 0.18, z + 11.0], MAT.iron, false, 0.008, 1);
+    for (const [i, tickZ] of [z - 3.4, z + 4.2, z + 11.0].entries()) {
+      addGroundedBeveledBox(roomGroup, prefix + '-road-edge-tick-' + i + '-west', [1.35, 0.08, 0.18], [x - 3.0, roadY + 0.18, tickZ], MAT.iron, false, 0.008, 1);
+      addGroundedBeveledBox(roomGroup, prefix + '-road-edge-tick-' + i + '-east', [1.35, 0.08, 0.18], [x + 3.0, roadY + 0.18, tickZ], MAT.iron, false, 0.008, 1);
+    }
 
     addWallBox(roomGroup, prefix + '-retaining-bite-west', [2.2, 6.6, 18.5], [x - 12.4, wallBaseY + 3.3, z + 2.0], MAT.wall, false);
     addWallBox(roomGroup, prefix + '-retaining-bite-east', [2.2, 6.6, 18.5], [x + 12.4, wallBaseY + 3.3, z + 2.0], MAT.wall, false);
@@ -276,6 +323,131 @@ export function createDistrictGeometryApi(deps) {
       const pierZ = z - 5.8 + Math.floor(i / 2) * 15.2;
       addGroundedCylinder(roomGroup, prefix + '-anchor-pylon-' + i, 0.42, 4.8, [x + side * 9.7, roadY - 1.8, pierZ], MAT.iron, 6);
       addBeveledBox(roomGroup, prefix + '-pylon-bite-' + i, [2.3, 0.28, 0.28], [x + side * 10.8, roadY + 0.34, pierZ], MAT.bronze, false, 0.01, 1).rotation.z = side * 0.18;
+    }
+  }
+
+  function materialForPrimitive(key) {
+    switch (key) {
+      case 'stone2': return MAT.stone2;
+      case 'connectorFloor': return MAT.connectorFloor;
+      case 'connectorWall': return MAT.connectorWall;
+      case 'platform': return MAT.platform;
+      case 'bronze': return MAT.bronze;
+      case 'trim': return MAT.trim;
+      case 'plaster': return MAT.plaster;
+      case 'wall': return MAT.wall;
+      default: return MAT.wall;
+    }
+  }
+
+  function centerToBase(center, size) {
+    return [center[0], center[1] - size[1] * 0.5, center[2]];
+  }
+
+  function noteBuildingPrimitive(contract, part) {
+    notePrimitiveArchitecture(contract, part.kind, {
+      support: /retaining|pier|lintel|wall|brace|parapet|cliff|foundation/.test(part.kind),
+      route: part.collisionPolicy === 'walkable' || /stair|threshold|floor/.test(part.kind),
+      structural: part.supportRole !== 'dressing',
+      visualOnly: part.collisionPolicy === 'visual-only',
+    });
+  }
+
+  function addVisibleSolidBox(name, size, center, mat) {
+    addGroundedBeveledBox(roomGroup, name, size, centerToBase(center, size), mat, false, 0.035, 1, {
+      physicsOptions: { force: true, kind: 'structure', source: name, margin: 0.015 },
+    });
+  }
+
+  function renderBuildingPrimitive(plan, part, contract) {
+    const mat = materialForPrimitive(part.materialKey);
+    if (part.shape.type === 'stair') {
+      const from = makeVec(part.shape.from[0], part.shape.from[1] + PLAYER_EYE_HEIGHT, part.shape.from[2]);
+      const to = makeVec(part.shape.to[0], part.shape.to[1] + PLAYER_EYE_HEIGHT, part.shape.to[2]);
+      addBatchStairRun(roomGroup, plan.id + '-' + part.id, from, to, part.shape.from[1], part.shape.to[1], mat);
+      noteBuildingPrimitive(contract, part);
+      return;
+    }
+    if (part.shape.type !== 'box') return;
+    const name = plan.id + '-' + part.id;
+    const size = part.shape.size;
+    const center = part.shape.center;
+    if (part.collisionPolicy === 'walkable') {
+      addWalkableBox(roomGroup, name, size, center, mat, false, 0.08, {
+        source: part.id,
+        traversalCritical: part.routeRole === 'official_route',
+      });
+    } else {
+      addVisibleSolidBox(name, size, center, mat);
+    }
+    noteBuildingPrimitive(contract, part);
+  }
+
+  function addSpawnCisternCustomsArchitecture(district, contract) {
+    const role = district?.massAnchors?.[0]?.role || district?.segmentRoles?.[0];
+    if (district?.index !== 0 && role !== 'retaining_gate') return;
+    const spawnRead = beginSpawnAreaArchitectureContract(contract);
+    const origin = district.origin;
+    const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation - 1.0;
+    const buildBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 0.1;
+    const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 2.6;
+    const plan = buildSpawnCisternCustomsPlan({ origin, lowBand, buildBand, highBand });
+    const validation = validateSpawnCisternCustomsPlan(plan);
+    if (!validation.ok) {
+      throw new Error('Spawn building plan failed: ' + validation.failures.join('; '));
+    }
+    district.spawnBuildingPlan = {
+      id: plan.id,
+      roomCount: validation.roomCount,
+      connectorCount: validation.connectorCount,
+      primitiveCount: validation.primitiveCount,
+      walkablePrimitiveCount: validation.walkablePrimitiveCount,
+      solidPrimitiveCount: validation.solidPrimitiveCount,
+      rooms: plan.rooms.map((room) => ({
+        id: room.id,
+        kind: room.kind,
+        purpose: room.purpose,
+        center: [...room.center],
+        size: [...room.size],
+        topY: room.topY,
+      })),
+      connectors: plan.connectors.map((connector) => ({ ...connector })),
+    };
+
+    for (const part of plan.primitives) renderBuildingPrimitive(plan, part, contract);
+
+    const cistern = plan.rooms.find((room) => room.id === 'cistern_court');
+    const gate = plan.rooms.find((room) => room.id === 'customs_gate');
+    const roof = plan.rooms.find((room) => room.id === 'roof_overlook');
+    if (cistern) {
+      addCisternPool(roomGroup, plan.id + '-poison-measure-cistern', cistern.center[0] - 1.4, cistern.topY + 0.04, cistern.center[1] - 0.8, 5.8, 3.8);
+      addGroundedBeveledBox(roomGroup, plan.id + '-measure-bench', [4.6, 0.28, 1.0], [cistern.center[0] + 3.8, cistern.topY + 0.02, cistern.center[1] + 1.6], MAT.timber, false, 0.02, 1);
+      addHangingJarCluster(roomGroup, plan.id + '-water-tally-jars', cistern.center[0] + 5.2, cistern.topY + 0.02, cistern.center[1] - 3.2, 4, 1.0);
+    }
+    if (gate) {
+      addBrazier(roomGroup, plan.id + '-customs-fire-left', [gate.center[0] - 4.2, gate.topY + 0.18, gate.center[1] - 2.8], { kind: 'flame' });
+      addBrazier(roomGroup, plan.id + '-customs-fire-right', [gate.center[0] + 4.2, gate.topY + 0.18, gate.center[1] - 2.8], { kind: 'corpsefire' });
+    }
+    if (roof) {
+      addWatchPost(roomGroup, plan.id + '-roof-watch-post', roof.center[0] + 3.8, roof.topY + 0.02, roof.center[1] + 1.8, -0.18);
+    }
+    for (let i = 0; i < 4; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const z = origin.z + 1.0 + Math.floor(i / 2) * 18.0;
+      addGroundedBeveledBox(roomGroup, plan.id + '-repair-brace-' + i, [1.0, 5.4, 1.0], [origin.x + side * 12.2, district.baseElevation - 2.2, z], MAT.timber, false, 0.025, 1).rotation.z = side * 0.34;
+      notePrimitiveArchitecture(contract, 'repair brace', { support: true, structural: true });
+    }
+
+    if (spawnRead) {
+      spawnRead.retainingGate = true;
+      spawnRead.cisternCourt = true;
+      spawnRead.stairRoute = true;
+      spawnRead.supportLanguage = true;
+      spawnRead.edgeTreatment = true;
+      spawnRead.buildingPlanValid = true;
+      spawnRead.roomCount = validation.roomCount;
+      spawnRead.connectorCount = validation.connectorCount;
+      spawnRead.primitiveCount = validation.primitiveCount;
     }
   }
 
@@ -317,6 +489,8 @@ export function createDistrictGeometryApi(deps) {
       addGroundedBeveledBox(roomGroup, prefix + '-inlaid-sleeper-' + i, [8.8, 0.06, 0.22], [origin.x, buildBand + 0.42, z], MAT.bronze, false, 0.006, 1);
       addGroundedCylinder(roomGroup, prefix + '-vent-stack-' + i, 0.28, 2.4 + (i % 2) * 0.9, [origin.x + 8.8 + (i % 2) * 1.8, buildBand + 0.12, z + 3.8], MAT.iron, 6);
     }
+
+    addSpawnCisternCustomsArchitecture(district, contract);
   }
 
   function addHangingMarketDistrictSkeleton(district) {

@@ -27,6 +27,7 @@ Read extra docs only when the change actually touches that area:
 ## Change Discipline
 
 - Prefer local edits over broad refactors.
+- Read `docs/TOOL_FIRST_ENGINEERING_DOCTRINE.md` before implementing hard-domain systems such as physics, collision, profiling, visual QA, procedural generation validation, asset import, animation, deployment, or schema/content validation. Propose proven tools proactively instead of hand-rolling infrastructure by default.
 - For new durable runtime pieces, prefer object-oriented or factory-scoped stateful modules over adding more free functions and globals to `src/main.js`.
 - Preserve the single-family Hanging Gardens world policy unless the user explicitly changes it.
 - If a task crosses runtime-contract boundaries, update the relevant contract doc in the same pass.

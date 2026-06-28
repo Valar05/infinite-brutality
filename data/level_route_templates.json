@@ -1012,6 +1012,30 @@
         "reward_breadcrumbing",
         "entity_vertical_pressure"
       ]
+    },
+    {
+      "id": "quake_m1e1_slice",
+      "source_level_ref": "hand-authored Infinite Brutality prototype using quake_seq_02_gate_loop_return grammar",
+      "route_sentence": [
+        "start_casemate",
+        "first_combat_battery",
+        "visible_locked_gate",
+        "side_key_trench",
+        "upper_overlook_loopback",
+        "optional_secret_ledge",
+        "final_gun_room_exit"
+      ],
+      "movement_lesson": "compact first playable fortress route: show the blocked goal, route around it, return above it, then exit through a final combat room",
+      "infinite_brutality_use": "Default first playable slice. Preserve the broader generated gauntlet behind ?slice=generated until this route proves readable.",
+      "features": [
+        "visible_locked_gate",
+        "side_route_bypass",
+        "upper_loopback",
+        "optional_secret",
+        "terrain_layer_foundations",
+        "primitive_blockout_rooms",
+        "combat_room_purpose"
+      ]
     }
   ],
   "runtime_notes": {

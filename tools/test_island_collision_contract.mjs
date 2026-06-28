@@ -31,7 +31,9 @@ const terrainLayerSource = fs.readFileSync(path.resolve('src/terrain-layer.js'),
 assert.match(districtGeometrySource, /activeTerrainLayer/, 'district terrain must target the active TerrainLayer');
 assert.match(districtGeometrySource, /terrain\.addIslandStamp\(/, 'district island traversal must be submitted as TerrainLayer stamps');
 assert.match(terrainLayerSource, /buildRoomIslandField\(spec\.size, seed,/, 'TerrainLayer island stamps must build voxel room-island fields');
-assert.match(terrainLayerSource, /addCollider\(field, origin, yaw, source, kind, mesh\)/, 'TerrainLayer must register visible mesh colliders from the generated terrain mesh');
+assert.ok(terrainLayerSource.includes('addCollider = (field, origin, yaw, source, kind, mesh = null)'), 'TerrainLayer must register visible mesh colliders from the generated terrain mesh');
+assert.match(terrainLayerSource, /physicsWorld\?\.addTerrainMesh\?\.\(\{ meshData, origin, yaw, source, kind \}\)/, 'TerrainLayer must submit the generated visible mesh data to the physics layer once');
+assert.doesNotMatch(terrainLayerSource, /buildMeshWallTriangles|wallTriangles|intersectsBody/, 'TerrainLayer must not hand-roll runtime mesh body collision');
 assert.match(districtGeometrySource, /const spec = buildIslandBridgeSpec\(anchors\[i\], anchors\[i \+ 1\]\);/, 'district landmark bridges must still come from the shared bridge spec');
 assert.match(districtGeometrySource, /terrain\.addBridgeSpan\(/, 'district bridges must be submitted as TerrainLayer spans');
 assert.match(terrainLayerSource, /buildSedimentaryMesaBridgeField\(spec\.length, spec\.width, thickness, seed\)/, 'TerrainLayer bridges must build visible sedimentary slab fields from the shared bridge spec');
@@ -43,6 +45,7 @@ assert.match(terrainLayerSource, /grammar: grammar\.fieldGrammar/, 'district lan
 assert.match(terrainLayerSource, /buildSedimentaryMesaMeshData\(field, MAT\.sedimentaryRock/, 'district islands must use dedicated layered slab meshes with sedimentary rock materials');
 assert.match(terrainLayerSource, /terrainSupportRaycaster\.intersectObject\(collider\.mesh, true\)/, 'visible terrain mesh must be runtime support truth');
 assert.doesNotMatch(terrainLayerSource, /queryVoxelTopY/, 'TerrainLayer must not use hidden voxel tops as runtime support truth');
+assert.doesNotMatch(terrainLayerSource, /queryVoxelIntersectsPrism/, 'TerrainLayer must not use hidden voxel occupancy as runtime body truth');
 assert.match(districtGeometrySource, /source: 'district-island-voxel:' \+ anchor\.id/, 'district landmark islands must register oriented voxel support from the same generated field');
 const mainSource = fs.readFileSync(path.resolve('src/main.js'), 'utf8');
 assert.match(mainSource, /terrain\.addBridgeSpan\(/, 'world connector bridges must route through TerrainLayer');

@@ -3,11 +3,27 @@ import fs from 'node:fs';
 import { buildRoomIslandField, buildSedimentaryMesaMeshData } from '../src/island-geometry.js';
 
 const terrainLayerSource = fs.readFileSync(new URL('../src/terrain-layer.js', import.meta.url), 'utf8');
+const supportAtBody = terrainLayerSource.slice(
+  terrainLayerSource.indexOf('const supportAt = (x, z, feetY, options = {}) => {'),
+  terrainLayerSource.indexOf('const colliderBySource ='),
+);
 assert.match(terrainLayerSource, /const meshColliders = \[\]/, 'TerrainLayer must track visible mesh colliders');
 assert.match(terrainLayerSource, /meshColliders\.push\(collider\)/, 'visible terrain meshes must be registered as support colliders');
 assert.match(terrainLayerSource, /terrainSupportRaycaster\.intersectObject\(collider\.mesh, true\)/, 'supportAt must raycast the visible mesh');
-assert.doesNotMatch(terrainLayerSource, /queryVoxelTopY/, 'supportAt must not use hidden voxel top sampling');
-assert.doesNotMatch(terrainLayerSource, /queryVoxelIntersectsPrism/, 'terrain body checks must not use hidden voxel prism blocking');
+assert.doesNotMatch(supportAtBody, /queryVoxelTopY/, 'supportAt must not use hidden voxel top sampling');
+assert.doesNotMatch(terrainLayerSource, /queryVoxelTopY/, 'TerrainLayer must not use hidden voxel tops as runtime terrain truth');
+assert.doesNotMatch(terrainLayerSource, /queryVoxelIntersectsPrism/, 'TerrainLayer must not use hidden voxel occupancy as runtime terrain truth');
+assert.doesNotMatch(terrainLayerSource, /intersectsBody|buildMeshWallTriangles|wallTriangles|triangleIntersectsBodyColumn/, 'terrain body contact must be owned by the physics layer, not custom triangle scans');
+
+const mainSource = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+assert.match(mainSource, /roomState\.physicsWorld\.movePlayer\(/, 'player movement must go through the physics character controller when available');
+assert.doesNotMatch(mainSource, /terrainLayer\?\.intersectsBody/, 'gameplay must not call terrain-layer body collision');
+assert.match(mainSource, /physicsStepMs/, 'visual QA beacons must expose physics step time');
+assert.match(mainSource, /playerContactCount/, 'visual QA beacons must expose player contact count');
+assert.match(mainSource, /addIslandArtSteppedRamp\('carved-causeway-' \+ index \+ '-rise'/, 'island-art height connectors must be rock terrain ramps, not stair props');
+assert.match(mainSource, /addIslandArtBridge\('carved-causeway-' \+ index/, 'island-art flat connectors must be terrain bridges');
+assert.doesNotMatch(mainSource, /addBatchStairRun\(roomGroup, 'carved-causeway-' \+ index \+ '-rise'/, 'island-art connectors must not emit old stair treads');
+assert.doesNotMatch(mainSource, /addBatchRouteSegment\(roomGroup, 'carved-causeway-' \+ index/, 'island-art connectors must not emit old floating route slabs');
 
 function vecAt(positions, index) {
   const i = index * 3;

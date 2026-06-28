@@ -7,7 +7,7 @@ import {
   buildSedimentaryMesaBridgeField,
   buildSedimentaryMesaMeshData,
   buildSurfaceNetMeshData,
-} from './island-geometry.js?v=0.8.179';
+} from './island-geometry.js?v=0.8.191';
 
 const TERRAIN_DOWN = new THREE.Vector3(0, -1, 0);
 const terrainSupportRaycaster = new THREE.Raycaster();
@@ -21,14 +21,6 @@ function buildRuntimeMesh(meshData, material) {
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return new THREE.Mesh(geometry, material);
-}
-
-function toOrientedLocal(x, z, centerX, centerZ, yaw = 0) {
-  const dx = x - centerX;
-  const dz = z - centerZ;
-  const c = Math.cos(yaw);
-  const s = Math.sin(yaw);
-  return { x: dx * c - dz * s, z: dx * s + dz * c };
 }
 
 function disposeObjectTree(root) {
@@ -82,7 +74,7 @@ function applyTerrainGrammarMetadata(field, metadata, spec = {}) {
   return field;
 }
 
-export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
+export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', physicsWorld = null }) {
   const group = new THREE.Group();
   group.name = 'terrain-layer';
   group.userData.owner = 'TerrainLayer';
@@ -140,6 +132,7 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     visualMeshes.push(mesh);
     const collider = addCollider(field, origin, yaw, source, kind, mesh);
     refreshMeshColliderBounds(collider);
+    physicsWorld?.addTerrainMesh?.({ meshData, origin, yaw, source, kind });
     return holder;
   };
 
@@ -245,8 +238,6 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     return best;
   };
 
-  const intersectsBody = () => false;
-
   const colliderBySource = (source) => colliders.find((collider) => collider.source === source) || null;
 
   const localToWorld = (collider, localX, localY, localZ) => {
@@ -280,7 +271,6 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     addIslandStamp,
     addBridgeSpan,
     supportAt,
-    intersectsBody,
     colliderBySource,
     localToWorld,
     dispose,
