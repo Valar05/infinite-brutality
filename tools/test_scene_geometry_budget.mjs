@@ -1,26 +1,19 @@
 import assert from 'node:assert/strict';
-import { buildExposedVoxelFaceMeshData, buildRoomIslandField, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData } from '../src/island-geometry.js';
+import { buildExposedVoxelFaceMeshData, buildRoomIslandField, buildSedimentaryMesaMeshData } from '../src/island-geometry.js';
 
 // This test intentionally measures only procedural slice geometry. It excludes
 // imported actors, sky, HUD, and textures so lag from the procedural generator
 // cannot hide behind unrelated runtime cost.
-const CURRENT_SLICE_ISLANDS = [
-  { label: 'Cistern Customs Terrace', size: [30, 11, 26], seed: 1000 },
-  { label: 'Graft Market Crown', size: [35, 13, 30], seed: 1001 },
-  { label: 'Witness Cistern Stair', size: [28, 12, 27], seed: 1002 },
+const CURRENT_SLICE_STRUCTURES = [
+  { label: 'Cistern Customs Carved Structure', size: [40, 12, 50], seed: 1000 },
+  { label: 'Graft Market Carved Structure', size: [40, 12, 50], seed: 1001 },
+  { label: 'Witness Cistern Carved Structure', size: [40, 12, 50], seed: 1002 },
 ];
 
-// The live slice makes two inter-island connectors, and each connector is split
-// into three noisy rock spans by addIslandArtSteppedRamp(). These conservative
-// lengths are short; if this fails, the real browser scene is already too heavy.
-const CURRENT_SLICE_RAMP_SEGMENTS = [
-  { label: 'ramp-0-a', length: 10, width: 5.8, thickness: 1.55, seed: 2000 },
-  { label: 'ramp-0-b', length: 10, width: 5.8, thickness: 1.55, seed: 2001 },
-  { label: 'ramp-0-c', length: 10, width: 5.8, thickness: 1.55, seed: 2002 },
-  { label: 'ramp-1-a', length: 11, width: 5.8, thickness: 1.55, seed: 2003 },
-  { label: 'ramp-1-b', length: 11, width: 5.8, thickness: 1.55, seed: 2004 },
-  { label: 'ramp-1-c', length: 11, width: 5.8, thickness: 1.55, seed: 2005 },
-];
+// Active island-art connectors must now be built causeways/stairs, not terrain
+// bridge spans. This array intentionally stays empty so the budget mirrors the
+// no-floating-rock-bridge runtime contract.
+const CURRENT_SLICE_RAMP_SEGMENTS = [];
 
 const MOBILE_PROCEDURAL_BUDGET = {
   totalTriangles: 12000,
@@ -65,18 +58,18 @@ function meshStats(label, field, kind) {
   };
 }
 
-const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => {
+const islandStats = CURRENT_SLICE_STRUCTURES.map((entry) => {
   const field = buildRoomIslandField(entry.size, entry.seed, {
-    grammar: 'imperial_floating_strata',
+    grammar: 'carved_imperial_structure',
     terraced: true,
-    role: 'arena',
-    rockSilhouette: entry.label === 'Cistern Customs Terrace' ? 'fortress_plateau' : entry.label === 'Graft Market Crown' ? 'foundry_shelf' : 'artillery_crown',
-    imperialFunction: entry.label === 'Cistern Customs Terrace' ? 'imperial_core_retaining_gate' : entry.label === 'Graft Market Crown' ? 'suspended_foundry_logistics' : 'battery_terrace_command_road',
+    role: 'carved_imperial_structure',
+    rockSilhouette: 'fortress_cavern_logistics_spine',
+    imperialFunction: 'imperial_airship_logistics_fortress',
   });
   const mesh = buildSedimentaryMesaMeshData(field, 0.072);
   const exposedMesh = buildExposedVoxelFaceMeshData(field, 0.072);
   return {
-    kind: 'island',
+    kind: 'structure',
     label: entry.label,
     cell: Number(field.cell.toFixed(3)),
     dims: [field.nx, field.ny, field.nz],
@@ -87,22 +80,7 @@ const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => {
     uniqueEdges: uniqueEdgeCount(mesh),
   };
 });
-const rampStats = CURRENT_SLICE_RAMP_SEGMENTS.map((entry) => {
-  const field = buildSedimentaryMesaBridgeField(entry.length, entry.width, entry.thickness, entry.seed);
-  const mesh = buildSedimentaryMesaMeshData(field, 0.072);
-  const exposedMesh = buildExposedVoxelFaceMeshData(field, 0.072);
-  return {
-    kind: 'ramp',
-    label: entry.label,
-    cell: Number(field.cell.toFixed(3)),
-    dims: [field.nx, field.ny, field.nz],
-    triangles: mesh.triangleCount,
-    exposedFaceTriangles: exposedMesh.triangleCount,
-    exposedFaceRatio: Number((mesh.triangleCount / Math.max(1, exposedMesh.triangleCount)).toFixed(3)),
-    emittedVertices: mesh.positions.length / 3,
-    uniqueEdges: uniqueEdgeCount(mesh),
-  };
-});
+const rampStats = CURRENT_SLICE_RAMP_SEGMENTS;
 const allStats = [...islandStats, ...rampStats];
 const total = allStats.reduce((sum, stats) => ({
   triangles: sum.triangles + stats.triangles,
@@ -134,10 +112,10 @@ if (total.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxTotalContourToExposedRa
 }
 for (const stats of islandStats) {
   if (stats.triangles > MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles) {
-    failures.push(`${stats.label} island triangles ${stats.triangles} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles}`);
+    failures.push(`${stats.label} structure triangles ${stats.triangles} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles}`);
   }
   if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxIslandContourToExposedRatio) {
-    failures.push(`${stats.label} island contour ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandContourToExposedRatio}`);
+    failures.push(`${stats.label} structure contour ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandContourToExposedRatio}`);
   }
 }
 for (const stats of rampStats) {

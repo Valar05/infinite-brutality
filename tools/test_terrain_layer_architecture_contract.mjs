@@ -8,10 +8,10 @@ const terrainLayerSource = fs.readFileSync(new URL('../src/terrain-layer.js', im
 assert.match(mainSource, /import \{ createTerrainLayer \} from '\.\/terrain-layer\.js/, 'main runtime must import TerrainLayer');
 assert.match(mainSource, /roomState\.terrainLayer = layer/, 'roomState must own the active TerrainLayer');
 assert.match(mainSource, /roomGroup\.add\(layer\.group\)/, 'TerrainLayer group must be attached as one terrain owner');
-assert.match(mainSource, /terrain\.addBridgeSpan\(/, 'stepped ramp/connectors must add spans to TerrainLayer');
+assert.doesNotMatch(mainSource, /addIslandArtSteppedRamp\('slice-ramp-/, 'active island-art connectors must not emit floating terrain ramp spans');
 assert.match(districtSource, /activeTerrainLayer/, 'district geometry must target active TerrainLayer');
 assert.match(districtSource, /terrain\.addIslandStamp\(/, 'district islands must be terrain layer stamps');
-assert.match(districtSource, /terrain\.addBridgeSpan\(/, 'district bridges must be terrain layer spans');
+assert.match(districtSource, /terrainMode === 'carved_imperial_structure'/, 'district geometry must have a carved structure path before island bridge fallback');
 assert.doesNotMatch(districtSource, /registerMeshSupportCollider\(/, 'district terrain must not register mesh support colliders directly');
 assert.doesNotMatch(districtSource, /registerVoxelSupportCollider\(/, 'district terrain must not register voxel support colliders directly');
 assert.match(terrainLayerSource, /export function createTerrainLayer/, 'terrain-layer module must expose one layer factory');
@@ -19,7 +19,8 @@ assert.match(terrainLayerSource, /group\.userData\.owner = 'TerrainLayer'/, 'ter
 assert.match(terrainLayerSource, /const colliders = \[\]/, 'TerrainLayer must own support colliders internally');
 assert.match(terrainLayerSource, /const visualMeshes = \[\]/, 'TerrainLayer must own visual meshes internally');
 assert.match(terrainLayerSource, /imperial_floating_strata/, 'TerrainLayer must preserve the Imperial Floating Strata terrain label');
-assert.match(terrainLayerSource, /fieldGrammar: 'imperial_floating_strata'/, 'Imperial Floating Strata must route to its own field builder');
+assert.match(terrainLayerSource, /carved_imperial_structure/, 'TerrainLayer must preserve the carved imperial structure terrain label');
+assert.match(terrainLayerSource, /fieldGrammar: 'carved_imperial_structure'/, 'carved imperial structure must route to its own field builder');
 assert.match(terrainLayerSource, /baseGrammar/, 'TerrainLayer must record the base field grammar when a terrain label aliases an existing generator');
 assert.match(terrainLayerSource, /imperialFunction/, 'TerrainLayer must carry district function metadata into terrain fields');
 assert.match(terrainLayerSource, /const addIslandStamp = /, 'TerrainLayer must own island stamp emission');

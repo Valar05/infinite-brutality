@@ -9,7 +9,7 @@ import {
   buildSurfaceNetMeshData,
   queryVoxelIntersectsPrism,
   queryVoxelTopY,
-} from './island-geometry.js?v=0.8.175';
+} from './island-geometry.js?v=0.8.176';
 
 function buildRuntimeMesh(meshData, material) {
   const geometry = new THREE.BufferGeometry();
@@ -38,6 +38,13 @@ function disposeObjectTree(root) {
 }
 
 function normalizeTerrainGrammar(grammar) {
+  if (grammar === 'carved_imperial_structure') {
+    return {
+      requestedGrammar: 'carved_imperial_structure',
+      fieldGrammar: 'carved_imperial_structure',
+      process: 'imperial_structure_caved_from_rock',
+    };
+  }
   if (grammar === 'imperial_floating_strata') {
     return {
       requestedGrammar: 'imperial_floating_strata',
@@ -140,7 +147,8 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     const isSedimentaryMesa = field.rockGrammar?.baseGrammar === 'sedimentary_mesa'
       || field.rockGrammar?.fieldGrammar === 'sedimentary_mesa'
       || field.rockGrammar?.grammar === 'sedimentary_mesa'
-      || field.rockGrammar?.grammar === 'imperial_floating_strata';
+      || field.rockGrammar?.grammar === 'imperial_floating_strata'
+      || field.rockGrammar?.grammar === 'carved_imperial_structure';
     const meshData = isSedimentaryMesa
       ? buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)
       : buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);

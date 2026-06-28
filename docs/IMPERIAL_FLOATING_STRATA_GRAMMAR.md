@@ -289,3 +289,19 @@ until district-specific imperial cuts are added: retaining walls, rail bites,
 quarry scars, battery shelves, dock pylons, and fused masonry. The next fix
 should add one small structural signature to one district archetype, then
 validate the screenshot before expanding.
+
+
+## Runtime Pivot: Carved Structure, Not Rock Formation
+
+The active proof slice must read as a structure made out of rock, not as rocks with architectural props on top.
+
+Implementation rule:
+- `carved_imperial_structure` is the active Napoleon proof-slice terrain grammar.
+- The terrain field is the carved base: fortress mass, parade spine, retaining cliffs, quarry galleries, undercroft service, mooring bites, and collapse voids.
+- District geometry adds roads, courts, rails, pylons, vents, gatehouses, and towers as structural features fused into that base.
+- Island chains, floating ramp rubble, and disconnected decorative rock chunks are failures for the proof slice.
+- Connectors in the proof slice are built causeways or stairs; they are not terrain bridge spans.
+
+Screenshot test:
+- If the player sees separate floating rocks first, the slice failed.
+- If the player sees a road/court cut through a fortified airship logistics structure, the slice is moving in the right direction.

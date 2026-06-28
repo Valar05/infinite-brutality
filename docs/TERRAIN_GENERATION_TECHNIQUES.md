@@ -9,12 +9,35 @@ they are used, and what validates them.
 
 `docs/IMPERIAL_FLOATING_STRATA_GRAMMAR.md` is the current design bridge from
 sedimentary terrain machinery to Napoleon's Floating Kingdom terrain language.
-When runtime labels request `imperial_floating_strata`, they use an
-imperial-specific field builder that bakes roads, retaining bites, service
-shelves, and engineered silhouettes into the voxel field. The first visible
-mesh path still uses the proven sedimentary contour shell.
+The active proof slice now requests `carved_imperial_structure`: one carved
+fortress/logistics structure made from rock, not a chain of floating rocks. The
+field bakes parade spine, fortress court, retaining cliffs, quarry galleries,
+undercroft service, mooring bites, and collapse voids into the voxel support
+truth. The visible terrain still uses the proven sedimentary contour shell for
+the carved base, while district geometry supplies fused architecture.
 
 ## Current Runtime Terrain
+
+
+### Carved Imperial Structure Fields
+
+- `src/island-geometry.js`: `buildRoomIslandField(size, seed, { grammar: 'carved_imperial_structure', ... })`
+- `src/district-geometry.js`: `addCarvedImperialStructure(...)`
+- `src/main.js`: active districts carry `terrainMode: 'carved_imperial_structure'`
+
+This is the active Napoleon proof-slice path. It is deliberately not an island
+or bridge generator. It emits one carved base per district and suppresses the
+old active island/bridge terrain chain. World connectors in island-art mode use
+built causeways/stairs, not `addIslandArtSteppedRamp(...)` terrain spans.
+
+The generated field carries:
+
+- `grammar`: `carved_imperial_structure`
+- `baseGrammar`: `imperial_floating_strata`
+- `fieldGrammar`: `carved_imperial_structure`
+- `process`: `imperial_structure_caved_from_rock`
+- `zones`: parade spine, fortress court, retaining cliffs, quarry galleries,
+  undercroft service, airship mooring bites, collapse voids
 
 ### Sedimentary Mesa Island Fields
 

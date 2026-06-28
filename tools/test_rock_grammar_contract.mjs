@@ -245,6 +245,24 @@ const imperialMesh = buildSedimentaryMesaMeshData(imperial, 0.072);
 assert.ok(imperialMesh.triangleCount > 0, 'imperial terrain must emit visible geometry');
 assert.ok(imperialMesh.triangleCount <= 4000, `imperial visible mesh emitted ${imperialMesh.triangleCount} triangles > 4000 island budget`);
 
+
+const carved = buildRoomIslandField([40, 12, 50], 1000, {
+  grammar: 'carved_imperial_structure',
+  terraced: true,
+  role: 'carved_imperial_structure',
+  rockSilhouette: 'fortress_cavern_logistics_spine',
+  imperialFunction: 'imperial_airship_logistics_fortress',
+});
+assert.equal(carved.rockGrammar.grammar, 'carved_imperial_structure', 'carved terrain must be a first-class structure grammar');
+assert.equal(carved.rockGrammar.baseGrammar, 'imperial_floating_strata', 'carved terrain should declare the imperial terrain grammar it builds on');
+assert.equal(carved.rockGrammar.process, 'imperial_structure_caved_from_rock', 'carved terrain must state structure-caved-from-rock process');
+for (const zone of ['paradeSpine', 'fortressCourt', 'retainingCliffs', 'quarryGalleries', 'undercroftService', 'airshipMooringBites', 'collapseVoids']) {
+  assert.ok(carved.rockGrammar.zones.includes(zone), `carved imperial structure missing zone ${zone}`);
+}
+const carvedMesh = buildSedimentaryMesaMeshData(carved, 0.072);
+assert.ok(carvedMesh.triangleCount > 0, 'carved imperial structure must emit visible geometry');
+assert.ok(carvedMesh.triangleCount <= 4000, `carved imperial structure emitted ${carvedMesh.triangleCount} triangles > 4000 structure budget`);
+
 const legacyTerraced = buildRoomIslandField([30, 11, 26], 1000, true);
 assert.ok(queryVoxelTopY(legacyTerraced, 0, 0, legacyTerraced.cell * 0.2) != null, 'legacy boolean terraced island must still emit support at center');
 
@@ -265,4 +283,5 @@ console.log(JSON.stringify({
   imperialRoadCoverage: Number(roadCoverage.toFixed(3)),
   imperialRoadToSideDrop: Number(biteStats.roadToSideDrop.toFixed(3)),
   imperialTriangles: imperialMesh.triangleCount,
+  carvedTriangles: carvedMesh.triangleCount,
 }));

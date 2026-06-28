@@ -106,7 +106,13 @@ const cases = [
     rockSilhouette: 'fortress_plateau',
     imperialFunction: 'imperial_core_retaining_gate',
   })],
-  ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1)],
+  ['carved-imperial-structure', buildRoomIslandField([40, 12, 50], 1000, {
+    grammar: 'carved_imperial_structure',
+    terraced: true,
+    role: 'carved_imperial_structure',
+    rockSilhouette: 'fortress_cavern_logistics_spine',
+    imperialFunction: 'imperial_airship_logistics_fortress',
+  })],
 ];
 
 const failures = [];

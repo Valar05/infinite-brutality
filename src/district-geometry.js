@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildIslandBridgeSpec } from './island-geometry.js?v=0.8.175';
+import { buildIslandBridgeSpec } from './island-geometry.js?v=0.8.176';
 
 export function createDistrictGeometryApi(deps) {
   const {
@@ -279,6 +279,61 @@ export function createDistrictGeometryApi(deps) {
     }
   }
 
+  function addCarvedImperialStructure(district, contract) {
+    const origin = district.origin;
+    const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation - 0.8;
+    const buildBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 0.1;
+    const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 2.8;
+    const prefix = 'district-' + district.id + '-carved';
+    const terrain = activeTerrainLayer?.();
+    if (!terrain) throw new Error('TerrainLayer is required before carved imperial structure terrain can be emitted');
+
+    terrain.addIslandStamp({
+      id: district.id + '-carved-imperial-structure',
+      role: 'carved_imperial_structure',
+      origin: [origin.x, district.baseElevation - 5.6, origin.z + 22],
+      size: district.structureSize || [40, 12, 50],
+      yaw: district.structureYaw || 0,
+      terraced: true,
+      rockGrammar: 'carved_imperial_structure',
+      rockSilhouette: 'fortress_cavern_logistics_spine',
+      imperialFunction: 'imperial_airship_logistics_fortress',
+      seed: hashRoomKey('district-carved-structure:' + district.id + ':' + district.baseElevation.toFixed(2)),
+      materialVariant: district.index || 0,
+      source: 'district-carved-structure-voxel:' + district.id,
+    });
+    contract.visibleIslandCount += 1;
+    contract.islandMeshCount += 1;
+
+    addWalkableBox(roomGroup, prefix + '-parade-spine', [10.8, 0.46, 72], [origin.x, buildBand - 0.18, origin.z + 22], MAT.stone2, false, 0.08);
+    addWalkableBox(roomGroup, prefix + '-fortress-court', [34, 0.58, 24], [origin.x - 4, buildBand + 0.1, origin.z + 8], MAT.stone2, false, 0.08);
+    addWalkableBox(roomGroup, prefix + '-cargo-apron', [28, 0.48, 18], [origin.x + 12, buildBand - 0.3, origin.z + 38], MAT.platform, false, 0.08);
+    addWalkableBox(roomGroup, prefix + '-undercroft-service', [24, 0.42, 28], [origin.x - 9, lowBand - 0.44, origin.z + 38], MAT.stone2, false, 0.08);
+
+    for (const side of [-1, 1]) {
+      addGroundedBeveledBox(roomGroup, prefix + '-retaining-cliff-' + side, [4.8, 10.8, 68], [origin.x + side * 18.4, district.baseElevation - 7.4, origin.z + 22], MAT.wall, false, 0.035, 1);
+      addGroundedBeveledBox(roomGroup, prefix + '-quarry-gallery-' + side, [3.0, 0.5, 52], [origin.x + side * 14.8, buildBand + 0.38, origin.z + 26], MAT.trim, false, 0.025, 1);
+      addGroundedBeveledBox(roomGroup, prefix + '-rail-bed-' + side, [0.36, 0.18, 58], [origin.x + side * 5.2, buildBand + 0.14, origin.z + 24], MAT.iron, false, 0.01, 1);
+      addGroundedBeveledBox(roomGroup, prefix + '-mooring-rib-' + side, [2.2, 7.2, 1.2], [origin.x + side * 20.8, district.baseElevation - 5.2, origin.z + 2], MAT.iron, false, 0.025, 1);
+      addGroundedBeveledBox(roomGroup, prefix + '-mooring-rib-far-' + side, [2.2, 8.4, 1.2], [origin.x + side * 20.8, district.baseElevation - 6.0, origin.z + 50], MAT.iron, false, 0.025, 1);
+    }
+
+    for (let i = 0; i < 5; i += 1) {
+      const z = origin.z - 8 + i * 14;
+      addGroundedBeveledBox(roomGroup, prefix + '-road-sleeper-' + i, [11.6, 0.08, 0.3], [origin.x, buildBand + 0.12, z], MAT.bronze, false, 0.008, 1);
+      addGroundedCylinder(roomGroup, prefix + '-vent-stack-' + i, 0.34, 3.2 + (i % 2) * 1.1, [origin.x + 9.8 + (i % 2) * 2.1, buildBand + 0.02, z + 4.5], MAT.iron, 6);
+    }
+
+    addGroundedBeveledBox(roomGroup, prefix + '-gatehouse-left', [5.0, 6.2, 4.2], [origin.x - 8.2, buildBand - 0.1, origin.z - 16.0], MAT.wall, false, 0.035, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-gatehouse-right', [5.0, 6.2, 4.2], [origin.x + 8.2, buildBand - 0.1, origin.z - 16.0], MAT.wall, false, 0.035, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-gatehouse-lintel', [20.0, 2.4, 3.0], [origin.x, buildBand + 4.4, origin.z - 16.0], MAT.trim, false, 0.025, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-command-tower', [8.8, 24.0, 8.8], [origin.x + 6.5, buildBand - 0.4, origin.z + 61], MAT.connectorWall, false, 0.04, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-tower-crown', [12.8, 2.0, 12.8], [origin.x + 6.5, buildBand + 22.8, origin.z + 61], MAT.bronze, false, 0.025, 1);
+
+    addBatchStairRun(roomGroup, prefix + '-service-stair', makeVec(origin.x - 13.0, lowBand + PLAYER_EYE_HEIGHT, origin.z + 26), makeVec(origin.x - 8.0, buildBand + PLAYER_EYE_HEIGHT, origin.z + 10), lowBand - 0.28, buildBand + 0.06, MAT.stone2);
+    addBatchRouteSegment(roomGroup, prefix + '-upper-inspection-run', makeVec(origin.x + 14, highBand, origin.z + 6), makeVec(origin.x + 14, highBand + 0.16, origin.z + 52), highBand + 0.08, 2.8, MAT.bridge, 0.8);
+  }
+
   function addHangingMarketDistrictSkeleton(district) {
     const origin = district.origin;
     const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
@@ -474,6 +529,11 @@ export function createDistrictGeometryApi(deps) {
   function addDistrictSkeletonGeometry(district) {
     if (!district) return;
     const contract = beginDistrictVisualCollisionContract(district);
+    if (district.terrainMode === 'carved_imperial_structure') {
+      addCarvedImperialStructure(district, contract);
+      finalizeDistrictVisualCollisionContract(contract);
+      return;
+    }
     addDistrictIslandMasses(district, contract);
     addDistrictIslandBridges(district, contract);
     addDistrictRouteIslands(district, contract);

@@ -12,15 +12,23 @@ assert.ok(
 );
 assert.ok(
   districtGeometry.includes('addDistrictIslandMasses(district, contract);\n    addDistrictIslandBridges(district, contract);'),
-  'district visuals must come from mass islands and mass bridges',
+  'legacy fallback district visuals must still keep mass-island bridge order when carved mode is not active',
+);
+assert.ok(
+  districtGeometry.includes("district.terrainMode === 'carved_imperial_structure'"),
+  'active Napoleon proof slice must have a carved-structure district path before island/bridge fallback',
 );
 assert.ok(
   main.includes('const PLAYABLE_SLICE_ROOM_COUNT = 3;'),
   'runtime must cap the current playable slice to three islands',
 );
 assert.ok(
-  main.includes('addIslandArtSteppedRamp('),
-  'slice islands must use explicit stair-stepped organic ramp connectors',
+  main.includes("'carved-causeway-' + index"),
+  'active slice connectors must use built carved causeways/stairs instead of floating terrain ramps',
+);
+assert.ok(
+  !main.includes("addIslandArtSteppedRamp('slice-ramp-"),
+  'active slice connectors must not emit floating terrain ramp spans',
 );
 assert.ok(
   !main.includes("addIslandArtSteppedRamp('gauntlet-connector-"),
@@ -28,37 +36,33 @@ assert.ok(
 );
 
 assert.ok(
-  districtGeometry.includes("rockGrammar: anchor.rockGrammar || 'sedimentary_mesa'"),
-  'active terraced district mass anchors must use the sedimentary mesa rock grammar',
+  districtGeometry.includes("rockGrammar: 'carved_imperial_structure'"),
+  'active carved structure must submit carved imperial structure terrain labels',
 );
 assert.ok(
-  main.includes("rockGrammar: 'imperial_floating_strata'"),
-  'playable slice anchors must opt into Imperial Floating Strata terrain labels',
+  main.includes("rockGrammar: 'carved_imperial_structure'"),
+  'playable slice anchors must opt into carved imperial structure terrain labels',
 );
 assert.ok(
   main.includes("rockGrammar: options.rockGrammar || 'imperial_floating_strata'"),
   'active connector spans must default to Imperial Floating Strata terrain labels',
 );
 assert.ok(
-  districtGeometry.includes('function addImperialCoreTerrainSignature(district)'),
-  'Imperial Core terrain must have a visible structural signature hook',
+  districtGeometry.includes('function addCarvedImperialStructure(district, contract)'),
+  'Imperial terrain must have a carved structure emission path',
 );
 assert.ok(
-  districtGeometry.includes("anchor?.imperialFunction !== 'imperial_core_retaining_gate'"),
-  'Imperial Core signature must stay scoped to the imperial retaining-gate district',
+  districtGeometry.includes("'-parade-spine'") && districtGeometry.includes("'-undercroft-service'") && districtGeometry.includes("'-mooring-rib-"),
+  'carved imperial structure must include a parade spine, undercroft service path, and airship mooring ribs',
 );
 assert.ok(
-  districtGeometry.includes("'-parade-road-cap'") && districtGeometry.includes("'-retaining-bite-west'") && districtGeometry.includes("'-anchor-pylon-'"),
-  'Imperial Core signature must include parade road, retaining-wall bite, and anchor pylons',
-);
-assert.ok(
-  main.includes("const BUILD = '0.8.175';"),
+  main.includes("const BUILD = '0.8.176';"),
   'runtime build should be cache-busted for the playable sedimentary mesa slice',
 );
 
 assert.ok(
-  terrainLayer.includes("field.rockGrammar?.grammar === 'imperial_floating_strata'"),
-  'imperial terrain labels must still use the dedicated sedimentary visible mesh/material path',
+  terrainLayer.includes("field.rockGrammar?.grammar === 'carved_imperial_structure'"),
+  'carved structure labels must still use the dedicated sedimentary visible mesh/material path',
 );
 assert.ok(
   terrainLayer.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),

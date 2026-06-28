@@ -1553,8 +1553,36 @@ function buildImperialFloatingStrataField(size, seed, options) {
   return field;
 }
 
+function buildCarvedImperialStructureField(size, seed, options) {
+  const field = buildImperialFloatingStrataField(size, seed, {
+    ...options,
+    rockSilhouette: options.rockSilhouette || 'carved_fortress_cavern',
+    imperialFunction: options.imperialFunction || 'imperial_carved_logistics_spine',
+  });
+  field.rockGrammar = {
+    ...field.rockGrammar,
+    grammar: 'carved_imperial_structure',
+    fieldGrammar: 'carved_imperial_structure',
+    baseGrammar: 'imperial_floating_strata',
+    silhouette: options.rockSilhouette || 'carved_fortress_cavern',
+    process: 'imperial_structure_caved_from_rock',
+    imperialFunction: options.imperialFunction || 'imperial_carved_logistics_spine',
+    zones: [
+      'paradeSpine',
+      'fortressCourt',
+      'retainingCliffs',
+      'quarryGalleries',
+      'undercroftService',
+      'airshipMooringBites',
+      'collapseVoids',
+    ],
+  };
+  return field;
+}
+
 export function buildRoomIslandField(size, seed, optionsOrTerraced = false) {
   const options = normalizeRoomIslandOptions(optionsOrTerraced);
+  if (options.grammar === 'carved_imperial_structure') return buildCarvedImperialStructureField(size, seed, options);
   if (options.grammar === 'imperial_floating_strata') return buildImperialFloatingStrataField(size, seed, options);
   if (options.grammar === 'sedimentary_mesa') return buildSedimentaryMesaField(size, seed, options);
   return buildLegacyRoomIslandField(size, seed, options);

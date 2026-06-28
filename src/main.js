@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
-import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.175';
-import { createMaterialResources } from './materials.js?v=0.8.175';
+import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.176';
+import { createMaterialResources } from './materials.js?v=0.8.176';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js';
 import { createNookTtsApi } from './nook-tts.js';
-import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.175';
-import { createTerrainLayer } from './terrain-layer.js?v=0.8.175';
+import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.176';
+import { createTerrainLayer } from './terrain-layer.js?v=0.8.176';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
@@ -27,7 +27,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.175';
+const BUILD = '0.8.176';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;
@@ -3499,8 +3499,10 @@ function generateDistrictPlan(levelIndex) {
       preferredRoles: [...archetype.preferredRoles],
       realSourceA: sliceConfig.sourceA,
       realSourceB: sliceConfig.sourceB,
-      skeletonType: 'terraced_island_node',
-      patchStyle: 'organic_noise_terrace_cut',
+      skeletonType: 'carved_imperial_structure',
+      terrainMode: 'carved_imperial_structure',
+      patchStyle: 'rough_hewn_imperial_carving',
+      structureSize: [40, 12, 50],
       silhouetteRule: sliceConfig.silhouetteRule,
       storyPilotId: sliceConfig.storyPilotId,
       storyPlacementSet: sliceConfig.storyPlacementSet,
@@ -3520,7 +3522,7 @@ function generateDistrictPlan(levelIndex) {
         size: sliceConfig.size,
         yaw,
         terraced: true,
-        rockGrammar: 'imperial_floating_strata',
+        rockGrammar: 'carved_imperial_structure',
         rockSilhouette: sliceConfig.terrainSilhouette,
         imperialFunction: sliceConfig.terrainFunction,
       }],
@@ -3662,11 +3664,13 @@ function addWorldConnector(index, from, to, options = {}) {
   const heightDelta = Math.abs(toTop - fromTop);
 
   if (ISLAND_ART_ONLY) {
-    addIslandArtSteppedRamp('slice-ramp-' + index, fromRun, toRun, {
-      width: options.branch ? 4.8 : 5.8,
-      thickness: options.branch ? 1.25 : 1.55,
-      source: 'slice-ramp-' + index,
-    });
+    const routeTopA = Math.max(0.34, fromTop + 0.14);
+    const routeTopB = Math.max(0.34, toTop + 0.14);
+    if (heightDelta > 0.28) {
+      addBatchStairRun(roomGroup, 'carved-causeway-' + index + '-rise', fromRun, toRun, routeTopA, routeTopB, MAT.stone2);
+    } else {
+      addBatchRouteSegment(roomGroup, 'carved-causeway-' + index, fromRun, toRun, Math.max(routeTopA, routeTopB), options.branch ? 3.2 : 3.8, MAT.stone2, 0.85);
+    }
     return;
   }
 
