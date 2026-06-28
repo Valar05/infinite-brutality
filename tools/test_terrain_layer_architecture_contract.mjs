@@ -18,6 +18,7 @@ assert.match(terrainLayerSource, /export function createTerrainLayer/, 'terrain-
 assert.match(terrainLayerSource, /group\.userData\.owner = 'TerrainLayer'/, 'terrain group must declare TerrainLayer ownership');
 assert.match(terrainLayerSource, /const colliders = \[\]/, 'TerrainLayer must own support colliders internally');
 assert.match(terrainLayerSource, /const visualMeshes = \[\]/, 'TerrainLayer must own visual meshes internally');
+assert.match(terrainLayerSource, /const meshColliders = \[\]/, 'TerrainLayer must own visible mesh colliders internally');
 assert.match(terrainLayerSource, /imperial_floating_strata/, 'TerrainLayer must preserve the Imperial Floating Strata terrain label');
 assert.match(terrainLayerSource, /carved_imperial_structure/, 'TerrainLayer must preserve the carved imperial structure terrain label');
 assert.match(terrainLayerSource, /fieldGrammar: 'carved_imperial_structure'/, 'carved imperial structure must route to its own field builder');
@@ -26,7 +27,10 @@ assert.match(terrainLayerSource, /imperialFunction/, 'TerrainLayer must carry di
 assert.match(terrainLayerSource, /const addIslandStamp = /, 'TerrainLayer must own island stamp emission');
 assert.match(terrainLayerSource, /const addBridgeSpan = /, 'TerrainLayer must own connector span emission');
 assert.match(terrainLayerSource, /const supportAt = /, 'TerrainLayer must answer support queries');
-assert.match(terrainLayerSource, /const intersectsBody = /, 'TerrainLayer must answer body intersection queries');
+assert.match(terrainLayerSource, /terrainSupportRaycaster\.intersectObject\(collider\.mesh, true\)/, 'TerrainLayer support must raycast against the visible terrain mesh');
+assert.doesNotMatch(terrainLayerSource, /queryVoxelTopY/, 'TerrainLayer support must not sample hidden voxel tops');
+assert.match(terrainLayerSource, /const intersectsBody = \(\) => false;/, 'TerrainLayer must not create hidden body blockers from terrain voxels');
+assert.doesNotMatch(terrainLayerSource, /queryVoxelIntersectsPrism/, 'TerrainLayer body checks must not use hidden voxel prisms');
 assert.match(terrainLayerSource, /colliderBySource/, 'TerrainLayer must index colliders by source for spawn selection');
 assert.match(terrainLayerSource, /colliders\.includes\(collider\)/, 'TerrainLayer local transforms must reject legacy colliders it does not own');
 assert.match(terrainLayerSource, /disposeObjectTree/, 'TerrainLayer must own disposal for generated terrain meshes');

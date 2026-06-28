@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
-import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.176';
-import { createMaterialResources } from './materials.js?v=0.8.176';
+import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.179';
+import { createMaterialResources } from './materials.js?v=0.8.179';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js';
 import { createNookTtsApi } from './nook-tts.js';
-import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.176';
-import { createTerrainLayer } from './terrain-layer.js?v=0.8.176';
+import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
+import { createTerrainLayer } from './terrain-layer.js?v=0.8.179';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
@@ -27,7 +27,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.176';
+const BUILD = '0.8.179';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;

@@ -1554,18 +1554,73 @@ function buildImperialFloatingStrataField(size, seed, options) {
 }
 
 function buildCarvedImperialStructureField(size, seed, options) {
-  const field = buildImperialFloatingStrataField(size, seed, {
-    ...options,
-    rockSilhouette: options.rockSilhouette || 'carved_fortress_cavern',
-    imperialFunction: options.imperialFunction || 'imperial_carved_logistics_spine',
+  const [sx, sy, sz] = size;
+  const cell = Math.min(DRIFTFIELD_TERRAIN_CELL, Math.max(MIN_PLAYABLE_ISLAND_CELL, Math.min(sx, sy, sz) / 3.85));
+  const min = vec3(-sx * 0.62, -sy * 1.12, -sz * 0.72);
+  const max = vec3(sx * 0.62, sy * 0.86, sz * 0.72);
+  const field = buildFieldFromVerticalSpan(cell, min, max, (p) => {
+    const nx = p.x / Math.max(0.001, sx * 0.5);
+    const nz = p.z / Math.max(0.001, sz * 0.5);
+    const ax = Math.abs(nx);
+    const az = Math.abs(nz);
+    const road = ax <= 0.24 && az <= 1.22;
+    const fortressCourt = ax <= 0.76 && nz >= -0.72 && nz <= -0.05;
+    const cargoApron = nx >= -0.30 && nx <= 0.92 && nz >= 0.16 && nz <= 0.78;
+    const undercroft = ax <= 0.58 && nz >= 0.48 && nz <= 1.04;
+    const quarryGallery = ax >= 0.58 && ax <= 0.88 && az <= 1.06;
+    const retainingCliff = ax >= 0.72 && ax <= 1.08 && az <= 1.18;
+    const towerButtress = ax <= 0.40 && nz >= 0.92 && nz <= 1.34;
+    const gateRib = ax >= 0.34 && ax <= 0.78 && nz <= -0.86 && nz >= -1.28;
+    const mooringBite = ax >= 0.86 && ax <= 1.16 && (Math.abs(nz - 0.72) <= 0.18 || Math.abs(nz + 0.62) <= 0.18);
+    const structural = road || fortressCourt || cargoApron || undercroft || quarryGallery || retainingCliff || towerButtress || gateRib || mooringBite;
+    const outer = Math.max(ax / 1.08, az / 1.30);
+    const strataNoise = valueNoise2(nx * 4.2 + 3.1, nz * 4.2 - 8.4, seed + 701);
+    const fractureNoise = valueNoise2(nx * 8.1 - 2.4, nz * 8.1 + 5.6, seed + 719);
+    const biteCut = outer > 0.78 && fractureNoise > 0.76 + Math.max(0, outer - 0.78) * 0.45;
+    const cornerCollapse = Math.max(0, ax - 0.78) * Math.max(0, az - 0.92);
+    if (!structural) {
+      if (outer + cornerCollapse * 0.85 > 1.0) return null;
+      if (biteCut) return null;
+    }
+    if (!road && !fortressCourt && !cargoApron && fractureNoise > 0.92 && outer > 0.56) return null;
+
+    let top = sy * (0.30 - clamp01(outer) * 0.08 + (strataNoise - 0.5) * 0.035);
+    if (fortressCourt) top = Math.max(top, sy * 0.42);
+    if (road) top = Math.max(top, sy * 0.48);
+    if (cargoApron) top = Math.max(top, sy * 0.34);
+    if (undercroft && !road) top = Math.min(top, sy * 0.18);
+    if (quarryGallery && !road) top = Math.min(top, sy * 0.24 + (strataNoise - 0.5) * sy * 0.025);
+    if (retainingCliff && !road) top = Math.min(top, sy * 0.14);
+    if (mooringBite && !road) top = Math.min(top, sy * 0.08);
+    if (gateRib) top = Math.max(top, sy * 0.58);
+    if (towerButtress) top = Math.max(top, sy * (0.64 + (1 - ax) * 0.10));
+    if (options.terraced && !road && !fortressCourt) {
+      const terraceStep = sy * 0.055;
+      top = Math.round(top / terraceStep) * terraceStep;
+    }
+
+    const quarryStep = Math.floor((ax * 5.0 + az * 3.0 + strataNoise * 2.0) % 5) * 0.032;
+    const verticalGroove = Math.max(0, valueNoise2(nx * 6.7 + 11.2, nz * 6.7 - 4.5, seed + 733) - 0.55);
+    const engineeredDepth = retainingCliff ? 0.30 : undercroft ? 0.22 : quarryGallery ? 0.16 : gateRib ? 0.10 : towerButtress ? 0.18 : road ? 0.08 : 0.12;
+    const bottom = -sy * (
+      0.62
+      + clamp01(outer) * 0.18
+      + engineeredDepth
+      + Math.abs(strataNoise - 0.5) * 0.12
+      + verticalGroove * clamp01(outer) * 0.18
+      + quarryStep
+    );
+    if (top - bottom < sy * 0.55) return null;
+    return { top, bottom };
   });
+  closeVoxelDiagonalEdgeGaps(field);
   field.rockGrammar = {
-    ...field.rockGrammar,
     grammar: 'carved_imperial_structure',
-    fieldGrammar: 'carved_imperial_structure',
     baseGrammar: 'imperial_floating_strata',
+    fieldGrammar: 'carved_imperial_structure',
     silhouette: options.rockSilhouette || 'carved_fortress_cavern',
     process: 'imperial_structure_caved_from_rock',
+    role: options.role,
     imperialFunction: options.imperialFunction || 'imperial_carved_logistics_spine',
     zones: [
       'paradeSpine',
@@ -1574,6 +1629,8 @@ function buildCarvedImperialStructureField(size, seed, options) {
       'quarryGalleries',
       'undercroftService',
       'airshipMooringBites',
+      'gateVoid',
+      'towerButtress',
       'collapseVoids',
     ],
   };

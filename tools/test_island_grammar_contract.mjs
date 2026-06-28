@@ -44,19 +44,23 @@ assert.ok(
   'playable slice anchors must opt into carved imperial structure terrain labels',
 );
 assert.ok(
-  main.includes("rockGrammar: options.rockGrammar || 'imperial_floating_strata'"),
-  'active connector spans must default to Imperial Floating Strata terrain labels',
+  main.includes("'carved-causeway-' + index") && !main.includes("addIslandArtSteppedRamp('slice-ramp-"),
+  'active proof-slice connectors must be built causeways, not floating terrain bridge spans',
 );
 assert.ok(
   districtGeometry.includes('function addCarvedImperialStructure(district, contract)'),
   'Imperial terrain must have a carved structure emission path',
 );
 assert.ok(
-  districtGeometry.includes("'-parade-spine'") && districtGeometry.includes("'-undercroft-service'") && districtGeometry.includes("'-mooring-rib-"),
-  'carved imperial structure must include a parade spine, undercroft service path, and airship mooring ribs',
+  districtGeometry.includes("'-embedded-rail-'") && districtGeometry.includes("'-mooring-socket-a-"),
+  'carved imperial structure renderer must keep only sparse embedded hardware, not large box surfaces',
 );
 assert.ok(
-  main.includes("const BUILD = '0.8.176';"),
+  !districtGeometry.includes("'-parade-spine'") && !districtGeometry.includes("'-fortress-court'") && !districtGeometry.includes("'-command-tower'"),
+  'carved imperial structure must not be assembled from large walkable boxes or pasted box towers',
+);
+assert.ok(
+  main.includes("const BUILD = '0.8.179';"),
   'runtime build should be cache-busted for the playable sedimentary mesa slice',
 );
 

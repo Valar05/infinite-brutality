@@ -7,9 +7,10 @@ import {
   buildSedimentaryMesaBridgeField,
   buildSedimentaryMesaMeshData,
   buildSurfaceNetMeshData,
-  queryVoxelIntersectsPrism,
-  queryVoxelTopY,
-} from './island-geometry.js?v=0.8.176';
+} from './island-geometry.js?v=0.8.179';
+
+const TERRAIN_DOWN = new THREE.Vector3(0, -1, 0);
+const terrainSupportRaycaster = new THREE.Raycaster();
 
 function buildRuntimeMesh(meshData, material) {
   const geometry = new THREE.BufferGeometry();
@@ -88,11 +89,13 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
   group.userData.debugMode = debugMode;
   const colliders = [];
   const visualMeshes = [];
+  const meshColliders = [];
   const terrainSpecs = [];
 
-  const addCollider = (field, origin, yaw, source, kind) => {
+  const addCollider = (field, origin, yaw, source, kind, mesh = null) => {
     const collider = {
       field,
+      mesh,
       centerX: origin[0],
       centerY: origin[1],
       centerZ: origin[2],
@@ -107,7 +110,22 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
       kind,
     };
     colliders.push(collider);
+    if (mesh) meshColliders.push(collider);
     return collider;
+  };
+
+  const refreshMeshColliderBounds = (collider) => {
+    if (!collider?.mesh) return null;
+    collider.mesh.parent?.updateMatrixWorld(true);
+    collider.mesh.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(collider.mesh);
+    collider.minX = bounds.min.x;
+    collider.maxX = bounds.max.x;
+    collider.minY = bounds.min.y;
+    collider.maxY = bounds.max.y;
+    collider.minZ = bounds.min.z;
+    collider.maxZ = bounds.max.z;
+    return bounds;
   };
 
   const addFieldMesh = ({ field, meshData, origin, yaw = 0, material, source, kind }) => {
@@ -120,7 +138,8 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     mesh.userData.terrainLayerSource = source;
     holder.add(mesh);
     visualMeshes.push(mesh);
-    addCollider(field, origin, yaw, source, kind);
+    const collider = addCollider(field, origin, yaw, source, kind, mesh);
+    refreshMeshColliderBounds(collider);
     return holder;
   };
 
@@ -162,7 +181,7 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
       yaw: spec.yaw || 0,
       material,
       source: spec.source || 'terrain-island:' + spec.id,
-      kind: 'island',
+      kind: spec.kind || (field.rockGrammar?.grammar === 'carved_imperial_structure' ? 'structure' : 'island'),
     });
   };
 
@@ -199,33 +218,34 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     const prevFeetY = Number.isFinite(options.prevFeetY) ? options.prevFeetY : feetY;
     const sweepDrop = Math.max(0, prevFeetY - feetY);
     const effectiveStepDown = Math.max(stepDown, sweepDrop + 0.2);
+    const originY = Math.max(feetY, prevFeetY) + stepUp + 6.0;
+    terrainSupportRaycaster.set(new THREE.Vector3(x, originY, z), TERRAIN_DOWN);
+    terrainSupportRaycaster.far = stepUp + effectiveStepDown + 12.0;
     let best = null;
-    for (const collider of colliders) {
+    for (const collider of meshColliders) {
       if (feetY > collider.maxY + stepUp || feetY < collider.minY - effectiveStepDown) continue;
       if (x < collider.minX - radius || x > collider.maxX + radius) continue;
       if (z < collider.minZ - radius || z > collider.maxZ + radius) continue;
-      const local = toOrientedLocal(x, z, collider.centerX, collider.centerZ, collider.yaw || 0);
-      const topLocalY = queryVoxelTopY(collider.field, local.x, local.z, radius);
-      if (topLocalY == null) continue;
-      const topY = collider.centerY + topLocalY;
-      if (velocityY > 0.5 && feetY < topY - 0.14) continue;
-      if (feetY > topY + stepUp) continue;
-      if (feetY < topY - effectiveStepDown) continue;
-      if (!best || topY > best.topY) best = { topY, collider, source: collider.source };
+      collider.mesh.parent?.updateMatrixWorld(true);
+      collider.mesh.updateMatrixWorld(true);
+      const hits = terrainSupportRaycaster.intersectObject(collider.mesh, true);
+      for (const hit of hits) {
+        const worldNormal = hit.face?.normal?.clone?.().transformDirection(hit.object.matrixWorld);
+        if (!worldNormal || worldNormal.y < 0.2) continue;
+        const topY = hit.point.y;
+        if (velocityY > 0.5 && feetY < topY - 0.14) continue;
+        if (feetY > topY + stepUp) continue;
+        if (feetY < topY - effectiveStepDown) continue;
+        if (!best || topY > best.topY) {
+          best = { topY, collider, source: collider.source, point: hit.point.clone(), normal: worldNormal, kind: collider.kind };
+        }
+        break;
+      }
     }
     return best;
   };
 
-  const intersectsBody = (x, z, minY, maxY, radius = 0.38) => {
-    for (const collider of colliders) {
-      if (maxY < collider.minY || minY > collider.maxY) continue;
-      if (x < collider.minX - radius || x > collider.maxX + radius) continue;
-      if (z < collider.minZ - radius || z > collider.maxZ + radius) continue;
-      const local = toOrientedLocal(x, z, collider.centerX, collider.centerZ, collider.yaw || 0);
-      if (queryVoxelIntersectsPrism(collider.field, local.x, local.z, minY - collider.centerY, maxY - collider.centerY, radius)) return true;
-    }
-    return false;
-  };
+  const intersectsBody = () => false;
 
   const colliderBySource = (source) => colliders.find((collider) => collider.source === source) || null;
 
@@ -247,6 +267,7 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     group.clear();
     colliders.length = 0;
     visualMeshes.length = 0;
+    meshColliders.length = 0;
     terrainSpecs.length = 0;
   };
 
@@ -254,6 +275,7 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     group,
     colliders,
     visualMeshes,
+    meshColliders,
     terrainSpecs,
     addIslandStamp,
     addBridgeSpan,
