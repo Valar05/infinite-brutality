@@ -139,8 +139,8 @@ function countEnclosedAir(field) {
 const cases = [
   ['legacy-room', buildRoomIslandField([8.8, 5.2, 8.8], 1), buildSurfaceNetMeshData, { strictEdges: true }],
   ['legacy-bridge', buildRockBridgeField(28, 4.8, 1.6, 1), buildSurfaceNetMeshData, { strictEdges: true }],
-  ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' }), buildSedimentaryMesaMeshData, { strictEdges: false, maxBadFacingRatio: 0.085 }],
-  ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1), buildSedimentaryMesaMeshData, { strictEdges: false, maxBadFacingRatio: 0.085 }],
+  ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' }), buildSedimentaryMesaMeshData, { strictEdges: true }],
+  ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1), buildSedimentaryMesaMeshData, { strictEdges: true }],
 ];
 
 const failures = [];
@@ -155,5 +155,5 @@ for (const [label, field, meshFactory, options] of cases) {
   if (badFacingRatio > (options.maxBadFacingRatio ?? 0)) failures.push(label + ' mesh has bad-facing ratio ' + badFacingRatio.toFixed(3) + ' > ' + (options.maxBadFacingRatio ?? 0));
 }
 
-assert.deepEqual(failures, [], 'island voxel fields must be cavity-free; legacy meshes stay edge-watertight; sedimentary LOD meshes must keep acceptable solid/air facing');
+assert.deepEqual(failures, [], 'active visible terrain meshes must be cavity-free, edge-watertight, and consistently face solid vs air');
 console.log(JSON.stringify({ ok: true, contract: 'island-mesh-integrity' }));

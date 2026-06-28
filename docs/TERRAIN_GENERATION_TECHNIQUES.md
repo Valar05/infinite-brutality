@@ -78,12 +78,15 @@ Primary functions:
 - `src/island-geometry.js`: `buildGreedyVoxelMeshData(field, uvScale, vertexTransform)`
 - `src/island-geometry.js`: `weatherSedimentaryLodVertex(...)`
 
-This is the current accepted mesh output for sedimentary terrain. It preserves
-the voxel field for support and collision, but the visible mesh no longer emits
-one quad per exposed voxel face. The active path uses a greedy merged-face LOD
-that merges coplanar exposed faces and then applies deterministic in-plane
-sediment shear/erosion offsets so large merged faces do not read as an exact
-cube grid.
+This is the current review-branch experiment, not an accepted art result. It
+preserves the voxel field for support and collision, but the visible mesh no
+longer emits one quad per exposed voxel face. The active path uses a greedy
+merged-face LOD that merges coplanar exposed faces and then applies
+deterministic in-plane sediment shear/erosion offsets.
+
+The experiment proves the budget reduction, but it still reads as voxel-box
+language in fresh visual review. Do not merge this path as the final terrain
+solution.
 
 The important split is:
 
@@ -92,9 +95,11 @@ The important split is:
 - Strata and erosion should come primarily from UVs/material response plus
   sparse in-plane silhouette offsets, not per-voxel geometry.
 
-This replaced both the smooth surface-net output and the literal exposed-voxel
-face output for active sedimentary terrain. Surface nets rounded mesas back
-toward blob language; exposed voxel faces were too heavy and too Minecraft.
+This was intended to replace both the smooth surface-net output and the literal
+exposed-voxel face output for active sedimentary terrain. Surface nets rounded
+mesas back toward blob language; exposed voxel faces were too heavy and too
+Minecraft. Greedy merged faces reduce budget, but remain too boxy without a
+real sedimentary visual shell.
 
 Current validation:
 
@@ -107,6 +112,9 @@ Current validation:
 - `tools/test_scene_geometry_budget.mjs` checks the active district slice
   against mobile triangle, vertex, edge, island, ramp, and exposed-face-ratio
   budgets.
+- `tools/test_terrain_visual_contract.mjs` is the visual-proxy red test for the
+  current branch. It rejects giant axis-aligned sheets and box-bounded
+  silhouettes.
 
 ### Voxel Support And Collision Queries
 
