@@ -1,0 +1,486 @@
+{
+  "schema": "infinite_brutality.ingested_slice_plan.v1",
+  "source": {
+    "id": "mini_gate_loop",
+    "schema": "neutral_quake_geometry.v1",
+    "copyrightBoundary": "synthetic_or_local_analysis_only_no_shipped_quake_content",
+    "scale": 32
+  },
+  "generatedBy": "tools/quake_geometry_ingest",
+  "copyrightBoundary": "route_structure_analysis_only_rebuilt_as_infinite_brutality_voxels",
+  "rooms": [
+    {
+      "id": "room_start",
+      "label": "Start Casemate",
+      "role": "start",
+      "center": [
+        4,
+        1,
+        3
+      ],
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          0
+        ],
+        "max": [
+          8,
+          0.5,
+          6
+        ]
+      },
+      "surfaces": [
+        "surface_0_start_floor"
+      ]
+    },
+    {
+      "id": "room_battery",
+      "label": "Battery Court",
+      "role": "combat",
+      "center": [
+        4,
+        1,
+        10
+      ],
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          6
+        ],
+        "max": [
+          8,
+          0.5,
+          14
+        ]
+      },
+      "surfaces": [
+        "surface_1_battery_floor"
+      ]
+    },
+    {
+      "id": "room_gate",
+      "label": "Locked Gate Face",
+      "role": "gate",
+      "center": [
+        4,
+        1,
+        17
+      ],
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          14
+        ],
+        "max": [
+          8,
+          0.5,
+          20
+        ]
+      },
+      "surfaces": [
+        "surface_2_gate_face_floor"
+      ]
+    },
+    {
+      "id": "room_trench",
+      "label": "Side Key Trench",
+      "role": "side",
+      "center": [
+        -3,
+        1,
+        16
+      ],
+      "bounds": {
+        "min": [
+          -6,
+          1.5,
+          20
+        ],
+        "max": [
+          -4,
+          1.5,
+          22
+        ]
+      },
+      "surfaces": [
+        "surface_4_stair_01"
+      ]
+    },
+    {
+      "id": "room_upper",
+      "label": "Upper Loopback Overlook",
+      "role": "overlook",
+      "center": [
+        -1,
+        4.5,
+        28
+      ],
+      "bounds": {
+        "min": [
+          -6,
+          2.5,
+          22
+        ],
+        "max": [
+          4,
+          4,
+          31
+        ]
+      },
+      "surfaces": [
+        "surface_5_stair_02",
+        "surface_6_stair_03",
+        "surface_7_upper_overlook_floor"
+      ]
+    },
+    {
+      "id": "room_secret",
+      "label": "Secret Ledge",
+      "role": "secret",
+      "center": [
+        -9,
+        4.5,
+        29
+      ],
+      "bounds": {
+        "min": [
+          -12,
+          4,
+          27
+        ],
+        "max": [
+          -6,
+          4,
+          31
+        ]
+      },
+      "surfaces": [
+        "surface_8_secret_ledge_floor"
+      ]
+    },
+    {
+      "id": "room_final",
+      "label": "Final Gun Room",
+      "role": "final",
+      "center": [
+        4,
+        4.5,
+        34.5
+      ],
+      "bounds": {
+        "min": [
+          0,
+          4,
+          31
+        ],
+        "max": [
+          8,
+          4,
+          38
+        ]
+      },
+      "surfaces": [
+        "surface_9_final_gun_floor"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "room_start",
+      "to": "room_battery",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_battery",
+      "to": "room_gate",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_trench",
+      "to": "room_upper",
+      "kind": "ledge",
+      "routeRole": "side_or_secret_candidate"
+    },
+    {
+      "from": "room_upper",
+      "to": "room_secret",
+      "kind": "stair_step",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_upper",
+      "to": "room_secret",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_upper",
+      "to": "room_final",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_gate",
+      "to": "room_trench",
+      "kind": "locked_gate",
+      "routeRole": "blocked_goal"
+    }
+  ],
+  "walkableSurfaces": [
+    {
+      "id": "surface_0_start_floor",
+      "roomId": "room_start",
+      "y": 0.5,
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          0
+        ],
+        "max": [
+          8,
+          0.5,
+          6
+        ]
+      },
+      "sourceBrushId": "start_floor"
+    },
+    {
+      "id": "surface_1_battery_floor",
+      "roomId": "room_battery",
+      "y": 0.5,
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          6
+        ],
+        "max": [
+          8,
+          0.5,
+          14
+        ]
+      },
+      "sourceBrushId": "battery_floor"
+    },
+    {
+      "id": "surface_2_gate_face_floor",
+      "roomId": "room_gate",
+      "y": 0.5,
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          14
+        ],
+        "max": [
+          8,
+          0.5,
+          20
+        ]
+      },
+      "sourceBrushId": "gate_face_floor"
+    },
+    {
+      "id": "surface_4_stair_01",
+      "roomId": "room_trench",
+      "y": 1.5,
+      "bounds": {
+        "min": [
+          -6,
+          1.5,
+          20
+        ],
+        "max": [
+          -4,
+          1.5,
+          22
+        ]
+      },
+      "sourceBrushId": "stair_01"
+    },
+    {
+      "id": "surface_5_stair_02",
+      "roomId": "room_upper",
+      "y": 2.5,
+      "bounds": {
+        "min": [
+          -5.5,
+          2.5,
+          22
+        ],
+        "max": [
+          -3.5,
+          2.5,
+          24
+        ]
+      },
+      "sourceBrushId": "stair_02"
+    },
+    {
+      "id": "surface_6_stair_03",
+      "roomId": "room_upper",
+      "y": 3.5,
+      "bounds": {
+        "min": [
+          -5,
+          3.5,
+          24
+        ],
+        "max": [
+          -3,
+          3.5,
+          26
+        ]
+      },
+      "sourceBrushId": "stair_03"
+    },
+    {
+      "id": "surface_7_upper_overlook_floor",
+      "roomId": "room_upper",
+      "y": 4,
+      "bounds": {
+        "min": [
+          -6,
+          4,
+          26
+        ],
+        "max": [
+          4,
+          4,
+          31
+        ]
+      },
+      "sourceBrushId": "upper_overlook_floor"
+    },
+    {
+      "id": "surface_8_secret_ledge_floor",
+      "roomId": "room_secret",
+      "y": 4,
+      "bounds": {
+        "min": [
+          -12,
+          4,
+          27
+        ],
+        "max": [
+          -6,
+          4,
+          31
+        ]
+      },
+      "sourceBrushId": "secret_ledge_floor"
+    },
+    {
+      "id": "surface_9_final_gun_floor",
+      "roomId": "room_final",
+      "y": 4,
+      "bounds": {
+        "min": [
+          0,
+          4,
+          31
+        ],
+        "max": [
+          8,
+          4,
+          38
+        ]
+      },
+      "sourceBrushId": "final_gun_floor"
+    }
+  ],
+  "stairs": [
+    {
+      "fromSurface": "surface_6_stair_03",
+      "toSurface": "surface_7_upper_overlook_floor"
+    },
+    {
+      "fromSurface": "surface_6_stair_03",
+      "toSurface": "surface_8_secret_ledge_floor"
+    }
+  ],
+  "ledges": [
+    {
+      "fromSurface": "surface_4_stair_01",
+      "toSurface": "surface_5_stair_02"
+    },
+    {
+      "fromSurface": "surface_4_stair_01",
+      "toSurface": "surface_6_stair_03"
+    },
+    {
+      "fromSurface": "surface_5_stair_02",
+      "toSurface": "surface_6_stair_03"
+    },
+    {
+      "fromSurface": "surface_5_stair_02",
+      "toSurface": "surface_7_upper_overlook_floor"
+    }
+  ],
+  "gates": [
+    {
+      "id": "locked_gate_bars",
+      "locked": true,
+      "center": [
+        4,
+        2.25,
+        19.875
+      ],
+      "size": [
+        3.5,
+        3.5,
+        0.5
+      ]
+    }
+  ],
+  "loopbacks": [
+    {
+      "rooms": [
+        "room_start",
+        "room_battery",
+        "room_gate",
+        "room_trench",
+        "room_upper",
+        "room_secret",
+        "room_final"
+      ],
+      "kind": "cycle"
+    }
+  ],
+  "secretOrSidePathCandidates": [
+    {
+      "roomId": "room_trench",
+      "kind": "side"
+    },
+    {
+      "roomId": "room_secret",
+      "kind": "secret"
+    }
+  ],
+  "voxelField": {
+    "cell": 1,
+    "origin": [
+      -13,
+      -1,
+      -2
+    ],
+    "dimensions": [
+      23,
+      10,
+      42
+    ],
+    "solidVoxelCount": 548,
+    "encoding": "rle_u8_xyz"
+  },
+  "terrainReconstruction": {
+    "owner": "Infinite Brutality",
+    "primitiveKind": "voxel_solids_plus_walkable_surface_graph",
+    "recommendedMaterialSet": "imperial_floating_strata"
+  }
+}

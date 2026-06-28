@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640">
+<rect width="100%" height="100%" fill="#111318"/>
+<text x="24" y="28" fill="#e8dcc2" font-family="monospace" font-size="18">quake geometry ingest route graph</text>
+<line x1="277.1" y1="549.1" x2="277.1" y2="448.8" stroke="#7cc7ff" stroke-width="4" opacity="0.85"/>
+<text x="277.1" y="498.9" fill="#7cc7ff" font-family="monospace" font-size="12">portal</text>
+<line x1="277.1" y1="448.8" x2="277.1" y2="348.6" stroke="#7cc7ff" stroke-width="4" opacity="0.85"/>
+<text x="277.1" y="398.7" fill="#7cc7ff" font-family="monospace" font-size="12">portal</text>
+<line x1="176.8" y1="362.9" x2="205.5" y2="191.2" stroke="#f3bf4f" stroke-width="4" opacity="0.85"/>
+<text x="191.2" y="277.1" fill="#f3bf4f" font-family="monospace" font-size="12">ledge</text>
+<line x1="205.5" y1="191.2" x2="90.9" y2="176.8" stroke="#7cc7ff" stroke-width="4" opacity="0.85"/>
+<text x="148.2" y="184.0" fill="#7cc7ff" font-family="monospace" font-size="12">stair_step</text>
+<line x1="205.5" y1="191.2" x2="90.9" y2="176.8" stroke="#7cc7ff" stroke-width="4" opacity="0.85"/>
+<text x="148.2" y="184.0" fill="#7cc7ff" font-family="monospace" font-size="12">portal</text>
+<line x1="205.5" y1="191.2" x2="277.1" y2="98.1" stroke="#7cc7ff" stroke-width="4" opacity="0.85"/>
+<text x="241.3" y="144.6" fill="#7cc7ff" font-family="monospace" font-size="12">portal</text>
+<line x1="277.1" y1="348.6" x2="176.8" y2="362.9" stroke="#ff6a5e" stroke-width="4" opacity="0.85"/>
+<text x="226.9" y="355.8" fill="#ff6a5e" font-family="monospace" font-size="12">locked_gate</text>
+<rect x="219.8" y="506.1" width="114.5" height="85.9" fill="#2d333d" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="277.1" cy="549.1" r="5" fill="#f4e9cd"/>
+<text x="225.8" y="524.1" fill="#f4e9cd" font-family="monospace" font-size="13">Start Casemate</text>
+<rect x="219.8" y="391.6" width="114.5" height="114.5" fill="#2d333d" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="277.1" cy="448.8" r="5" fill="#f4e9cd"/>
+<text x="225.8" y="409.6" fill="#f4e9cd" font-family="monospace" font-size="13">Battery Court</text>
+<rect x="219.8" y="305.7" width="114.5" height="85.9" fill="#2d333d" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="277.1" cy="348.6" r="5" fill="#f4e9cd"/>
+<text x="225.8" y="323.7" fill="#f4e9cd" font-family="monospace" font-size="13">Locked Gate Face</text>
+<rect x="133.9" y="277.1" width="28.6" height="28.6" fill="#3f4f5f" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="176.8" cy="362.9" r="5" fill="#f4e9cd"/>
+<text x="139.9" y="295.1" fill="#f4e9cd" font-family="monospace" font-size="13">Side Key Trench</text>
+<rect x="133.9" y="148.2" width="143.2" height="128.8" fill="#2d333d" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="205.5" cy="191.2" r="5" fill="#f4e9cd"/>
+<text x="139.9" y="166.2" fill="#f4e9cd" font-family="monospace" font-size="13">Upper Loopback Overlook</text>
+<rect x="48.0" y="148.2" width="85.9" height="57.3" fill="#50375f" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="90.9" cy="176.8" r="5" fill="#f4e9cd"/>
+<text x="54.0" y="166.2" fill="#f4e9cd" font-family="monospace" font-size="13">Secret Ledge</text>
+<rect x="219.8" y="48.0" width="114.5" height="100.2" fill="#2d333d" stroke="#d7c7a7" stroke-width="2" opacity="0.88"/>
+<circle cx="277.1" cy="98.1" r="5" fill="#f4e9cd"/>
+<text x="225.8" y="66.0" fill="#f4e9cd" font-family="monospace" font-size="13">Final Gun Room</text>
+<text x="180.4" y="366.5" fill="#ffcb6b" font-family="monospace" font-size="14">side</text>
+<text x="94.5" y="180.4" fill="#ffcb6b" font-family="monospace" font-size="14">secret</text>
+</svg>

@@ -1,0 +1,226 @@
+{
+  "nodes": [
+    {
+      "id": "room_start",
+      "label": "Start Casemate",
+      "role": "start",
+      "center": [
+        4,
+        1,
+        3
+      ],
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          0
+        ],
+        "max": [
+          8,
+          0.5,
+          6
+        ]
+      }
+    },
+    {
+      "id": "room_battery",
+      "label": "Battery Court",
+      "role": "combat",
+      "center": [
+        4,
+        1,
+        10
+      ],
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          6
+        ],
+        "max": [
+          8,
+          0.5,
+          14
+        ]
+      }
+    },
+    {
+      "id": "room_gate",
+      "label": "Locked Gate Face",
+      "role": "gate",
+      "center": [
+        4,
+        1,
+        17
+      ],
+      "bounds": {
+        "min": [
+          0,
+          0.5,
+          14
+        ],
+        "max": [
+          8,
+          0.5,
+          20
+        ]
+      }
+    },
+    {
+      "id": "room_trench",
+      "label": "Side Key Trench",
+      "role": "side",
+      "center": [
+        -3,
+        1,
+        16
+      ],
+      "bounds": {
+        "min": [
+          -6,
+          1.5,
+          20
+        ],
+        "max": [
+          -4,
+          1.5,
+          22
+        ]
+      }
+    },
+    {
+      "id": "room_upper",
+      "label": "Upper Loopback Overlook",
+      "role": "overlook",
+      "center": [
+        -1,
+        4.5,
+        28
+      ],
+      "bounds": {
+        "min": [
+          -6,
+          2.5,
+          22
+        ],
+        "max": [
+          4,
+          4,
+          31
+        ]
+      }
+    },
+    {
+      "id": "room_secret",
+      "label": "Secret Ledge",
+      "role": "secret",
+      "center": [
+        -9,
+        4.5,
+        29
+      ],
+      "bounds": {
+        "min": [
+          -12,
+          4,
+          27
+        ],
+        "max": [
+          -6,
+          4,
+          31
+        ]
+      }
+    },
+    {
+      "id": "room_final",
+      "label": "Final Gun Room",
+      "role": "final",
+      "center": [
+        4,
+        4.5,
+        34.5
+      ],
+      "bounds": {
+        "min": [
+          0,
+          4,
+          31
+        ],
+        "max": [
+          8,
+          4,
+          38
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "room_start",
+      "to": "room_battery",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_battery",
+      "to": "room_gate",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_trench",
+      "to": "room_upper",
+      "kind": "ledge",
+      "routeRole": "side_or_secret_candidate"
+    },
+    {
+      "from": "room_upper",
+      "to": "room_secret",
+      "kind": "stair_step",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_upper",
+      "to": "room_secret",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_upper",
+      "to": "room_final",
+      "kind": "portal",
+      "routeRole": "route"
+    },
+    {
+      "from": "room_gate",
+      "to": "room_trench",
+      "kind": "locked_gate",
+      "routeRole": "blocked_goal"
+    }
+  ],
+  "loopbacks": [
+    {
+      "rooms": [
+        "room_start",
+        "room_battery",
+        "room_gate",
+        "room_trench",
+        "room_upper",
+        "room_secret",
+        "room_final"
+      ],
+      "kind": "cycle"
+    }
+  ],
+  "sidePathCandidates": [
+    {
+      "roomId": "room_trench",
+      "kind": "side"
+    },
+    {
+      "roomId": "room_secret",
+      "kind": "secret"
+    }
+  ]
+}

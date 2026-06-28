@@ -1,0 +1,39 @@
+{
+  "schema": "neutral_quake_geometry.v1",
+  "id": "mini_gate_loop",
+  "source": "synthetic Infinite Brutality test fixture",
+  "license": "repo-owned synthetic geometry; not copied from Quake map data",
+  "scale": {
+    "quakeUnitsPerIbUnit": 32
+  },
+  "brushes": [
+    { "id": "start_floor", "kind": "solid", "min": [0, 0, 0], "max": [256, 192, 16], "material": "stone", "tags": ["floor"] },
+    { "id": "battery_floor", "kind": "solid", "min": [0, 192, 0], "max": [256, 448, 16], "material": "stone", "tags": ["floor"] },
+    { "id": "gate_face_floor", "kind": "solid", "min": [0, 448, 0], "max": [256, 640, 16], "material": "stone", "tags": ["floor"] },
+    { "id": "locked_gate_bars", "kind": "solid", "min": [72, 628, 16], "max": [184, 644, 128], "material": "iron", "tags": ["locked_gate", "door", "bar"] },
+    { "id": "side_trench_floor", "kind": "solid", "min": [-192, 384, 0], "max": [0, 640, 16], "material": "stone", "tags": ["floor", "side"] },
+    { "id": "stair_01", "kind": "solid", "min": [-192, 640, 0], "max": [-128, 704, 48], "material": "stone", "tags": ["floor", "stair"] },
+    { "id": "stair_02", "kind": "solid", "min": [-176, 704, 0], "max": [-112, 768, 80], "material": "stone", "tags": ["floor", "stair"] },
+    { "id": "stair_03", "kind": "solid", "min": [-160, 768, 0], "max": [-96, 832, 112], "material": "stone", "tags": ["floor", "stair"] },
+    { "id": "upper_overlook_floor", "kind": "solid", "min": [-192, 832, 112], "max": [128, 992, 128], "material": "stone", "tags": ["floor", "overlook"] },
+    { "id": "secret_ledge_floor", "kind": "solid", "min": [-384, 864, 112], "max": [-192, 992, 128], "material": "stone", "tags": ["floor", "secret"] },
+    { "id": "final_gun_floor", "kind": "solid", "min": [0, 992, 112], "max": [256, 1216, 128], "material": "stone", "tags": ["floor", "final"] },
+    { "id": "start_back_wall", "kind": "solid", "min": [0, -16, 16], "max": [256, 0, 160], "material": "stone", "tags": ["wall"] },
+    { "id": "battery_left_wall", "kind": "solid", "min": [-16, 192, 16], "max": [0, 448, 160], "material": "stone", "tags": ["wall"] },
+    { "id": "gate_right_wall", "kind": "solid", "min": [256, 448, 16], "max": [272, 640, 160], "material": "stone", "tags": ["wall"] },
+    { "id": "final_exit_wall", "kind": "solid", "min": [0, 1216, 128], "max": [256, 1232, 256], "material": "stone", "tags": ["wall"] }
+  ],
+  "entities": [
+    { "id": "spawn", "classname": "info_player_start", "origin": [128, 64, 32] },
+    { "id": "room_start", "classname": "info_room", "label": "Start Casemate", "role": "start", "origin": [128, 96, 32] },
+    { "id": "room_battery", "classname": "info_room", "label": "Battery Court", "role": "combat", "origin": [128, 320, 32] },
+    { "id": "room_gate", "classname": "info_room", "label": "Locked Gate Face", "role": "gate", "origin": [128, 544, 32] },
+    { "id": "room_trench", "classname": "info_room", "label": "Side Key Trench", "role": "side", "origin": [-96, 512, 32], "tags": ["side"] },
+    { "id": "room_upper", "classname": "info_room", "label": "Upper Loopback Overlook", "role": "overlook", "origin": [-32, 896, 144] },
+    { "id": "room_secret", "classname": "info_room", "label": "Secret Ledge", "role": "secret", "origin": [-288, 928, 144], "tags": ["secret"] },
+    { "id": "room_final", "classname": "info_room", "label": "Final Gun Room", "role": "final", "origin": [128, 1104, 144] },
+    { "id": "gate_lock", "classname": "func_door", "origin": [128, 636, 72], "targetname": "locked_gate", "tags": ["locked_gate"] },
+    { "id": "secret_trigger", "classname": "trigger_secret", "origin": [-288, 928, 144], "tags": ["secret"] },
+    { "id": "exit", "classname": "info_player_exit", "origin": [128, 1184, 144] }
+  ]
+}

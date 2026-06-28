@@ -1,0 +1,15 @@
+{
+  "schema": "infinite_brutality.quake_geometry_ingest_report.v1",
+  "input": "tools/quake_geometry_ingest/fixtures/mini_gate_loop.neutral.json",
+  "outputDir": "generated/quake_geometry_ingest/mini_gate_loop",
+  "roomCount": 7,
+  "edgeCount": 7,
+  "walkableSurfaceCount": 9,
+  "stairCount": 2,
+  "ledgeCount": 4,
+  "gateCount": 1,
+  "loopbackCount": 1,
+  "sidePathCandidateCount": 2,
+  "solidVoxelCount": 548,
+  "copyrightBoundary": "route_structure_analysis_only_rebuilt_as_infinite_brutality_voxels"
+}

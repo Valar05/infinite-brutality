@@ -35,6 +35,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 ## Level Generation
 
 - `LEVEL_GENERATION_CONTRACT.md`: current route-grammar rules for Quake-style level generation without copied Quake layouts.
+- `tools/quake_geometry_ingest/`: neutral geometry ingestion experiment that extracts Quake-style spatial structure into Infinite Brutality-owned room graphs, voxels, and debug outputs.
 - `docs/QUAKE_M1E1_FORTRESS_SLICE.md`: default first playable fortress-rock slice, with the old generated gauntlet preserved by `?slice=generated`.
 - `data/level_route_templates.json`: generator-facing route template contract.
 - `data/room_junction_batch.json`: overnight batch list of room prompts by connector topology.
