@@ -37,9 +37,10 @@ Current runtime use:
 
 - `src/main.js`: `generateDistrictPlan(...)` creates three terraced district
   mass anchors with `rockGrammar: 'sedimentary_mesa'`.
-- `src/district-geometry.js`: `addDistrictIslandMasses(...)` calls
-  `buildRoomIslandField(..., { grammar: anchor.rockGrammar || 'sedimentary_mesa',
-  terraced: true, role: anchor.role || 'arena' })` for terraced anchors.
+- `src/district-geometry.js`: `addDistrictIslandMasses(...)` submits each
+  anchor to `TerrainLayer.addIslandStamp(...)`. The layer builds the
+  `buildRoomIslandField(..., { grammar: spec.rockGrammar || 'sedimentary_mesa',
+  terraced: true, role: spec.role || 'arena' })` field for terraced anchors.
 
 ### Sedimentary Mesa Bridge Fields
 
@@ -65,9 +66,11 @@ Current runtime use:
   `ISLAND_ART_ONLY` is active.
 - `addIslandArtSteppedRamp(...)` splits a connector into several bent segments,
   and each segment calls `addIslandArtBridge(...)`.
-- `addIslandArtBridge(...)` defaults to `buildSedimentaryMesaBridgeField(...)`
-  unless explicitly passed `slabBridge: false`.
-- `addDistrictIslandBridges(...)` also uses the sedimentary bridge field for
+- `addIslandArtBridge(...)` submits a connector stamp to
+  `TerrainLayer.addBridgeSpan(...)`. The layer defaults to
+  `buildSedimentaryMesaBridgeField(...)` unless explicitly passed
+  `slabBridge: false`.
+- `addDistrictIslandBridges(...)` submits bridge stamps to the same layer for
   visible bridges between district mass anchors.
 
 ### Budgeted Sedimentary Visual Shell
@@ -113,28 +116,61 @@ Current validation:
   current branch. It rejects giant axis-aligned sheets and box-bounded
   silhouettes.
 
+### Terrain Layer Ownership
+
+Primary functions:
+
+- `src/terrain-layer.js`: `createTerrainLayer(...)`
+- `src/terrain-layer.js`: `addIslandStamp(...)`
+- `src/terrain-layer.js`: `addBridgeSpan(...)`
+- `src/terrain-layer.js`: `supportAt(...)`
+- `src/terrain-layer.js`: `intersectsBody(...)`
+
+Runtime terrain is owned by one `TerrainLayer` per built room. `src/main.js`
+creates the layer before district geometry emits terrain, attaches
+`layer.group` to `roomGroup`, and disposes the layer before rebuilding the
+room. District geometry no longer constructs terrain meshes or registers
+terrain colliders directly; it submits island and bridge stamps to the layer.
+
+The layer keeps the current split explicit:
+
+- Terrain intent lives in district/main stamp calls.
+- Voxel fields live in the layer as support/collision data.
+- Visible terrain meshes live in the layer group.
+- Player and enemy support/body queries ask the layer first.
+- Layer disposal clears generated terrain meshes and collider records together.
+
+This is the first architectural boundary for moving toward a Driftfield-style
+terrain pipeline: current terrain pieces have one room-level owner and a single
+query surface instead of scattered per-island mesh/collider registration.
+
 ### Voxel Support And Collision Queries
 
 Primary functions:
 
 - `src/island-geometry.js`: `queryVoxelTopY(...)`
 - `src/island-geometry.js`: `queryVoxelIntersectsPrism(...)`
+- `src/terrain-layer.js`: `supportAt(...)`
+- `src/terrain-layer.js`: `intersectsBody(...)`
 - `src/main.js`: `registerVoxelSupportCollider(...)`
 - `src/main.js`: `findVoxelSupport(...)`
 - `src/main.js`: `voxelBodyBlockedAt(...)`
 
-Visible sedimentary meshes are paired with voxel support colliders. Player and
-enemy support queries use the same field as the rendered island or bridge,
-which keeps visual terrain and traversal truth aligned.
+Visible sedimentary meshes are paired with voxel fields owned by
+`TerrainLayer`. Player and enemy support queries use the same field as the
+rendered island or bridge, which keeps visual terrain and traversal truth
+aligned. The older `registerVoxelSupportCollider(...)` path remains for legacy
+surfaces that have not moved into the layer.
 
 Current runtime use:
 
-- `addIslandArtBridge(...)` registers both mesh support and voxel support for
-  each generated bridge segment.
-- `addDistrictIslandMasses(...)` registers mesh and voxel support for each
-  generated district island mass.
+- `addIslandArtBridge(...)` and `addDistrictIslandMasses(...)` submit terrain
+  stamps to `TerrainLayer`, which stores the voxel support collider internally.
+- `resolveSupportHeight(...)`, `findEnemySupport(...)`, `playerBlockedInBand(...)`,
+  and `enemyBodyBlockedAt(...)` query `TerrainLayer` before legacy voxel/mesh
+  support arrays.
 - `findVoxelSupport(...)` and `voxelBodyBlockedAt(...)` participate in enemy
-  and player support/blocking checks.
+  and player support/blocking checks for legacy callers.
 
 ## Historical Or Legacy Techniques Still In Code
 

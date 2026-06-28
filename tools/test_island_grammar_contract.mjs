@@ -4,6 +4,7 @@ import { buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData, buildSur
 
 const districtGeometry = fs.readFileSync(new URL('../src/district-geometry.js', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const terrainLayer = fs.readFileSync(new URL('../src/terrain-layer.js', import.meta.url), 'utf8');
 
 assert.ok(
   districtGeometry.includes('function addDistrictRouteIslands(district, contract) {\n    return;'),
@@ -27,7 +28,7 @@ assert.ok(
 );
 
 assert.ok(
-  districtGeometry.includes("grammar: anchor.rockGrammar || 'sedimentary_mesa'"),
+  districtGeometry.includes("rockGrammar: anchor.rockGrammar || 'sedimentary_mesa'"),
   'active terraced district mass anchors must use the sedimentary mesa rock grammar',
 );
 assert.ok(
@@ -40,28 +41,28 @@ assert.ok(
 );
 
 assert.ok(
-  districtGeometry.includes("const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';"),
+  terrainLayer.includes("const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';"),
   'sedimentary mesa islands must use a dedicated visible mesh/material path',
 );
 assert.ok(
-  districtGeometry.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
+  terrainLayer.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
   'sedimentary mesa visible mesh must use the dedicated manifold sedimentary mesh and material',
 );
 assert.ok(
-  districtGeometry.includes('MAT.sedimentaryRock : MAT.sedimentaryRockDark'),
+  terrainLayer.includes('MAT.sedimentaryRock : MAT.sedimentaryRockDark'),
   'sedimentary mesa islands must use dedicated sedimentary terrain materials, not vector-stone architecture materials',
 );
 
 assert.ok(
-  main.includes('buildSedimentaryMesaBridgeField(length, width, thickness, bridgeSeed)'),
+  terrainLayer.includes('buildSedimentaryMesaBridgeField(spec.length, spec.width, thickness, seed)'),
   'active island art bridges must use contiguous sedimentary slab bridge fields',
 );
 assert.ok(
-  main.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
+  terrainLayer.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
   'active island art bridges must use the dedicated manifold sedimentary mesh and material',
 );
 assert.ok(
-  main.includes('material: options.material || MAT.sedimentaryRockDark'),
+  terrainLayer.includes('spec.material || (spec.slabBridge === false ? MAT.islandRockDark : MAT.sedimentaryRockDark)'),
   'active stepped ramps must default to dedicated sedimentary material, not vector stone or pebble rock',
 );
 

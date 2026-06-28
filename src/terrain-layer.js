@@ -1,0 +1,212 @@
+import * as THREE from 'three';
+import {
+  buildIslandVoxelField,
+  buildRoomIslandField,
+  buildRockBridgeField,
+  buildRockBridgeMeshData,
+  buildSedimentaryMesaBridgeField,
+  buildSedimentaryMesaMeshData,
+  buildSurfaceNetMeshData,
+  queryVoxelIntersectsPrism,
+  queryVoxelTopY,
+} from './island-geometry.js?v=0.8.175';
+
+function buildRuntimeMesh(meshData, material) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+  geometry.setIndex(meshData.indices);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return new THREE.Mesh(geometry, material);
+}
+
+function toOrientedLocal(x, z, centerX, centerZ, yaw = 0) {
+  const dx = x - centerX;
+  const dz = z - centerZ;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return { x: dx * c - dz * s, z: dx * s + dz * c };
+}
+
+function disposeObjectTree(root) {
+  root.traverse((object) => {
+    if (object.geometry?.dispose) object.geometry.dispose();
+    if (object.userData?.disposeMaterial && object.material?.dispose) object.material.dispose();
+  });
+}
+
+export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
+  const group = new THREE.Group();
+  group.name = 'terrain-layer';
+  group.userData.owner = 'TerrainLayer';
+  group.userData.debugMode = debugMode;
+  const colliders = [];
+  const visualMeshes = [];
+  const terrainSpecs = [];
+
+  const addCollider = (field, origin, yaw, source, kind) => {
+    const collider = {
+      field,
+      centerX: origin[0],
+      centerY: origin[1],
+      centerZ: origin[2],
+      yaw: Number.isFinite(yaw) ? yaw : 0,
+      minX: origin[0] + field.min.x,
+      maxX: origin[0] + field.max.x,
+      minY: origin[1] + field.min.y,
+      maxY: origin[1] + field.max.y,
+      minZ: origin[2] + field.min.z,
+      maxZ: origin[2] + field.max.z,
+      source,
+      kind,
+    };
+    colliders.push(collider);
+    return collider;
+  };
+
+  const addFieldMesh = ({ field, meshData, origin, yaw = 0, material, source, kind }) => {
+    const holder = new THREE.Group();
+    holder.name = source;
+    holder.position.set(origin[0], origin[1], origin[2]);
+    holder.rotation.y = yaw;
+    group.add(holder);
+    const mesh = buildRuntimeMesh(meshData, material);
+    mesh.userData.terrainLayerSource = source;
+    holder.add(mesh);
+    visualMeshes.push(mesh);
+    addCollider(field, origin, yaw, source, kind);
+    return holder;
+  };
+
+  const addIslandStamp = (spec) => {
+    terrainSpecs.push({ type: 'islandStamp', ...spec });
+    const seed = spec.seed ?? hashRoomKey('terrain-layer-island:' + spec.id);
+    const field = spec.terraced
+      ? buildRoomIslandField(spec.size, seed, {
+        grammar: spec.rockGrammar || 'sedimentary_mesa',
+        terraced: true,
+        role: spec.role || 'arena',
+      })
+      : buildIslandVoxelField({
+        id: spec.id,
+        role: spec.role,
+        pos: spec.origin,
+        size: spec.size,
+        yaw: spec.yaw || 0,
+      }, seed);
+    const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';
+    const meshData = isSedimentaryMesa
+      ? buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)
+      : buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
+    const material = spec.material || (isSedimentaryMesa
+      ? (spec.materialVariant % 2 === 0 ? MAT.sedimentaryRock : MAT.sedimentaryRockDark)
+      : (spec.materialVariant % 2 === 0 ? MAT.islandRock : MAT.islandRockDark));
+    return addFieldMesh({
+      field,
+      meshData,
+      origin: spec.origin,
+      yaw: spec.yaw || 0,
+      material,
+      source: spec.source || 'terrain-island:' + spec.id,
+      kind: 'island',
+    });
+  };
+
+  const addBridgeSpan = (spec) => {
+    if (!Number.isFinite(spec.length) || spec.length < 0.4) return null;
+    terrainSpecs.push({ type: 'connectorStamp', ...spec });
+    const seed = spec.seed ?? hashRoomKey('terrain-layer-bridge:' + spec.id + ':' + Math.round(spec.length * 10));
+    const thickness = spec.thickness || 1.45;
+    const field = spec.slabBridge === false
+      ? buildRockBridgeField(spec.length, spec.width, thickness, seed)
+      : buildSedimentaryMesaBridgeField(spec.length, spec.width, thickness, seed);
+    const meshData = spec.slabBridge === false
+      ? buildRockBridgeMeshData(spec.length, spec.width, thickness, seed, MAT.islandRock?.userData?.uvScale ?? 0.12)
+      : buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);
+    const material = spec.material || (spec.slabBridge === false ? MAT.islandRockDark : MAT.sedimentaryRockDark);
+    return addFieldMesh({
+      field,
+      meshData,
+      origin: spec.origin,
+      yaw: spec.yaw || 0,
+      material,
+      source: spec.source || 'terrain-bridge:' + spec.id,
+      kind: 'bridge',
+    });
+  };
+
+  const supportAt = (x, z, feetY, options = {}) => {
+    const radius = options.radius ?? 0.38;
+    const stepUp = options.stepUp ?? 0.92;
+    const stepDown = options.stepDown ?? 1.65;
+    const velocityY = options.velocityY ?? 0;
+    const prevFeetY = Number.isFinite(options.prevFeetY) ? options.prevFeetY : feetY;
+    const sweepDrop = Math.max(0, prevFeetY - feetY);
+    const effectiveStepDown = Math.max(stepDown, sweepDrop + 0.2);
+    let best = null;
+    for (const collider of colliders) {
+      if (feetY > collider.maxY + stepUp || feetY < collider.minY - effectiveStepDown) continue;
+      if (x < collider.minX - radius || x > collider.maxX + radius) continue;
+      if (z < collider.minZ - radius || z > collider.maxZ + radius) continue;
+      const local = toOrientedLocal(x, z, collider.centerX, collider.centerZ, collider.yaw || 0);
+      const topLocalY = queryVoxelTopY(collider.field, local.x, local.z, radius);
+      if (topLocalY == null) continue;
+      const topY = collider.centerY + topLocalY;
+      if (velocityY > 0.5 && feetY < topY - 0.14) continue;
+      if (feetY > topY + stepUp) continue;
+      if (feetY < topY - effectiveStepDown) continue;
+      if (!best || topY > best.topY) best = { topY, collider, source: collider.source };
+    }
+    return best;
+  };
+
+  const intersectsBody = (x, z, minY, maxY, radius = 0.38) => {
+    for (const collider of colliders) {
+      if (maxY < collider.minY || minY > collider.maxY) continue;
+      if (x < collider.minX - radius || x > collider.maxX + radius) continue;
+      if (z < collider.minZ - radius || z > collider.maxZ + radius) continue;
+      const local = toOrientedLocal(x, z, collider.centerX, collider.centerZ, collider.yaw || 0);
+      if (queryVoxelIntersectsPrism(collider.field, local.x, local.z, minY - collider.centerY, maxY - collider.centerY, radius)) return true;
+    }
+    return false;
+  };
+
+  const colliderBySource = (source) => colliders.find((collider) => collider.source === source) || null;
+
+  const localToWorld = (collider, localX, localY, localZ) => {
+    if (!colliders.includes(collider)) return null;
+    const yaw = collider.yaw || 0;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    return new THREE.Vector3(
+      collider.centerX + localX * c + localZ * s,
+      collider.centerY + localY,
+      collider.centerZ - localX * s + localZ * c,
+    );
+  };
+
+  const dispose = () => {
+    group.parent?.remove(group);
+    disposeObjectTree(group);
+    group.clear();
+    colliders.length = 0;
+    visualMeshes.length = 0;
+    terrainSpecs.length = 0;
+  };
+
+  return {
+    group,
+    colliders,
+    visualMeshes,
+    terrainSpecs,
+    addIslandStamp,
+    addBridgeSpan,
+    supportAt,
+    intersectsBody,
+    colliderBySource,
+    localToWorld,
+    dispose,
+  };
+}

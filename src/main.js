@@ -7,7 +7,8 @@ import { createMaterialResources } from './materials.js?v=0.8.175';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js';
 import { createNookTtsApi } from './nook-tts.js';
-import { buildRockBridgeField, buildRockBridgeMeshData, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData, queryVoxelTopY, queryVoxelIntersectsPrism } from './island-geometry.js?v=0.8.175';
+import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.175';
+import { createTerrainLayer } from './terrain-layer.js?v=0.8.175';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
@@ -254,6 +255,7 @@ const roomState = {
   gauntletRooms: [],
   navGraph: null,
   connectivityRepair: null,
+  terrainLayer: null,
 };
 
 const SHOW_NAV_LINKS = bootParams.get('links') === '1';
@@ -1105,31 +1107,22 @@ function addIslandArtBridge(name, from, to, width = 4.4, options = {}) {
   if (length < 0.4) return null;
   const center = makeVec((from.x + to.x) * 0.5, (from.y + to.y) * 0.5, (from.z + to.z) * 0.5);
   const yaw = Math.atan2(dx, dz);
-  const group = new THREE.Group();
-  group.name = name;
-  group.position.copy(center);
-  group.rotation.y = yaw;
-  roomGroup.add(group);
+  const terrain = roomState.terrainLayer;
+  if (!terrain) throw new Error('TerrainLayer is required before island-art connectors can be emitted');
   const thickness = options.thickness || 1.45;
   const bridgeSeed = hashRoomKey(name + ':' + Math.round(length * 10));
-  const field = options.slabBridge === false
-    ? buildRockBridgeField(length, width, thickness, bridgeSeed)
-    : buildSedimentaryMesaBridgeField(length, width, thickness, bridgeSeed);
-  const meshData = options.slabBridge === false
-    ? buildRockBridgeMeshData(length, width, thickness, bridgeSeed, MAT.islandRock?.userData?.uvScale ?? 0.12)
-    : buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
-  geometry.setIndex(meshData.indices);
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geometry, options.material || (options.slabBridge === false ? MAT.islandRockDark : MAT.sedimentaryRockDark));
-  group.add(mesh);
-  registerMeshSupportCollider(group, { source: options.source || name });
-  registerVoxelSupportCollider(field, { origin: [center.x, center.y, center.z], yaw, source: (options.source || name) + ':voxel' });
-  return group;
+  return terrain.addBridgeSpan({
+    id: name,
+    length,
+    width,
+    thickness,
+    origin: [center.x, center.y, center.z],
+    yaw,
+    slabBridge: options.slabBridge,
+    material: options.material,
+    seed: bridgeSeed,
+    source: (options.source || name) + ':voxel',
+  });
 }
 
 function addIslandArtSteppedRamp(name, from, to, options = {}) {
@@ -1316,6 +1309,24 @@ function addWalkableBox(parent, name, size, pos, mat, cast = true, margin = 0.12
 
 function clearGroup(group) {
   while (group.children.length) group.remove(group.children[0]);
+}
+
+function disposeActiveTerrainLayer() {
+  if (!roomState.terrainLayer) return;
+  roomState.terrainLayer.dispose();
+  roomState.terrainLayer = null;
+}
+
+function createActiveTerrainLayer() {
+  disposeActiveTerrainLayer();
+  const layer = createTerrainLayer({
+    MAT,
+    hashRoomKey,
+    debugMode: URL_PARAMS.get('terrain') || 'visual',
+  });
+  roomState.terrainLayer = layer;
+  roomGroup.add(layer.group);
+  return layer;
 }
 
 function resetWalkableBounds() {
@@ -3709,6 +3720,7 @@ function playerBlockedInBand(x, z, minY, maxY, radius) {
     if (!horizontalContainsShape(solid, x, z, radius)) continue;
     return true;
   }
+  if (roomState.terrainLayer?.intersectsBody(x, z, minY, maxY, radius)) return true;
   return voxelBodyBlockedAt(x, z, minY, maxY, radius);
 }
 
@@ -3770,10 +3782,12 @@ function findClearPlayerAnchor(point, lookTarget = null) {
 
 function findRoomIslandVoxelCollider(districtId, localIndex) {
   const source = 'district-room-island-voxel:' + districtId + ':' + localIndex;
-  return voxelSupportColliders.find((collider) => collider.source === source) || null;
+  return roomState.terrainLayer?.colliderBySource(source) || voxelSupportColliders.find((collider) => collider.source === source) || null;
 }
 
 function voxelLocalToWorld(collider, localX, localY, localZ) {
+  const terrainWorld = roomState.terrainLayer?.localToWorld?.(collider, localX, localY, localZ);
+  if (terrainWorld) return terrainWorld;
   const yaw = collider.yaw || 0;
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
@@ -4348,10 +4362,7 @@ const districtGeometry = createDistrictGeometryApi({
   addBrakeLeverStand,
   addScreenWallSegment,
   addBeveledBox,
-  registerWalkable,
-  registerSolid,
-  registerMeshSupportCollider,
-  registerVoxelSupportCollider,
+  activeTerrainLayer: () => roomState.terrainLayer,
 });
 
 function validateAndRepairGauntletConnectivity(rooms, branchLinks) {
@@ -4471,6 +4482,7 @@ function buildGeneratedGauntlet(startIndex = 0) {
       },
     });
   }
+  createActiveTerrainLayer();
   for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
   for (const room of rawRooms) {
     const offset = room.offset;
@@ -4596,6 +4608,7 @@ function buildRoom(movePlayer = true) {
   ensureNookTtsLevelState();
   stopNookTtsPlayback();
   const rootGroup = roomGroup;
+  disposeActiveTerrainLayer();
   clearGroup(rootGroup);
   resetWalkableBounds();
   roomState.transitionLock = 0.7;
@@ -6213,6 +6226,14 @@ function resolveSupportHeight(x, z, feetY, velocityY, prevFeetY = feetY) {
     if (feetY < surface.topY - SUPPORT_SNAP_DOWN) continue;
     if (!best || surface.topY > best.topY) best = surface;
   }
+  const terrainSupport = roomState.terrainLayer?.supportAt(x, z, feetY, {
+    radius: PLAYER_SOLID_RADIUS,
+    stepUp: SUPPORT_SNAP_UP,
+    stepDown: SUPPORT_SNAP_DOWN,
+    velocityY,
+    prevFeetY,
+  });
+  if (terrainSupport && (!best || terrainSupport.topY > best.topY)) best = terrainSupport;
   const voxelSupport = resolveVoxelSupportHeight(x, z, feetY, velocityY, SUPPORT_SNAP_UP, SUPPORT_SNAP_DOWN, prevFeetY);
   if (voxelSupport && (!best || voxelSupport.topY > best.topY)) best = voxelSupport;
   const meshSupport = resolveMeshSupportHeight(x, z, feetY, velocityY, SUPPORT_SNAP_UP, SUPPORT_SNAP_DOWN, prevFeetY);
@@ -6255,6 +6276,14 @@ function findEnemySupport(x, z, referenceY, stepUp = ENEMY_STEP_UP, stepDown = E
     if (deltaY > stepUp || deltaY < -stepDown) continue;
     if (!best || surface.topY > best.topY) best = surface;
   }
+  const terrainSupport = roomState.terrainLayer?.supportAt(x, z, referenceY, {
+    radius: ENEMY_FLOOR_RADIUS,
+    stepUp,
+    stepDown,
+    velocityY: 0,
+    prevFeetY: referenceY,
+  });
+  if (terrainSupport && (!best || terrainSupport.topY > best.topY)) best = terrainSupport;
   const voxelSupport = resolveVoxelSupportHeight(x, z, referenceY, 0, stepUp, stepDown);
   if (voxelSupport && (!best || voxelSupport.topY > best.topY)) best = voxelSupport;
   const meshSupport = resolveMeshSupportHeight(x, z, referenceY, 0, stepUp, stepDown);
@@ -6329,6 +6358,7 @@ function enemyBodyBlockedAt(x, z, floorY) {
     if (!horizontalContainsShape(solid, x, z, -ENEMY_SOLID_RADIUS)) continue;
     return true;
   }
+  if (roomState.terrainLayer?.intersectsBody(x, z, minY, maxY, ENEMY_SOLID_RADIUS)) return true;
   if (voxelBodyBlockedAt(x, z, minY, maxY, ENEMY_SOLID_RADIUS)) return true;
   return false;
 }

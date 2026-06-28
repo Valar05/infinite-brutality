@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildIslandBridgeSpec, buildIslandVoxelField, buildSurfaceNetMeshData, buildSedimentaryMesaMeshData, buildRoomIslandField, buildRoomIslandMeshData, buildSedimentaryMesaBridgeField } from './island-geometry.js?v=0.8.175';
+import { buildIslandBridgeSpec } from './island-geometry.js?v=0.8.175';
 
 export function createDistrictGeometryApi(deps) {
   const {
@@ -44,8 +44,7 @@ export function createDistrictGeometryApi(deps) {
     addBrakeLeverStand,
     addScreenWallSegment,
     addBeveledBox,
-    registerMeshSupportCollider,
-    registerVoxelSupportCollider,
+    activeTerrainLayer,
   } = deps;
 
   function addDistrictCrystalGrowths(district) {
@@ -154,27 +153,6 @@ export function createDistrictGeometryApi(deps) {
 
   function addDistrictRouteIslands(district, contract) {
     return;
-    const offsets = district?.roomOffsets || [];
-    const roles = district?.segmentRoles || [];
-    for (let i = 0; i < offsets.length; i += 1) {
-      const point = offsets[i];
-      if (!point) continue;
-      const role = roles[i] || 'route';
-      const size = routeIslandSizeForRole(role);
-      const worldPos = [district.origin.x + point[0], district.origin.y + (point[2] || 0), district.origin.z + point[1]];
-      const field = buildRoomIslandField(size, hashRoomKey('district-room-island:' + district.id + ':' + i + ':' + role));
-      const meshData = buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
-      const group = new THREE.Group();
-      group.name = 'district-' + district.id + '-room-island-' + i;
-      group.position.set(worldPos[0], worldPos[1], worldPos[2]);
-      roomGroup.add(group);
-      const mesh = buildRuntimeIslandMesh(meshData, i % 2 === 0 ? MAT.islandRock : MAT.islandRockDark);
-      group.add(mesh);
-      registerMeshSupportCollider(group, { source: 'district-room-island-mesh:' + district.id + ':' + i });
-      registerVoxelSupportCollider(field, { origin: worldPos, source: 'district-room-island-voxel:' + district.id + ':' + i });
-      contract.visibleIslandCount += 1;
-      contract.islandMeshCount += 1;
-    }
   }
 
   function addDistrictIslandMasses(district, contract) {
@@ -182,26 +160,20 @@ export function createDistrictGeometryApi(deps) {
     if (!anchors.length) return;
     for (let i = 0; i < anchors.length; i += 1) {
       const anchor = anchors[i];
-      const group = new THREE.Group();
-      group.name = 'district-' + district.id + '-island-' + anchor.id;
-      group.position.set(anchor.pos[0], anchor.pos[1], anchor.pos[2]);
-      group.rotation.y = anchor.yaw || 0;
-      roomGroup.add(group);
-      const field = anchor.terraced
-        ? buildRoomIslandField(anchor.size, hashRoomKey('district-terraced-island:' + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)), {
-          grammar: anchor.rockGrammar || 'sedimentary_mesa',
-          terraced: true,
-          role: anchor.role || 'arena',
-        })
-        : buildIslandVoxelField(anchor, hashRoomKey('district-island:' + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)));
-      const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';
-      const meshData = isSedimentaryMesa
-        ? buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)
-        : buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
-      const mesh = buildRuntimeIslandMesh(meshData, isSedimentaryMesa ? (i % 2 === 0 ? MAT.sedimentaryRock : MAT.sedimentaryRockDark) : (i % 2 === 0 ? MAT.islandRock : MAT.islandRockDark));
-      group.add(mesh);
-      registerMeshSupportCollider(group, { source: 'district-island-mesh:' + anchor.id });
-      registerVoxelSupportCollider(field, { origin: anchor.pos, yaw: anchor.yaw || 0, source: 'district-island-voxel:' + anchor.id });
+      const terrain = activeTerrainLayer?.();
+      if (!terrain) throw new Error('TerrainLayer is required before district island terrain can be emitted');
+      terrain.addIslandStamp({
+        id: anchor.id,
+        role: anchor.role || 'arena',
+        origin: anchor.pos,
+        size: anchor.size,
+        yaw: anchor.yaw || 0,
+        terraced: !!anchor.terraced,
+        rockGrammar: anchor.rockGrammar || 'sedimentary_mesa',
+        seed: hashRoomKey((anchor.terraced ? 'district-terraced-island:' : 'district-island:') + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)),
+        materialVariant: i,
+        source: 'district-island-voxel:' + anchor.id,
+      });
       contract.visibleIslandCount += 1;
       contract.islandMeshCount += 1;
     }
@@ -213,17 +185,18 @@ export function createDistrictGeometryApi(deps) {
     for (let i = 0; i < anchors.length - 1; i += 1) {
       const spec = buildIslandBridgeSpec(anchors[i], anchors[i + 1]);
       if (!spec.visible) continue;
-      const group = new THREE.Group();
-      group.name = 'district-' + district.id + '-island-bridge-' + i;
-      group.position.set(spec.center.x, spec.center.y, spec.center.z);
-      group.rotation.y = spec.yaw;
-      roomGroup.add(group);
-      const field = buildSedimentaryMesaBridgeField(spec.horizontalLength, spec.deckSize[0], 1.6, hashRoomKey('district-island-bridge:' + district.id + ':' + i));
-      const meshData = buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);
-      const mesh = buildRuntimeIslandMesh(meshData, MAT.sedimentaryRockDark);
-      group.add(mesh);
-      registerMeshSupportCollider(group, { source: 'district-island-bridge-mesh:' + district.id + ':' + i });
-      registerVoxelSupportCollider(field, { origin: [spec.center.x, spec.center.y, spec.center.z], yaw: spec.yaw, source: 'district-island-bridge-voxel:' + district.id + ':' + i });
+      const terrain = activeTerrainLayer?.();
+      if (!terrain) throw new Error('TerrainLayer is required before district bridge terrain can be emitted');
+      terrain.addBridgeSpan({
+        id: district.id + '-island-bridge-' + i,
+        length: spec.horizontalLength,
+        width: spec.deckSize[0],
+        thickness: 1.6,
+        origin: [spec.center.x, spec.center.y, spec.center.z],
+        yaw: spec.yaw,
+        seed: hashRoomKey('district-island-bridge:' + district.id + ':' + i),
+        source: 'district-island-bridge-voxel:' + district.id + ':' + i,
+      });
       contract.visibleBridgeCount += 1;
       contract.bridgeMeshCount += 1;
     }
