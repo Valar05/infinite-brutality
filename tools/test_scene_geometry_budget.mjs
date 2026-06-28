@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildRoomIslandField, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData } from '../src/island-geometry.js';
+import { buildExposedVoxelFaceMeshData, buildRoomIslandField, buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData } from '../src/island-geometry.js';
 
 // This test intentionally measures only procedural slice geometry. It excludes
 // imported actors, sky, HUD, and textures so lag from the procedural generator
@@ -28,6 +28,9 @@ const MOBILE_PROCEDURAL_BUDGET = {
   totalUniqueEdges: 18000,
   maxIslandTriangles: 4000,
   maxRampTriangles: 900,
+  maxTotalExposedFaceRatio: 0.38,
+  maxIslandExposedFaceRatio: 0.36,
+  maxRampExposedFaceRatio: 0.36,
 };
 
 function uniqueEdgeCount(mesh) {
@@ -69,12 +72,15 @@ const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => {
     role: 'arena',
   });
   const mesh = buildSedimentaryMesaMeshData(field, 0.072);
+  const exposedMesh = buildExposedVoxelFaceMeshData(field, 0.072);
   return {
     kind: 'island',
     label: entry.label,
     cell: Number(field.cell.toFixed(3)),
     dims: [field.nx, field.ny, field.nz],
     triangles: mesh.triangleCount,
+    exposedFaceTriangles: exposedMesh.triangleCount,
+    exposedFaceRatio: Number((mesh.triangleCount / Math.max(1, exposedMesh.triangleCount)).toFixed(3)),
     emittedVertices: mesh.positions.length / 3,
     uniqueEdges: uniqueEdgeCount(mesh),
   };
@@ -82,12 +88,15 @@ const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => {
 const rampStats = CURRENT_SLICE_RAMP_SEGMENTS.map((entry) => {
   const field = buildSedimentaryMesaBridgeField(entry.length, entry.width, entry.thickness, entry.seed);
   const mesh = buildSedimentaryMesaMeshData(field, 0.072);
+  const exposedMesh = buildExposedVoxelFaceMeshData(field, 0.072);
   return {
     kind: 'ramp',
     label: entry.label,
     cell: Number(field.cell.toFixed(3)),
     dims: [field.nx, field.ny, field.nz],
     triangles: mesh.triangleCount,
+    exposedFaceTriangles: exposedMesh.triangleCount,
+    exposedFaceRatio: Number((mesh.triangleCount / Math.max(1, exposedMesh.triangleCount)).toFixed(3)),
     emittedVertices: mesh.positions.length / 3,
     uniqueEdges: uniqueEdgeCount(mesh),
   };
@@ -98,6 +107,8 @@ const total = allStats.reduce((sum, stats) => ({
   emittedVertices: sum.emittedVertices + stats.emittedVertices,
   uniqueEdges: sum.uniqueEdges + stats.uniqueEdges,
 }), { triangles: 0, emittedVertices: 0, uniqueEdges: 0 });
+total.exposedFaceTriangles = allStats.reduce((sum, stats) => sum + stats.exposedFaceTriangles, 0);
+total.exposedFaceRatio = Number((total.triangles / Math.max(1, total.exposedFaceTriangles)).toFixed(3));
 
 const report = {
   summary: 'Procedural slice geometry budget',
@@ -116,14 +127,23 @@ if (total.emittedVertices > MOBILE_PROCEDURAL_BUDGET.totalEmittedVertices) {
 if (total.uniqueEdges > MOBILE_PROCEDURAL_BUDGET.totalUniqueEdges) {
   failures.push(`unique edges ${total.uniqueEdges} > ${MOBILE_PROCEDURAL_BUDGET.totalUniqueEdges}`);
 }
+if (total.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxTotalExposedFaceRatio) {
+  failures.push(`active sedimentary LOD ratio ${total.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxTotalExposedFaceRatio}; visible terrain regressed toward exposed voxel faces`);
+}
 for (const stats of islandStats) {
   if (stats.triangles > MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles) {
     failures.push(`${stats.label} island triangles ${stats.triangles} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles}`);
+  }
+  if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxIslandExposedFaceRatio) {
+    failures.push(`${stats.label} island LOD ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandExposedFaceRatio}`);
   }
 }
 for (const stats of rampStats) {
   if (stats.triangles > MOBILE_PROCEDURAL_BUDGET.maxRampTriangles) {
     failures.push(`${stats.label} triangles ${stats.triangles} > ${MOBILE_PROCEDURAL_BUDGET.maxRampTriangles}`);
+  }
+  if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxRampExposedFaceRatio) {
+    failures.push(`${stats.label} LOD ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxRampExposedFaceRatio}`);
   }
 }
 

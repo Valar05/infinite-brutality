@@ -70,29 +70,31 @@ Current runtime use:
 - `addDistrictIslandBridges(...)` also uses the sedimentary bridge field for
   visible bridges between district mass anchors.
 
-### Exposed-Voxel Sedimentary Meshes With Visual Weathering
+### Budgeted Merged-Face Sedimentary Meshes
 
 Primary functions:
 
 - `src/island-geometry.js`: `buildSedimentaryMesaMeshData(field, uvScale)`
-- `src/island-geometry.js`: `buildExposedVoxelFaceMeshData(...)`
-- `src/island-geometry.js`: `weatherSedimentaryVertex(...)`
-- `src/island-geometry.js`: `emitWeatheredQuad(...)`
+- `src/island-geometry.js`: `buildGreedyVoxelMeshData(field, uvScale, vertexTransform)`
+- `src/island-geometry.js`: `weatherSedimentaryLodVertex(...)`
 
-This is the current accepted mesh output for sedimentary terrain. It emits
-literal exposed voxel faces from the same field used for collision and support,
-then applies deterministic per-vertex sediment shear, fracture offsets, erosion
-offsets, and vertical chips to the visual vertices.
+This is the current accepted mesh output for sedimentary terrain. It preserves
+the voxel field for support and collision, but the visible mesh no longer emits
+one quad per exposed voxel face. The active path uses a greedy merged-face LOD
+that merges coplanar exposed faces and then applies deterministic in-plane
+sediment shear/erosion offsets so large merged faces do not read as an exact
+cube grid.
 
 The important split is:
 
 - Collision/support stays voxel-aligned and queryable.
-- The rendered mesh moves most vertices off the exact grid so screenshots stop
-  reading as crisp cube stacks.
+- The rendered mesh is a budgeted LOD, not the collision mesh.
+- Strata and erosion should come primarily from UVs/material response plus
+  sparse in-plane silhouette offsets, not per-voxel geometry.
 
-This replaced the earlier smooth surface-net output for active sedimentary
-terrain because the surface-net path rounded mesas back toward blob language
-and cost more triangles.
+This replaced both the smooth surface-net output and the literal exposed-voxel
+face output for active sedimentary terrain. Surface nets rounded mesas back
+toward blob language; exposed voxel faces were too heavy and too Minecraft.
 
 Current validation:
 
@@ -103,7 +105,8 @@ Current validation:
   island and bridge meshes for cavity-free fields, watertight edges,
   manifoldness, and outward-facing triangles.
 - `tools/test_scene_geometry_budget.mjs` checks the active district slice
-  against mobile triangle, vertex, edge, island, and ramp budgets.
+  against mobile triangle, vertex, edge, island, ramp, and exposed-face-ratio
+  budgets.
 
 ### Voxel Support And Collision Queries
 
@@ -298,12 +301,12 @@ For current visible terrain, prefer:
 
 1. sedimentary mesa or sedimentary bridge field metadata
 2. diagonal-gap-closed voxel field
-3. exposed-voxel face mesh
-4. deterministic visual weathering
+3. budgeted merged-face visible mesh
+4. deterministic in-plane visual weathering
 5. registered mesh and voxel support colliders
 6. terrain contracts passing
 7. fresh screenshot review when the change is visible
 
-Legacy surface-net and organic rock paths may remain as comparison baselines or
-explicit fallback styles, but they should not silently become the default for
-the active Hanging Gardens terrain slice.
+Legacy surface-net, exposed-voxel, and organic rock paths may remain as
+comparison baselines or explicit fallback styles, but they should not silently
+become the default for the active Hanging Gardens terrain slice.

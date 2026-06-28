@@ -712,6 +712,23 @@ function weatherSedimentaryVertex(field, vert) {
   ];
 }
 
+function weatherSedimentaryLodVertex(field, vert, normal = [0, 1, 0]) {
+  const cell = field.cell;
+  const gx = Math.round((vert[0] - field.min.x) / cell);
+  const gy = Math.round((vert[1] - field.min.y) / cell);
+  const gz = Math.round((vert[2] - field.min.z) / cell);
+  const layerShear = Math.sin(gy * 1.73 + gx * 0.37) * cell * 0.052;
+  const fractureShear = signedGridNoise(gx, gy, gz, 701) * cell * 0.074;
+  const erosion = signedGridNoise(gx, gy, gz, 733) * cell * 0.064;
+  const movesX = Math.abs(normal[0]) < 0.5;
+  const movesZ = Math.abs(normal[2]) < 0.5;
+  return [
+    vert[0] + (movesX ? fractureShear + layerShear : 0),
+    vert[1],
+    vert[2] + (movesZ ? erosion - layerShear * 0.55 : 0),
+  ];
+}
+
 function triangleNormalFromVerts(a, b, c) {
   const ux = b[0] - a[0];
   const uy = b[1] - a[1];
@@ -748,7 +765,7 @@ function emitWeatheredQuad(field, positions, normals, uvs, indices, verts, norma
   emitWeatheredTriangle(positions, normals, uvs, indices, [weathered[0], weathered[2], weathered[3]], normal, uvScale);
 }
 
-function buildExposedVoxelFaceMeshData(field, uvScale = 0.072) {
+export function buildExposedVoxelFaceMeshData(field, uvScale = 0.072) {
   const positions = [];
   const normals = [];
   const uvs = [];
@@ -789,10 +806,100 @@ function buildExposedVoxelFaceMeshData(field, uvScale = 0.072) {
 }
 
 export function buildSedimentaryMesaMeshData(field, uvScale = 0.072) {
-  return buildExposedVoxelFaceMeshData(field, uvScale);
+  return buildGreedyVoxelMeshData(field, uvScale, weatherSedimentaryLodVertex);
 }
 
-export function buildGreedyVoxelMeshData(field, uvScale = 0.12) {
+function buildColumnSpans(field) {
+  const spans = new Array(field.nx * field.nz).fill(null);
+  for (let z = 0; z < field.nz; z += 1) {
+    for (let x = 0; x < field.nx; x += 1) {
+      let bottomIndex = null;
+      let topIndex = null;
+      for (let y = 0; y < field.ny; y += 1) {
+        if (!getVoxel(field, x, y, z)) continue;
+        if (bottomIndex == null) bottomIndex = y;
+        topIndex = y;
+      }
+      if (bottomIndex == null || topIndex == null) continue;
+      spans[x + field.nx * z] = {
+        x,
+        z,
+        bottom: field.min.y + bottomIndex * field.cell,
+        top: field.min.y + (topIndex + 1) * field.cell,
+      };
+    }
+  }
+  return spans;
+}
+
+function columnSpanAt(spans, field, x, z) {
+  if (x < 0 || z < 0 || x >= field.nx || z >= field.nz) return null;
+  return spans[x + field.nx * z];
+}
+
+function emitSedimentaryLodQuad(field, positions, normals, uvs, indices, verts, normal, uvScale) {
+  const weathered = verts.map((vert) => weatherSedimentaryLodVertex(field, vert));
+  emitWeatheredTriangle(positions, normals, uvs, indices, [weathered[0], weathered[1], weathered[2]], normal, uvScale);
+  emitWeatheredTriangle(positions, normals, uvs, indices, [weathered[0], weathered[2], weathered[3]], normal, uvScale);
+}
+
+function buildSedimentaryColumnSpanMeshData(field, uvScale = 0.072) {
+  const positions = [];
+  const normals = [];
+  const uvs = [];
+  const indices = [];
+  const spans = buildColumnSpans(field);
+  const cell = field.cell;
+  let quadCount = 0;
+  const emitFace = (verts, normal) => {
+    emitSedimentaryLodQuad(field, positions, normals, uvs, indices, verts, normal, uvScale);
+    quadCount += 1;
+  };
+  const emitVoxelSide = (x, y, z, dirX, dirZ) => {
+    const x0 = field.min.x + x * cell;
+    const x1 = x0 + cell;
+    const y0 = field.min.y + y * cell;
+    const y1 = y0 + cell;
+    const z0 = field.min.z + z * cell;
+    const z1 = z0 + cell;
+    if (dirX < 0) emitFace([[x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1]], [-1, 0, 0]);
+    else if (dirX > 0) emitFace([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], [1, 0, 0]);
+    else if (dirZ < 0) emitFace([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [0, 0, -1]);
+    else if (dirZ > 0) emitFace([[x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1]], [0, 0, 1]);
+  };
+
+  for (let z = 0; z < field.nz; z += 1) {
+    for (let x = 0; x < field.nx; x += 1) {
+      const span = columnSpanAt(spans, field, x, z);
+      if (!span) continue;
+      const x0 = field.min.x + x * cell;
+      const x1 = x0 + cell;
+      const z0 = field.min.z + z * cell;
+      const z1 = z0 + cell;
+      emitFace([[x0, span.top, z0], [x1, span.top, z0], [x1, span.top, z1], [x0, span.top, z1]], [0, 1, 0]);
+      emitFace([[x0, span.bottom, z1], [x1, span.bottom, z1], [x1, span.bottom, z0], [x0, span.bottom, z0]], [0, -1, 0]);
+
+      for (let y = 0; y < field.ny; y += 1) {
+        if (!getVoxel(field, x, y, z)) continue;
+        if (!getVoxel(field, x - 1, y, z)) emitVoxelSide(x, y, z, -1, 0);
+        if (!getVoxel(field, x + 1, y, z)) emitVoxelSide(x, y, z, 1, 0);
+        if (!getVoxel(field, x, y, z - 1)) emitVoxelSide(x, y, z, 0, -1);
+        if (!getVoxel(field, x, y, z + 1)) emitVoxelSide(x, y, z, 0, 1);
+      }
+    }
+  }
+
+  return {
+    positions,
+    normals,
+    uvs,
+    indices,
+    quadCount,
+    triangleCount: indices.length / 3,
+  };
+}
+
+export function buildGreedyVoxelMeshData(field, uvScale = 0.12, vertexTransform = null) {
   const dims = [field.nx, field.ny, field.nz];
   const positions = [];
   const normals = [];
@@ -853,10 +960,16 @@ export function buildGreedyVoxelMeshData(field, uvScale = 0.12) {
           const startIndex = positions.length / 3;
           const ordered = c > 0 ? corners : [corners[0], corners[3], corners[2], corners[1]];
           for (const corner of ordered) {
-            positions.push(
+            const vert = [
               field.min.x + corner[0] * field.cell,
               field.min.y + corner[1] * field.cell,
               field.min.z + corner[2] * field.cell,
+            ];
+            const finalVert = vertexTransform ? vertexTransform(field, vert, normal) : vert;
+            positions.push(
+              finalVert[0],
+              finalVert[1],
+              finalVert[2],
             );
             normals.push(normal[0], normal[1], normal[2]);
           }
