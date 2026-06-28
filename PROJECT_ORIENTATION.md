@@ -42,6 +42,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 - `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`: district-level route graph and implementation status.
 - `docs/DISTRICT_RUNTIME_CONTRACT.md`: authoritative runtime contract for district build order, skeleton geometry, support snapping, spawns, and enemy traversal.
 - `docs/ROCK_SHAPE_GRAMMAR.md`: terrain shape grammar for floating geological fragments, readable island silhouettes, and rock/architecture fusion.
+- `docs/TERRAIN_GENERATION_TECHNIQUES.md`: implementation map of current and historical terrain generators still present in code.
 
 ## Direction
 

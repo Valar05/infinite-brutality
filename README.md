@@ -20,6 +20,11 @@ Use `sh ./tools/status_local_server.sh` to check it and `sh ./tools/stop_local_s
 
 Build `0.8.175` keeps sedimentary meshes manifold while adding deterministic visual weathering so sandstone corners shear off the cube grid without changing collision.
 
+## Terrain Docs
+
+- `docs/ROCK_SHAPE_GRAMMAR.md`: terrain shape contract.
+- `docs/TERRAIN_GENERATION_TECHNIQUES.md`: current and historical terrain generator implementation map.
+
 ## Validation
 
 ```sh
