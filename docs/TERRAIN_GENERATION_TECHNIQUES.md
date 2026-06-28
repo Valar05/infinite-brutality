@@ -70,36 +70,33 @@ Current runtime use:
 - `addDistrictIslandBridges(...)` also uses the sedimentary bridge field for
   visible bridges between district mass anchors.
 
-### Budgeted Merged-Face Sedimentary Meshes
+### Budgeted Sedimentary Visual Shell
 
 Primary functions:
 
 - `src/island-geometry.js`: `buildSedimentaryMesaMeshData(field, uvScale)`
-- `src/island-geometry.js`: `buildGreedyVoxelMeshData(field, uvScale, vertexTransform)`
-- `src/island-geometry.js`: `weatherSedimentaryLodVertex(...)`
+- `src/island-geometry.js`: `buildSedimentaryVisualMeshData(field, uvScale)`
+- `src/island-geometry.js`: `buildSurfaceNetMeshData(field, uvScale)`
 
-This is the current review-branch experiment, not an accepted art result. It
-preserves the voxel field for support and collision, but the visible mesh no
-longer emits one quad per exposed voxel face. The active path uses a greedy
-merged-face LOD that merges coplanar exposed faces and then applies
-deterministic in-plane sediment shear/erosion offsets.
-
-The experiment proves the budget reduction, but it still reads as voxel-box
-language in fresh visual review. Do not merge this path as the final terrain
-solution.
+This is the active sedimentary terrain path. It preserves the voxel field for
+support and collision, but the visible mesh is a budgeted contour shell instead
+of exposed voxel faces or greedy merged voxel sheets. The shell starts from the
+surface-net mesh, applies deterministic sedimentary terrace/fracture shaping,
+then reorients triangles against the voxel field so the result remains
+watertight and consistently outward-facing.
 
 The important split is:
 
 - Collision/support stays voxel-aligned and queryable.
 - The rendered mesh is a budgeted LOD, not the collision mesh.
-- Strata and erosion should come primarily from UVs/material response plus
-  sparse in-plane silhouette offsets, not per-voxel geometry.
+- Playable top surfaces stay broad and clean.
+- Chipped rim and fracture shaping are concentrated at side/boundary regions.
+- Strata and erosion come from the shell shape plus material/UV response, not
+  one quad per voxel cell.
 
-This was intended to replace both the smooth surface-net output and the literal
-exposed-voxel face output for active sedimentary terrain. Surface nets rounded
-mesas back toward blob language; exposed voxel faces were too heavy and too
-Minecraft. Greedy merged faces reduce budget, but remain too boxy without a
-real sedimentary visual shell.
+`buildGreedyVoxelMeshData(...)` and `buildExposedVoxelFaceMeshData(...)` remain
+in code as comparison/debug paths. They are not the accepted active visible
+sedimentary terrain path.
 
 Current validation:
 
@@ -110,7 +107,7 @@ Current validation:
   island and bridge meshes for cavity-free fields, watertight edges,
   manifoldness, and outward-facing triangles.
 - `tools/test_scene_geometry_budget.mjs` checks the active district slice
-  against mobile triangle, vertex, edge, island, ramp, and exposed-face-ratio
+  against mobile triangle, vertex, edge, island, ramp, and contour-shell
   budgets.
 - `tools/test_terrain_visual_contract.mjs` is the visual-proxy red test for the
   current branch. It rejects giant axis-aligned sheets and box-bounded

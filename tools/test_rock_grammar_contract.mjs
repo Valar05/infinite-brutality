@@ -171,8 +171,8 @@ assert.ok(sideProfile.topSpread <= mesa.cell * 1.15, `mesa center top is too dom
 const surfaceMesh = buildSurfaceNetMeshData(mesa);
 const mesh = buildSedimentaryMesaMeshData(mesa, 0.072);
 assert.ok(mesh.triangleCount > 0, 'mesa grammar must emit visible geometry');
-assert.ok(mesh.triangleCount < 2200, `sedimentary slab mesh emitted ${mesh.triangleCount} triangles > 2200 island budget`);
-assert.ok(mesh.triangleCount < surfaceMesh.triangleCount, `sedimentary slab mesh ${mesh.triangleCount} should be cheaper than surface-net ${surfaceMesh.triangleCount}`);
+assert.ok(mesh.triangleCount <= 4000, `sedimentary visual mesh emitted ${mesh.triangleCount} triangles > 4000 island budget`);
+assert.ok(mesh.triangleCount <= surfaceMesh.triangleCount, `sedimentary visual mesh ${mesh.triangleCount} should not exceed the surface shell ${surfaceMesh.triangleCount}`);
 const weatheredRatio = offGridVertexRatio(mesa, mesh);
 assert.ok(weatheredRatio >= 0.82, `sedimentary mesh still reads like a cube grid: off-grid visual vertex ratio ${weatheredRatio.toFixed(2)} < 0.82`);
 

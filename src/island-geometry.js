@@ -805,8 +805,203 @@ export function buildExposedVoxelFaceMeshData(field, uvScale = 0.072) {
   };
 }
 
+function transformedSedimentarySurfaceVertex(field, vert) {
+  const cell = field.cell;
+  const spanX = Math.max(cell, field.max.x - field.min.x);
+  const spanZ = Math.max(cell, field.max.z - field.min.z);
+  const centerX = (field.min.x + field.max.x) * 0.5;
+  const centerZ = (field.min.z + field.max.z) * 0.5;
+  const nx = (vert[0] - centerX) / (spanX * 0.5);
+  const nz = (vert[2] - centerZ) / (spanZ * 0.5);
+  const radial = Math.hypot(nx, nz);
+  const edge = smoothstep(0.54, 0.96, radial);
+  const gx = Math.round((vert[0] - field.min.x) / cell);
+  const gy = Math.round((vert[1] - field.min.y) / cell);
+  const gz = Math.round((vert[2] - field.min.z) / cell);
+  const layer = Math.round(vert[1] / Math.max(0.001, cell * 0.42)) * cell * 0.42;
+  const topBandWeight = smoothstep(field.min.y + cell * (field.ny - 3), field.min.y + cell * field.ny, vert[1]);
+  const sideWeight = smoothstep(0.36, 0.86, radial);
+  const fractureA = signedGridNoise(gx, gy, gz, 811);
+  const fractureB = signedGridNoise(gx + 17, gy, gz - 13, 853);
+  const strata = Math.sin(vert[1] * 2.15 + fractureA * 1.7) * cell * 0.035;
+  const chip = signedGridNoise(gx, Math.round(layer / cell), gz, 877);
+  const playableTopWeight = topBandWeight * (1 - smoothstep(0.42, 0.72, radial));
+  const silhouetteAmp = cell * (0.045 + edge * 0.12 + sideWeight * 0.075);
+  const terraceY = lerp(vert[1], layer + strata, sideWeight * 0.55 + edge * 0.25);
+  const cleanTopY = lerp(terraceY, layer, playableTopWeight * 0.72);
+  return [
+    vert[0] + fractureA * silhouetteAmp + Math.sin(gy * 1.37 + gz * 0.43) * cell * 0.028 * edge,
+    cleanTopY + chip * cell * 0.045 * (edge + sideWeight) - Math.abs(fractureB) * cell * 0.035 * smoothstep(0.62, 1.04, radial),
+    vert[2] + fractureB * silhouetteAmp - Math.sin(gy * 1.11 + gx * 0.51) * cell * 0.024 * edge,
+  ];
+}
+
+function recomputeMeshNormals(mesh) {
+  const positions = mesh.positions;
+  const indices = mesh.indices?.length
+    ? mesh.indices
+    : Array.from({ length: positions.length / 3 }, (_, index) => index);
+  const normals = new Array(positions.length).fill(0);
+  for (let i = 0; i < indices.length; i += 3) {
+    const ia = indices[i] * 3;
+    const ib = indices[i + 1] * 3;
+    const ic = indices[i + 2] * 3;
+    const ax = positions[ia];
+    const ay = positions[ia + 1];
+    const az = positions[ia + 2];
+    const bx = positions[ib];
+    const by = positions[ib + 1];
+    const bz = positions[ib + 2];
+    const cx = positions[ic];
+    const cy = positions[ic + 1];
+    const cz = positions[ic + 2];
+    const ux = bx - ax;
+    const uy = by - ay;
+    const uz = bz - az;
+    const vx = cx - ax;
+    const vy = cy - ay;
+    const vz = cz - az;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    normals[ia] += nx;
+    normals[ia + 1] += ny;
+    normals[ia + 2] += nz;
+    normals[ib] += nx;
+    normals[ib + 1] += ny;
+    normals[ib + 2] += nz;
+    normals[ic] += nx;
+    normals[ic + 1] += ny;
+    normals[ic + 2] += nz;
+  }
+  for (let i = 0; i < normals.length; i += 3) {
+    const length = Math.hypot(normals[i], normals[i + 1], normals[i + 2]) || 1;
+    normals[i] /= length;
+    normals[i + 1] /= length;
+    normals[i + 2] /= length;
+  }
+  return {
+    ...mesh,
+    normals,
+  };
+}
+
+function sampledVoxelDensity(field, x, y, z) {
+  const gx = (x - field.min.x) / field.cell - 0.5;
+  const gy = (y - field.min.y) / field.cell - 0.5;
+  const gz = (z - field.min.z) / field.cell - 0.5;
+  const x0 = Math.floor(gx);
+  const y0 = Math.floor(gy);
+  const z0 = Math.floor(gz);
+  const tx = gx - x0;
+  const ty = gy - y0;
+  const tz = gz - z0;
+  const sample = (ix, iy, iz) => {
+    if (ix < 0 || iy < 0 || iz < 0 || ix >= field.nx || iy >= field.ny || iz >= field.nz) return 1;
+    return getVoxel(field, ix, iy, iz) ? -1 : 1;
+  };
+  const c000 = sample(x0, y0, z0);
+  const c100 = sample(x0 + 1, y0, z0);
+  const c010 = sample(x0, y0 + 1, z0);
+  const c110 = sample(x0 + 1, y0 + 1, z0);
+  const c001 = sample(x0, y0, z0 + 1);
+  const c101 = sample(x0 + 1, y0, z0 + 1);
+  const c011 = sample(x0, y0 + 1, z0 + 1);
+  const c111 = sample(x0 + 1, y0 + 1, z0 + 1);
+  const x00 = lerp(c000, c100, tx);
+  const x10 = lerp(c010, c110, tx);
+  const x01 = lerp(c001, c101, tx);
+  const x11 = lerp(c011, c111, tx);
+  return lerp(lerp(x00, x10, ty), lerp(x01, x11, ty), tz);
+}
+
+function orientMeshTrianglesAgainstVoxelField(field, mesh) {
+  const positions = mesh.positions;
+  const indices = mesh.indices?.length
+    ? mesh.indices.slice()
+    : Array.from({ length: positions.length / 3 }, (_, index) => index);
+  for (let i = 0; i < indices.length; i += 3) {
+    const ia = indices[i] * 3;
+    const ib = indices[i + 1] * 3;
+    const ic = indices[i + 2] * 3;
+    const ax = positions[ia];
+    const ay = positions[ia + 1];
+    const az = positions[ia + 2];
+    const bx = positions[ib];
+    const by = positions[ib + 1];
+    const bz = positions[ib + 2];
+    const cx = positions[ic];
+    const cy = positions[ic + 1];
+    const cz = positions[ic + 2];
+    const ux = bx - ax;
+    const uy = by - ay;
+    const uz = bz - az;
+    const vx = cx - ax;
+    const vy = cy - ay;
+    const vz = cz - az;
+    let nx = uy * vz - uz * vy;
+    let ny = uz * vx - ux * vz;
+    let nz = ux * vy - uy * vx;
+    const length = Math.hypot(nx, ny, nz) || 1;
+    nx /= length;
+    ny /= length;
+    nz /= length;
+    const mx = (ax + bx + cx) / 3;
+    const my = (ay + by + cy) / 3;
+    const mz = (az + bz + cz) / 3;
+    let reversed = false;
+    let confirmed = false;
+    for (const multiplier of [0.2, 0.45, 0.75, 1.05]) {
+      const eps = field.cell * multiplier;
+      const front = sampledVoxelDensity(field, mx + nx * eps, my + ny * eps, mz + nz * eps);
+      const back = sampledVoxelDensity(field, mx - nx * eps, my - ny * eps, mz - nz * eps);
+      if (front > 0 && back < 0) {
+        confirmed = true;
+        break;
+      }
+      if (front < 0 && back > 0) reversed = true;
+    }
+    if (!confirmed && reversed) {
+      const temp = indices[i + 1];
+      indices[i + 1] = indices[i + 2];
+      indices[i + 2] = temp;
+    }
+  }
+  return {
+    ...mesh,
+    indices,
+  };
+}
+
+export function buildSedimentaryVisualMeshData(field, uvScale = 0.072) {
+  const shell = buildSurfaceNetMeshData(field, uvScale);
+  const transformed = shell.positions.slice();
+  const cache = new Map();
+  for (let i = 0; i < transformed.length; i += 3) {
+    const key = `${shell.positions[i].toFixed(5)},${shell.positions[i + 1].toFixed(5)},${shell.positions[i + 2].toFixed(5)}`;
+    let finalVert = cache.get(key);
+    if (!finalVert) {
+      finalVert = transformedSedimentarySurfaceVertex(field, [
+        shell.positions[i],
+        shell.positions[i + 1],
+        shell.positions[i + 2],
+      ]);
+      cache.set(key, finalVert);
+    }
+    transformed[i] = finalVert[0];
+    transformed[i + 1] = finalVert[1];
+    transformed[i + 2] = finalVert[2];
+  }
+  const oriented = orientMeshTrianglesAgainstVoxelField(field, {
+    ...shell,
+    positions: transformed,
+    sourceTriangleCount: shell.triangleCount,
+  });
+  return recomputeMeshNormals(oriented);
+}
+
 export function buildSedimentaryMesaMeshData(field, uvScale = 0.072) {
-  return buildGreedyVoxelMeshData(field, uvScale, weatherSedimentaryLodVertex);
+  return buildSedimentaryVisualMeshData(field, uvScale);
 }
 
 function buildColumnSpans(field) {

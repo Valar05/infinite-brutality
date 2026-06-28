@@ -28,9 +28,9 @@ const MOBILE_PROCEDURAL_BUDGET = {
   totalUniqueEdges: 18000,
   maxIslandTriangles: 4000,
   maxRampTriangles: 900,
-  maxTotalExposedFaceRatio: 0.38,
-  maxIslandExposedFaceRatio: 0.36,
-  maxRampExposedFaceRatio: 0.36,
+  maxTotalContourToExposedRatio: 1.6,
+  maxIslandContourToExposedRatio: 1.75,
+  maxRampContourToExposedRatio: 1.2,
 };
 
 function uniqueEdgeCount(mesh) {
@@ -127,23 +127,23 @@ if (total.emittedVertices > MOBILE_PROCEDURAL_BUDGET.totalEmittedVertices) {
 if (total.uniqueEdges > MOBILE_PROCEDURAL_BUDGET.totalUniqueEdges) {
   failures.push(`unique edges ${total.uniqueEdges} > ${MOBILE_PROCEDURAL_BUDGET.totalUniqueEdges}`);
 }
-if (total.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxTotalExposedFaceRatio) {
-  failures.push(`active sedimentary LOD ratio ${total.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxTotalExposedFaceRatio}; visible terrain regressed toward exposed voxel faces`);
+if (total.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxTotalContourToExposedRatio) {
+  failures.push(`active sedimentary contour ratio ${total.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxTotalContourToExposedRatio}; visible terrain exceeds the mobile contour-shell budget`);
 }
 for (const stats of islandStats) {
   if (stats.triangles > MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles) {
     failures.push(`${stats.label} island triangles ${stats.triangles} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandTriangles}`);
   }
-  if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxIslandExposedFaceRatio) {
-    failures.push(`${stats.label} island LOD ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandExposedFaceRatio}`);
+  if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxIslandContourToExposedRatio) {
+    failures.push(`${stats.label} island contour ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxIslandContourToExposedRatio}`);
   }
 }
 for (const stats of rampStats) {
   if (stats.triangles > MOBILE_PROCEDURAL_BUDGET.maxRampTriangles) {
     failures.push(`${stats.label} triangles ${stats.triangles} > ${MOBILE_PROCEDURAL_BUDGET.maxRampTriangles}`);
   }
-  if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxRampExposedFaceRatio) {
-    failures.push(`${stats.label} LOD ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxRampExposedFaceRatio}`);
+  if (stats.exposedFaceRatio > MOBILE_PROCEDURAL_BUDGET.maxRampContourToExposedRatio) {
+    failures.push(`${stats.label} contour ratio ${stats.exposedFaceRatio} > ${MOBILE_PROCEDURAL_BUDGET.maxRampContourToExposedRatio}`);
   }
 }
 
