@@ -7,6 +7,7 @@ This project should use Quake-style route grammar as an abstraction, not copy Qu
 - Current reference room: authored skull guillotine triple-bridge hall.
 - Previous hand-authored comparison slice: `quake_m1e1_slice`, a compact fortress-rock route using `start casemate -> battery court -> locked gate face -> key trench branch -> upper overlook -> optional secret ledge -> final gun room -> exit`, available with `?slice=quake_m1e1`.
 - Current default playable slice direction: `carved_voxel_fortress`, a single solid voxel rock mass with route spaces cut out of it. The fortress is carved negative space plus minimal reinforcement, not primitive rooms placed on rock.
+- Current district identity direction: generation must begin with district intent before geometry. The first implemented intent profiles are `artillery_battery`, `cloud_dock`, `imperial_foundry`, and `quarry_barracks`, selectable on the carved slice with `?district=...`.
 - Previous broad generated gauntlet remains available with `?slice=generated`.
 - Main experimental direction after `quake_m1e1_slice`: ingest Quake-style spatial structure through `tools/quake_geometry_ingest/`, then rebuild it as Infinite Brutality-owned voxels/primitives. Use neutral or local-analysis geometry as tooling input; do not ship copied Quake map data.
 - Current training artifact: `data/level_route_templates.json`.
@@ -23,6 +24,7 @@ The current templates are trained from John Romero/id Software's released Quake 
 - Build traversal route grammar first; add rubble, chains, pillars, enemies, and lights after the route reads.
 - Keep side galleries and lower floors as recovery lines for touch players.
 - Use landmarks and visible exits so the player understands the destination before optimizing the route.
+- Do not let a valid carved route remain anonymous. Each generated district must declare and expose purpose, required phrases, required assemblies, logistics flow, skyline, silhouette, and traversal identity before geometry emission.
 
 ## Training Pipeline
 

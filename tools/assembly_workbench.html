@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infinite Brutality Assembly Workbench</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #111719;
+      color: #dce7e2;
+    }
+    body {
+      margin: 0;
+      padding: 18px;
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+    #summary {
+      color: #a8bbb4;
+      font-size: 12px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(280px, 420px);
+      gap: 16px;
+    }
+    svg {
+      width: 100%;
+      min-height: 620px;
+      background: #182022;
+      border: 1px solid #334349;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #151d20;
+      border: 1px solid #334349;
+    }
+    th,
+    td {
+      border-bottom: 1px solid #29373b;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: #f0c46b;
+      font-weight: 700;
+    }
+    .ok {
+      color: #7bd18b;
+    }
+    .bad {
+      color: #ff7878;
+    }
+    @media (max-width: 860px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Assembly Workbench</h1>
+    <div id="summary">loading...</div>
+  </header>
+  <main>
+    <svg id="view" viewBox="-40 -55 100 100" aria-label="top-down assembly view"></svg>
+    <table>
+      <thead>
+        <tr>
+          <th>Part</th>
+          <th>Role</th>
+          <th>Host</th>
+        </tr>
+      </thead>
+      <tbody id="parts"></tbody>
+    </table>
+  </main>
+  <script type="module">
+    import { buildDistrictIntentPlan } from '../src/district-intent-planner.js';
+    import { buildDistrictAssemblyPlan } from '../src/district-assembly-emitter.js';
+
+    const colors = {
+      host: '#6c7f83',
+      plinth: '#44515a',
+      heat_core: '#f05a28',
+      service_landing: '#d5ad35',
+      catwalk_endpoint: '#ead472',
+      catwalk_span: '#d8b33b',
+      support: '#1d2a30',
+      vent_source: '#8d97a1',
+      vent_stack: '#28363e',
+      cooling_source: '#e56835',
+      cooling_channel: '#29a8bb',
+      channel_rim: '#45555a',
+      cooling_destination: '#627981',
+      service_route: '#8a7540',
+    };
+
+    const intent = buildDistrictIntentPlan(37, 'imperial_foundry');
+    const plan = buildDistrictAssemblyPlan(intent);
+    const svg = document.getElementById('view');
+    const tbody = document.getElementById('parts');
+    const summary = document.getElementById('summary');
+
+    summary.innerHTML = [
+      plan.validation?.passes ? '<span class="ok">valid</span>' : '<span class="bad">invalid</span>',
+      `${plan.parts.length} parts`,
+      `${plan.assemblies.length} assemblies`,
+      `unsupported ${plan.validation?.unsupportedPartIds?.length || 0}`,
+    ].join(' | ');
+
+    for (const part of plan.parts) {
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const x = part.center[0] - part.size[0] * 0.5;
+      const y = -(part.center[2] + part.size[2] * 0.5);
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', part.size[0]);
+      rect.setAttribute('height', part.size[2]);
+      rect.setAttribute('fill', colors[part.role] || '#87949b');
+      rect.setAttribute('stroke', part.supportedBy?.length ? '#dff3ed' : '#111719');
+      rect.setAttribute('stroke-width', part.role === 'catwalk_span' ? '0.28' : '0.14');
+      rect.setAttribute('opacity', part.role === 'host' ? '0.45' : '0.9');
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      title.textContent = `${part.id} | ${part.role} | host ${part.hostId}`;
+      rect.append(title);
+      svg.append(rect);
+
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${part.id}</td><td>${part.role}</td><td>${part.hostId}</td>`;
+      tbody.append(row);
+    }
+  </script>
+</body>
+</html>

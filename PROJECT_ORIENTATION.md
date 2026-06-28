@@ -36,7 +36,11 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 
 - `LEVEL_GENERATION_CONTRACT.md`: current route-grammar rules for Quake-style level generation without copied Quake layouts.
 - `src/carved-voxel-fortress-slice.js`: current default playable slice direction. It starts from one solid voxel mass and carves the fortress route as negative space.
+- `src/district-intent-planner.js`: district identity planner for memorable place reads. It selects purpose, required phrases, assemblies, logistics, skyline, silhouette, and traversal identity before carved geometry is emitted.
+- `src/district-assembly-emitter.js`: district assembly emitter for turning intent into supported visible structures. The first implemented slice is the Imperial Foundry process chain.
 - `tools/quake_geometry_ingest/`: neutral geometry ingestion experiment that extracts Quake-style spatial structure into Infinite Brutality-owned room graphs, voxels, and debug outputs.
+- `tools/assembly_workbench.html`: static local workbench for reviewing district assembly support chains without booting the full game.
+- `tools/ib_doctor.sh`: one-command local validation for cache-bust consistency, key contracts, and tmux server health.
 - `docs/QUAKE_M1E1_FORTRESS_SLICE.md`: default first playable fortress-rock slice, with the old generated gauntlet preserved by `?slice=generated`.
 - `data/level_route_templates.json`: generator-facing route template contract.
 - `data/room_junction_batch.json`: overnight batch list of room prompts by connector topology.

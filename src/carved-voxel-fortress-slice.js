@@ -309,8 +309,14 @@ function hasLineOfSight(from, to, cuts) {
   return true;
 }
 
-export function buildCarvedVoxelFortressData() {
+export function buildCarvedVoxelFortressData(options = {}) {
+  const districtIntent = options.districtIntent || null;
   const field = createSolidMassField();
+  if (districtIntent) {
+    field.rockGrammar.imperialFunction = districtIntent.id;
+    field.rockGrammar.districtPurpose = districtIntent.purpose;
+    field.rockGrammar.expectedSilhouette = [...(districtIntent.expectedSilhouette || [])];
+  }
   const solidVoxelCountBeforeCuts = countSolid(field);
   const cutStats = [];
   for (const cut of CARVED_VOXEL_FORTRESS_CUTS) {
@@ -335,6 +341,7 @@ export function buildCarvedVoxelFortressData() {
   return {
     id: 'carved_voxel_fortress',
     field,
+    districtIntent,
     cuts: CARVED_VOXEL_FORTRESS_CUTS.map((cut) => ({ ...cut })),
     cutStats,
     metrics: {
@@ -353,6 +360,7 @@ export function buildCarvedVoxelFortressData() {
         && carvedStairProfile.landingRun >= field.cell * 2,
       overlookLineOfSight: hasLineOfSight(byId.get('overlook_window'), byId.get('battery_court'), CARVED_VOXEL_FORTRESS_CUTS),
       secretReturns: connectCuts(byId.get('secret_side_cut'), byId.get('overlook_window')),
+      districtIntentValidation: districtIntent?.validation || null,
     },
     anchors: {
       spawn: [0, -0.5, -25],

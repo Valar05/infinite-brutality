@@ -152,3 +152,11 @@ Do this as part of the same task when the lesson is durable.
 ## Carved Structure Correction
 
 When the Napoleon sky-kingdom slice reads as floating rocks, the generator is solving the wrong problem. The proof slice should begin from a place with a job: an imperial logistics/fortress structure caved from rock. Terrain should supply the carved mass and voids; architecture should explain use, circulation, defense, and airship support. Disconnected rocks and terrain bridge chains are regressions unless a later district explicitly proves why they exist.
+
+## District Assembly Correction
+
+Build `0.8.205` confirmed the next useful layer after district intent: assembly emitters. The foundry improved when loose district props were replaced with a chain of host, plinth, supports, working object, termination, service route, and silhouette. The screenshot read as a supported industrial bridge/catwalk over a hot process instead of random blocks.
+
+Do not treat this as final proof of playability. A structure can look supported while still failing traversal affordance. District identity now needs two contracts: an assembly contract that rejects naked parts, and a walkability contract that proves service landings, catwalk spans, and route pieces are wide, reachable, and visibly terminated.
+
+Use `tools/assembly_workbench.html` for fast top-down assembly review before booting the full game. Use `tools/ib_doctor.sh` before handoff to catch cache-bust drift, stale server state, and broken district contracts.

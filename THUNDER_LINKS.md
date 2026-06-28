@@ -29,6 +29,8 @@ This project has durable design/runtime notes in Thunder Brainstorm. Read these 
 - Hanging Gardens Thunder note: `../thunder-brainstorm/generated/session_learnings/2026-06-11_infinite_brutality_hanging_gardens_story_pilot.md`
 - Hanging Gardens source packet: `../thunder-brainstorm/generated/source_packets/infinite_brutality_hanging_gardens_nook_story_source.md`
 - Precursor FPS/Arcane brainstorm: `../thunder-brainstorm/generated/session_learnings/2026-06-07_fps_platformer_arcane_ik_brainstorm.md`
+- Ruined Air full-rig walk pattern: `../thunder-brainstorm/generated/session_learnings/2026-06-28_ruined_air_full_rig_walk_pattern_for_infinite_brutality.md`
+- Ruined Air full-rig walk source refs: `../thunder-brainstorm/generated/source_refs_manual/ruined_air_full_rig_walk_pattern_source_refs.jsonl`
 - Quake/touch movement brainstorm: `../thunder-brainstorm/generated/session_learnings/2026-06-08_quake_movement_touch_speedrun_brainstorm.md`
 - Quake route grammar curriculum: `../thunder-brainstorm/generated/quake_route_grammar/quake_route_grammar_curriculum.md`
 - Route grammar extractor: `../thunder-brainstorm/tools/quake_route_grammar.py`

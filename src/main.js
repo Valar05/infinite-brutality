@@ -3,7 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 import { QUAKE_M1E1_SLICE } from './quake-m1e1-slice.js?v=0.8.197';
-import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.203';
+import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.205';
+import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.205';
+import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.205';
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
 import { createMaterialResources } from './materials.js?v=0.8.179';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
@@ -30,9 +32,10 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.203';
+const BUILD = '0.8.205';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'carved_voxel_fortress';
+const ACTIVE_DISTRICT_ID = URL_PARAMS.get('district') || 'artillery_battery';
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;
 const USE_DYNAMIC_SHADOWS = false;
@@ -4813,9 +4816,106 @@ function sliceEdgeLink(edge) {
   };
 }
 
+function districtAssemblyMaterial(materialKey) {
+  return {
+    bridge: MAT.bridge,
+    connectorWall: MAT.connectorWall,
+    hazard: MAT.hazard,
+    iron: MAT.iron,
+    trim: MAT.trim,
+    water: MAT.water,
+  }[materialKey] || MAT.connectorWall;
+}
+
+function emitDistrictAssemblyPlan(assemblyPlan) {
+  if (!assemblyPlan?.parts?.length) return assemblyPlan || null;
+  for (const part of assemblyPlan.parts) {
+    if (part.visible === false) continue;
+    const mesh = addFortressSolid(
+      roomGroup,
+      'assembly-' + part.id,
+      part.size,
+      makeVec(part.center[0], part.center[1], part.center[2]),
+      districtAssemblyMaterial(part.material),
+      {
+        margin: 0.01,
+        kind: part.kind || (part.hazard ? 'hazard' : 'structure'),
+      },
+    );
+    Object.assign(mesh.userData, {
+      districtId: part.districtId,
+      assemblyId: part.assemblyId,
+      assemblyPartId: part.id,
+      assemblyRole: part.role,
+      hostId: part.hostId,
+      supports: part.supports,
+      supportedBy: part.supportedBy,
+      serviceAccess: part.serviceAccess,
+      silhouette: part.silhouette,
+    });
+  }
+  return assemblyPlan;
+}
+
+function publishDistrictAssemblyDebug(assemblyPlan) {
+  if (!assemblyPlan) return;
+  window.__infiniteBrutalityDistrictAssembly = {
+    build: BUILD,
+    districtId: assemblyPlan.districtId,
+    assemblyCount: assemblyPlan.assemblies?.length || 0,
+    partCount: assemblyPlan.parts?.length || 0,
+    requiredRoles: assemblyPlan.requiredRoles || [],
+    roles: [...new Set((assemblyPlan.parts || []).map((part) => part.role))],
+    unsupportedPartIds: assemblyPlan.validation?.unsupportedPartIds || [],
+    missingRoles: assemblyPlan.validation?.missingRoles || [],
+    nakedPartIds: assemblyPlan.validation?.nakedPartIds || [],
+    validation: assemblyPlan.validation,
+  };
+}
+
+function addDistrictIntentReadabilityProps(intent) {
+  const id = intent?.id || 'artillery_battery';
+  if (id === 'artillery_battery') {
+    addFortressSolid(roomGroup, 'intent-battery-front-parapet-a', [6.2, 1.05, 0.62], makeVec(8.8, 1.0, -9.2), MAT.connectorWall, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-battery-front-parapet-b', [5.4, 1.0, 0.62], makeVec(8.9, 1.0, -3.2), MAT.connectorWall, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-battery-gun-bed', [3.8, 0.55, 2.2], makeVec(6.4, 1.05, -6.3), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-battery-gun-barrel', [0.58, 0.58, 5.2], makeVec(8.8, 1.65, -6.3), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-battery-ammo-recess-a', [1.0, 1.0, 1.0], makeVec(-12.8, 0.2, -2.4), MAT.trim, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-battery-ammo-recess-b', [0.9, 0.9, 0.9], makeVec(-12.8, 0.15, -0.8), MAT.trim, { margin: 0.01 });
+    return;
+  }
+  if (id === 'cloud_dock') {
+    addFortressSolid(roomGroup, 'intent-dock-loading-lip', [1.0, 0.5, 12.0], makeVec(9.6, 1.0, -4.2), MAT.bridge, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-dock-crane-mast', [0.55, 6.8, 0.55], makeVec(7.7, 3.9, -2.2), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-dock-crane-boom', [7.2, 0.38, 0.42], makeVec(5.0, 7.15, -2.2), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-dock-crane-hook', [0.34, 1.9, 0.34], makeVec(2.2, 5.95, -2.2), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-dock-warehouse-mouth', [5.4, 2.6, 0.58], makeVec(-1.5, 1.4, 22.0), MAT.connectorWall, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-dock-cargo-a', [1.35, 1.1, 1.35], makeVec(-5.8, 0.2, -10.0), MAT.trim, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-dock-cargo-b', [1.1, 1.35, 1.1], makeVec(-4.1, 0.35, -10.4), MAT.trim, { margin: 0.01 });
+    return;
+  }
+  if (id === 'imperial_foundry') {
+    const assemblyPlan = emitDistrictAssemblyPlan(buildDistrictAssemblyPlan(intent));
+    publishDistrictAssemblyDebug(assemblyPlan);
+    return assemblyPlan;
+  }
+  if (id === 'quarry_barracks') {
+    addFortressSolid(roomGroup, 'intent-quarry-lift-rail-a', [0.32, 6.8, 0.32], makeVec(-14.2, 3.1, 4.0), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-quarry-lift-rail-b', [0.32, 6.8, 0.32], makeVec(-11.7, 3.1, 4.0), MAT.iron, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-quarry-lift-cage', [2.2, 2.1, 1.5], makeVec(-13.0, 1.8, 4.0), MAT.trim, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-quarry-shelf-low', [5.2, 0.52, 1.3], makeVec(-12.4, 0.9, -7.4), MAT.connectorWall, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-quarry-shelf-mid', [4.6, 0.5, 1.15], makeVec(-12.7, 2.4, 9.2), MAT.connectorWall, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-quarry-barracks-mouth-a', [0.55, 1.5, 2.2], makeVec(-15.0, 2.6, 13.4), MAT.trim, { margin: 0.01 });
+    addFortressSolid(roomGroup, 'intent-quarry-barracks-mouth-b', [0.55, 1.45, 2.0], makeVec(-15.0, 2.5, 17.0), MAT.trim, { margin: 0.01 });
+  }
+  return null;
+}
+
 function buildCarvedVoxelFortressSlice() {
   const layer = createActiveTerrainLayer();
-  const carved = buildCarvedVoxelFortressData();
+  const districtIntent = buildDistrictIntentPlan(hashRoomKey(ACTIVE_DISTRICT_ID + ':' + roomState.levelIndex), ACTIVE_DISTRICT_ID);
+  const districtAssemblyPlan = buildDistrictAssemblyPlan(districtIntent);
+  const carved = buildCarvedVoxelFortressData({ districtIntent });
   layer.addVoxelField({
     id: carved.id,
     field: carved.field,
@@ -4829,40 +4929,51 @@ function buildCarvedVoxelFortressSlice() {
   addFortressSolid(roomGroup, 'carved-void-brace-a', [0.34, 3.8, 0.34], makeVec(7.2, 1.9, -7.5), MAT.iron, { margin: 0.01 });
   addFortressSolid(roomGroup, 'carved-void-brace-b', [0.34, 4.6, 0.34], makeVec(7.6, 2.3, 8.0), MAT.iron, { margin: 0.01 });
   addFortressSolid(roomGroup, 'carved-final-gun-plinth', [4.8, 0.7, 2.0], makeVec(4.5, 4.1, 24.0), MAT.iron, { margin: 0.01 });
+  const emittedAssemblyPlan = addDistrictIntentReadabilityProps(districtIntent) || districtAssemblyPlan;
   addMarker(roomGroup, makeVec(carved.anchors.exit[0], carved.anchors.exit[1], carved.anchors.exit[2]), MAT.exit, 1.15);
 
   const district = {
-    id: 'carved-voxel-fortress',
-    name: 'Carved Voxel Fortress',
-    purpose: 'single solid floating rock mass cut into an imperial fortress fragment',
-    archetype: 'carved_voxel_fortress',
+    id: districtIntent.id,
+    name: districtIntent.displayName,
+    purpose: districtIntent.purpose,
+    archetype: districtIntent.id,
     roomStart: 0,
     roomCount: carved.anchors.rooms.length,
     layoutId: carved.id,
     elevationBand: 'carved ascent',
     baseElevation: 0,
     topElevation: 6,
-    macroTemplateId: 'subtractive_fortress_fragment',
+    macroTemplateId: districtIntent.routeTemplateId,
     approachType: 'spawn_alcove',
     departureType: 'final_chamber',
     supportStyle: 'single_voxel_field',
-    landmarkRole: 'overlook_window_back_to_court',
+    landmarkRole: districtIntent.landmark.id,
     requiresVisibleBelow: true,
     requiresVisibleAbove: true,
     skeletonType: 'solid_mass_subtractive_cuts',
     patchStyle: 'carved_negative_space',
-    silhouetteRule: 'one floating rock mass with route voids carved through it',
+    silhouetteRule: districtIntent.expectedSilhouette.join('; '),
     segmentRoles: carved.cuts.map((cut) => cut.tacticalRole),
-    validation: { implemented: true, passes: true, failedChecks: [] },
+    validation: districtIntent.validation,
     repairsApplied: [],
-    landmarkSchemas: [],
+    landmarkSchemas: [districtIntent.landmark],
     storyNookPlacements: [],
-    requiredStructuralReads: ['battery_court_void', 'trench_cut', 'overlook_window', 'secret_side_cut'],
+    requiredStructuralReads: districtIntent.validationTags,
+    districtIntent,
+    requiredPhrases: districtIntent.requiredPhrases,
+    requiredAssemblies: districtIntent.requiredAssemblies,
+    logisticsFlow: districtIntent.logisticsFlow,
+    expectedSkyline: districtIntent.expectedSkyline,
+    expectedSilhouette: districtIntent.expectedSilhouette,
+    traversalIdentity: districtIntent.traversalIdentity,
+    districtAssemblies: emittedAssemblyPlan,
   };
   const plan = {
     levelIndex: roomState.levelIndex,
     seed: hashRoomKey(carved.id + ':' + roomState.levelIndex),
     sliceId: carved.id,
+    districtIntentPlans: [districtIntent],
+    districtAssemblyPlans: [emittedAssemblyPlan],
     districts: [district],
     mainSpineEdges: carved.metrics.routeConnections.map((edge) => ({ ...edge, kind: 'carved_connection' })),
     returnEdges: [{ from: 'secret_side_cut', to: 'overlook_window', kind: 'secret_return' }],
@@ -5112,6 +5223,10 @@ function updateCurrentGauntletRoom() {
         districtId: district.id || 'carved-voxel-fortress',
         districtName: district.name || 'Carved Voxel Fortress',
         districtPurpose: district.purpose || 'single mass carved fortress fragment',
+        districtIntentId: district.districtIntent?.id || district.id,
+        districtLandmarkRole: district.landmarkRole,
+        districtLogisticsFlow: district.logisticsFlow || [],
+        districtTraversalIdentity: district.traversalIdentity || [],
         districtIndex: 0,
         districtRoomIndex: bestIndex,
         districtElevationBand: district.elevationBand || 'carved ascent',
@@ -5121,7 +5236,7 @@ function updateCurrentGauntletRoom() {
         districtSkeletonType: district.skeletonType || 'solid_mass_subtractive_cuts',
         districtSegmentRole: spec.tacticalRole,
       };
-      setStatus('carved_voxel_fortress | ' + spec.id + ' | ' + (spec.readabilityCue || spec.purpose));
+      setStatus((district.name || 'Carved Voxel Fortress') + ' | ' + spec.id + ' | ' + (spec.readabilityCue || spec.purpose));
       return;
     }
     if (useQuakeM1E1Slice()) {
@@ -5206,8 +5321,10 @@ function buildRoom(movePlayer = true) {
       levelIndex: roomState.levelIndex,
       seed: districtPlan.seed,
       sliceId: built.carved.id,
-      routeTemplateId: 'subtractive_fortress_fragment',
+      routeTemplateId: district.macroTemplateId,
       districts: districtPlan.districts.map((entry) => ({ ...entry })),
+      districtIntentPlans: districtPlan.districtIntentPlans.map((entry) => ({ ...entry })),
+      districtAssemblyPlans: districtPlan.districtAssemblyPlans.map((entry) => ({ ...entry })),
       mainSpineEdges: districtPlan.mainSpineEdges.map((edge) => ({ ...edge })),
       returnEdges: districtPlan.returnEdges.map((edge) => ({ ...edge })),
       landmarkViews: districtPlan.landmarkViews.map((view) => ({ ...view })),
@@ -5218,6 +5335,10 @@ function buildRoom(movePlayer = true) {
         districtId: district.id,
         districtName: district.name,
         districtPurpose: district.purpose,
+        districtIntentId: district.districtIntent.id,
+        districtLandmarkRole: district.landmarkRole,
+        districtLogisticsFlow: district.logisticsFlow,
+        districtTraversalIdentity: district.traversalIdentity,
         districtElevationBand: district.elevationBand,
         districtBaseElevation: district.baseElevation,
         districtTopElevation: district.topElevation,
@@ -5245,6 +5366,10 @@ function buildRoom(movePlayer = true) {
       districtId: district.id,
       districtName: district.name,
       districtPurpose: district.purpose,
+      districtIntentId: district.districtIntent.id,
+      districtLandmarkRole: district.landmarkRole,
+      districtLogisticsFlow: district.logisticsFlow,
+      districtTraversalIdentity: district.traversalIdentity,
       districtIndex: 0,
       districtRoomIndex: 0,
       districtElevationBand: district.elevationBand,
@@ -5254,10 +5379,10 @@ function buildRoom(movePlayer = true) {
       districtSkeletonType: district.skeletonType,
       districtSegmentRole: spec.tacticalRole,
       districtValidationImplemented: true,
-      districtValidationPasses: true,
-      districtValidationFailedChecks: [],
+      districtValidationPasses: district.validation.passes,
+      districtValidationFailedChecks: [...district.validation.failedChecks],
       districtRepairsApplied: [],
-      districtLandmarks: [],
+      districtLandmarks: district.landmarkSchemas.map((landmark) => ({ ...landmark })),
     };
     roomState.seed = hashRoomKey(built.carved.id);
     roomState.spawn.copy(built.spawn);
@@ -5286,7 +5411,7 @@ function buildRoom(movePlayer = true) {
       player.attack = null;
       player.attackTimer = 0;
     }
-    setStatus('carved_voxel_fortress | single mass -> subtractive cuts | air ' + built.carved.metrics.airVolumeCreated);
+    setStatus(district.name + ' | single mass -> ' + district.landmarkRole + ' | air ' + built.carved.metrics.airVolumeCreated);
     return;
   }
   if (useQuakeM1E1Slice()) {
