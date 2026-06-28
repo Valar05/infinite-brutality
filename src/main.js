@@ -1120,6 +1120,9 @@ function addIslandArtBridge(name, from, to, width = 4.4, options = {}) {
     yaw,
     slabBridge: options.slabBridge,
     material: options.material,
+    rockGrammar: options.rockGrammar || 'imperial_floating_strata',
+    rockSilhouette: options.rockSilhouette || 'rail_cut_causeway',
+    imperialFunction: options.imperialFunction || 'imperial_causeway_logistics',
     seed: bridgeSeed,
     source: (options.source || name) + ':voxel',
   });
@@ -3422,6 +3425,8 @@ function generateDistrictPlan(levelIndex) {
       storyPilotId: 'hanging_gardens_absent_people_01',
       storyPlacementSet: 'hg_market_intake_nooks',
       silhouetteRule: 'low intake shelf cut into an organic cistern rock',
+      terrainSilhouette: 'fortress_plateau',
+      terrainFunction: 'imperial_core_retaining_gate',
     },
     {
       name: 'Graft Market Crown',
@@ -3434,6 +3439,8 @@ function generateDistrictPlan(levelIndex) {
       storyPilotId: 'hanging_gardens_absent_people_01',
       storyPlacementSet: 'hg_market_intake_nooks',
       silhouetteRule: 'middle crown terrace with flat build pads and broken garden lips',
+      terrainSilhouette: 'foundry_shelf',
+      terrainFunction: 'suspended_foundry_logistics',
     },
     {
       name: 'Witness Cistern Stair',
@@ -3446,6 +3453,8 @@ function generateDistrictPlan(levelIndex) {
       storyPilotId: 'hanging_gardens_absent_people_02',
       storyPlacementSet: 'hg_shrine_rim_nooks',
       silhouetteRule: 'upper witness shelf pitched off-axis above the market crown',
+      terrainSilhouette: 'artillery_crown',
+      terrainFunction: 'battery_terrace_command_road',
     },
   ];
   const districts = [];
@@ -3511,8 +3520,9 @@ function generateDistrictPlan(levelIndex) {
         size: sliceConfig.size,
         yaw,
         terraced: true,
-        rockGrammar: 'sedimentary_mesa',
-        rockSilhouette: 'mesa',
+        rockGrammar: 'imperial_floating_strata',
+        rockSilhouette: sliceConfig.terrainSilhouette,
+        imperialFunction: sliceConfig.terrainFunction,
       }],
       landmarkAnchor: { x: origin.x, y: baseElevation + 2.6, z: origin.z, role: sliceConfig.role },
     });

@@ -18,6 +18,10 @@ assert.match(terrainLayerSource, /export function createTerrainLayer/, 'terrain-
 assert.match(terrainLayerSource, /group\.userData\.owner = 'TerrainLayer'/, 'terrain group must declare TerrainLayer ownership');
 assert.match(terrainLayerSource, /const colliders = \[\]/, 'TerrainLayer must own support colliders internally');
 assert.match(terrainLayerSource, /const visualMeshes = \[\]/, 'TerrainLayer must own visual meshes internally');
+assert.match(terrainLayerSource, /imperial_floating_strata/, 'TerrainLayer must preserve the Imperial Floating Strata terrain label');
+assert.match(terrainLayerSource, /fieldGrammar: 'imperial_floating_strata'/, 'Imperial Floating Strata must route to its own field builder');
+assert.match(terrainLayerSource, /baseGrammar/, 'TerrainLayer must record the base field grammar when a terrain label aliases an existing generator');
+assert.match(terrainLayerSource, /imperialFunction/, 'TerrainLayer must carry district function metadata into terrain fields');
 assert.match(terrainLayerSource, /const addIslandStamp = /, 'TerrainLayer must own island stamp emission');
 assert.match(terrainLayerSource, /const addBridgeSpan = /, 'TerrainLayer must own connector span emission');
 assert.match(terrainLayerSource, /const supportAt = /, 'TerrainLayer must answer support queries');

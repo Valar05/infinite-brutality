@@ -99,6 +99,13 @@ function visualStats(mesh) {
 
 const cases = [
   ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' })],
+  ['imperial-floating-strata', buildRoomIslandField([30, 11, 26], 1000, {
+    grammar: 'imperial_floating_strata',
+    terraced: true,
+    role: 'arena',
+    rockSilhouette: 'fortress_plateau',
+    imperialFunction: 'imperial_core_retaining_gate',
+  })],
   ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1)],
 ];
 

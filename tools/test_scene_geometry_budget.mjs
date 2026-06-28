@@ -67,9 +67,11 @@ function meshStats(label, field, kind) {
 
 const islandStats = CURRENT_SLICE_ISLANDS.map((entry) => {
   const field = buildRoomIslandField(entry.size, entry.seed, {
-    grammar: 'sedimentary_mesa',
+    grammar: 'imperial_floating_strata',
     terraced: true,
     role: 'arena',
+    rockSilhouette: entry.label === 'Cistern Customs Terrace' ? 'fortress_plateau' : entry.label === 'Graft Market Crown' ? 'foundry_shelf' : 'artillery_crown',
+    imperialFunction: entry.label === 'Cistern Customs Terrace' ? 'imperial_core_retaining_gate' : entry.label === 'Graft Market Crown' ? 'suspended_foundry_logistics' : 'battery_terrace_command_road',
   });
   const mesh = buildSedimentaryMesaMeshData(field, 0.072);
   const exposedMesh = buildExposedVoxelFaceMeshData(field, 0.072);

@@ -1288,6 +1288,8 @@ function normalizeRoomIslandOptions(optionsOrTerraced = false) {
       grammar: optionsOrTerraced.grammar || 'legacy_room_island',
       terraced: Boolean(optionsOrTerraced.terraced),
       role: optionsOrTerraced.role || 'generic',
+      rockSilhouette: optionsOrTerraced.rockSilhouette,
+      imperialFunction: optionsOrTerraced.imperialFunction,
     };
   }
   return {
@@ -1415,8 +1417,145 @@ function buildSedimentaryMesaField(size, seed, options) {
   return field;
 }
 
+function imperialShapeSettings(options) {
+  switch (options.imperialFunction) {
+    case 'suspended_foundry_logistics':
+      return {
+        silhouette: options.rockSilhouette || 'foundry_shelf',
+        roadHalfWidth: 0.24,
+        roadHalfLength: 0.92,
+        deckHalfWidth: 0.62,
+        deckHalfLength: 0.78,
+        shelfSide: -1,
+        process: 'rail_shelf_furnace_cut_into_suspended_strata',
+      };
+    case 'battery_terrace_command_road':
+      return {
+        silhouette: options.rockSilhouette || 'artillery_crown',
+        roadHalfWidth: 0.28,
+        roadHalfLength: 0.96,
+        deckHalfWidth: 0.72,
+        deckHalfLength: 0.70,
+        shelfSide: 1,
+        process: 'battery_terraces_cannon_roads_cut_into_strata',
+      };
+    case 'imperial_core_retaining_gate':
+    default:
+      return {
+        silhouette: options.rockSilhouette || 'fortress_plateau',
+        roadHalfWidth: 0.26,
+        roadHalfLength: 0.96,
+        deckHalfWidth: 0.56,
+        deckHalfLength: 0.82,
+        shelfSide: 0,
+        process: 'imperial_construction_cut_into_suspended_strata',
+      };
+  }
+}
+
+function enforceImperialEngineeredCuts(field, size, settings) {
+  const [sx, sy, sz] = size;
+  for (let z = 0; z < field.nz; z += 1) {
+    for (let x = 0; x < field.nx; x += 1) {
+      const p = voxelCenter(field, x, 0, z);
+      const nx = p.x / Math.max(0.001, sx * 0.5);
+      const nz = p.z / Math.max(0.001, sz * 0.5);
+      const ax = Math.abs(nx);
+      const az = Math.abs(nz);
+      const roadCut = ax <= settings.roadHalfWidth && az <= settings.roadHalfLength;
+      const retainingBite = ax >= 0.68 && ax <= 0.94 && az <= 0.76;
+      const serviceShelf = (
+        settings.shelfSide === 0
+          ? ax <= 0.88 && nz >= 0.34 && nz <= 0.94
+          : nx * settings.shelfSide >= 0.34 && nx * settings.shelfSide <= 0.92 && az <= 0.72
+      );
+      if (roadCut) continue;
+      const topLimit = retainingBite ? sy * 0.12 : serviceShelf ? sy * 0.16 : null;
+      if (topLimit == null) continue;
+      for (let y = 0; y < field.ny; y += 1) {
+        const centerY = field.min.y + (y + 0.5) * field.cell;
+        if (centerY > topLimit) setVoxel(field, x, y, z, 0);
+      }
+    }
+  }
+}
+
+function buildImperialFloatingStrataField(size, seed, options) {
+  const [sx, sy, sz] = size;
+  const settings = imperialShapeSettings(options);
+  const cell = Math.min(DRIFTFIELD_TERRAIN_CELL, Math.max(MIN_PLAYABLE_ISLAND_CELL, Math.min(sx, sy, sz) / 5.4));
+  const min = vec3(-sx * 0.58, -sy * 1.10, -sz * 0.58);
+  const max = vec3(sx * 0.58, sy * 0.42, sz * 0.58);
+  const field = buildFieldFromVerticalSpan(cell, min, max, (p) => {
+    const nx = p.x / Math.max(0.001, sx * 0.5);
+    const nz = p.z / Math.max(0.001, sz * 0.5);
+    const ax = Math.abs(nx);
+    const az = Math.abs(nz);
+    const angle = Math.atan2(nz, nx);
+    const roadCut = ax <= settings.roadHalfWidth && az <= settings.roadHalfLength;
+    const commandDeck = ax <= settings.deckHalfWidth && az <= settings.deckHalfLength;
+    const retainingBite = ax >= 0.68 && ax <= 0.94 && az <= 0.76;
+    const serviceShelf = (
+      settings.shelfSide === 0
+        ? ax <= 0.88 && nz >= 0.34 && nz <= 0.94
+        : nx * settings.shelfSide >= 0.34 && nx * settings.shelfSide <= 0.92 && az <= 0.72
+    );
+    const outer = Math.max(ax / 0.94, az / 1.0);
+    const cornerShear = Math.max(0, ax - 0.74) * Math.max(0, az - 0.78);
+    const edgeNoise = valueNoise2(nx * 5.3 + 14.0, nz * 5.3 - 3.1, seed + 503);
+    const blastCut = outer > 0.82 && edgeNoise > 0.82 + Math.max(0, outer - 0.82) * 0.52;
+    if (!commandDeck && !roadCut && !retainingBite && !serviceShelf) {
+      if (outer + cornerShear * 0.86 > 1.0) return null;
+      if (blastCut) return null;
+    }
+
+    const rim = clamp01(outer);
+    const strataNoise = valueNoise2(nx * 4.1 - 6.7, nz * 4.1 + 9.4, seed + 521);
+    const quarryStep = Math.floor((az * 5.0 + ax * 2.0 + strataNoise * 2.0) % 4) * 0.035;
+    const surfaceNoise = (valueNoise2(nx * 8.0 + 1.5, nz * 8.0 - 4.4, seed + 541) - 0.5) * sy * 0.025;
+    let top = sy * (0.29 - rim * 0.05) + surfaceNoise;
+    if (commandDeck) top = Math.max(top, sy * 0.31);
+    if (serviceShelf && !roadCut) top = Math.min(top, sy * 0.15 + surfaceNoise * 0.45);
+    if (retainingBite && !roadCut) top = Math.min(top, sy * 0.10 + surfaceNoise * 0.35);
+    if (roadCut) top = sy * 0.34;
+    if (options.terraced && !roadCut) {
+      const terraceStep = sy * 0.055;
+      top = Math.round(top / terraceStep) * terraceStep;
+    }
+
+    const verticalGroove = Math.max(0, valueNoise2(Math.cos(angle) * 5.0 + 2.0, Math.sin(angle) * 5.0 - 5.2, seed + 557) - 0.56);
+    const engineeredDepth = retainingBite ? 0.26 : roadCut ? 0.05 : serviceShelf ? 0.14 : 0;
+    const bottom = -sy * (
+      0.58
+      + rim * 0.16
+      + engineeredDepth
+      + Math.abs(strataNoise - 0.5) * (0.08 + rim * 0.14)
+      + verticalGroove * rim * 0.18
+      + quarryStep
+    );
+    const thickness = top - bottom;
+    if (thickness < sy * 0.54) return null;
+    if (rim > 0.86 && thickness < sy * 0.60) return null;
+    return { top, bottom };
+  });
+  closeVoxelDiagonalEdgeGaps(field);
+  enforceImperialEngineeredCuts(field, size, settings);
+  field.rockGrammar = {
+    grammar: 'imperial_floating_strata',
+    baseGrammar: 'sedimentary_mesa',
+    fieldGrammar: 'imperial_floating_strata',
+    silhouette: settings.silhouette,
+    process: settings.process,
+    role: options.role,
+    imperialFunction: options.imperialFunction || 'imperial_core_retaining_gate',
+    zones: ['commandDeck', 'roadCut', 'retainingBites', 'serviceShelf', 'undersideMass', 'damageCuts'],
+  };
+  return field;
+}
+
 export function buildRoomIslandField(size, seed, optionsOrTerraced = false) {
   const options = normalizeRoomIslandOptions(optionsOrTerraced);
+  if (options.grammar === 'imperial_floating_strata') return buildImperialFloatingStrataField(size, seed, options);
   if (options.grammar === 'sedimentary_mesa') return buildSedimentaryMesaField(size, seed, options);
   return buildLegacyRoomIslandField(size, seed, options);
 }

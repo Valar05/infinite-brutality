@@ -32,8 +32,24 @@ assert.ok(
   'active terraced district mass anchors must use the sedimentary mesa rock grammar',
 );
 assert.ok(
-  main.includes("rockGrammar: 'sedimentary_mesa'"),
-  'playable slice anchors must opt into sedimentary mesa terrain',
+  main.includes("rockGrammar: 'imperial_floating_strata'"),
+  'playable slice anchors must opt into Imperial Floating Strata terrain labels',
+);
+assert.ok(
+  main.includes("rockGrammar: options.rockGrammar || 'imperial_floating_strata'"),
+  'active connector spans must default to Imperial Floating Strata terrain labels',
+);
+assert.ok(
+  districtGeometry.includes('function addImperialCoreTerrainSignature(district)'),
+  'Imperial Core terrain must have a visible structural signature hook',
+);
+assert.ok(
+  districtGeometry.includes("anchor?.imperialFunction !== 'imperial_core_retaining_gate'"),
+  'Imperial Core signature must stay scoped to the imperial retaining-gate district',
+);
+assert.ok(
+  districtGeometry.includes("'-parade-road-cap'") && districtGeometry.includes("'-retaining-bite-west'") && districtGeometry.includes("'-anchor-pylon-'"),
+  'Imperial Core signature must include parade road, retaining-wall bite, and anchor pylons',
 );
 assert.ok(
   main.includes("const BUILD = '0.8.175';"),
@@ -41,8 +57,8 @@ assert.ok(
 );
 
 assert.ok(
-  terrainLayer.includes("const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';"),
-  'sedimentary mesa islands must use a dedicated visible mesh/material path',
+  terrainLayer.includes("field.rockGrammar?.grammar === 'imperial_floating_strata'"),
+  'imperial terrain labels must still use the dedicated sedimentary visible mesh/material path',
 );
 assert.ok(
   terrainLayer.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),

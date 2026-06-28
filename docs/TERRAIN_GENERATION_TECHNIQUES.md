@@ -7,6 +7,13 @@ Authoritative terrain shape direction lives in `docs/ROCK_SHAPE_GRAMMAR.md`.
 This file is the implementation map: which functions build which style, where
 they are used, and what validates them.
 
+`docs/IMPERIAL_FLOATING_STRATA_GRAMMAR.md` is the current design bridge from
+sedimentary terrain machinery to Napoleon's Floating Kingdom terrain language.
+When runtime labels request `imperial_floating_strata`, they use an
+imperial-specific field builder that bakes roads, retaining bites, service
+shelves, and engineered silhouettes into the voxel field. The first visible
+mesh path still uses the proven sedimentary contour shell.
+
 ## Current Runtime Terrain
 
 ### Sedimentary Mesa Island Fields
@@ -29,6 +36,15 @@ The generated field carries `field.rockGrammar` metadata:
 - `silhouette`: `mesa`
 - `process`: `sediment_layers_erosion_fracture`
 - `role`: caller-supplied gameplay role, such as `arena`
+
+When emitted through `TerrainLayer`, callers may request
+`imperial_floating_strata`. The layer routes that label to the imperial field
+builder and records:
+
+- `grammar`: `imperial_floating_strata`
+- `baseGrammar`: `sedimentary_mesa`
+- `fieldGrammar`: `imperial_floating_strata`
+- `imperialFunction`: caller-supplied district/logistics function
 
 After field sampling, `closeVoxelDiagonalEdgeGaps(...)` fills diagonal-only
 contacts so exposed-voxel meshing can remain watertight and manifold.
@@ -139,6 +155,12 @@ The layer keeps the current split explicit:
 - Visible terrain meshes live in the layer group.
 - Player and enemy support/body queries ask the layer first.
 - Layer disposal clears generated terrain meshes and collider records together.
+
+For Imperial Floating Strata, the layer owns grammar routing. A caller can
+submit `rockGrammar: 'imperial_floating_strata'`; the layer builds the
+imperial-specific voxel field, keeps support/collision tied to that field, and
+uses the current sedimentary contour shell for visible output. This is no
+longer a metadata-only hook.
 
 This is the first architectural boundary for moving toward a Driftfield-style
 terrain pipeline: current terrain pieces have one room-level owner and a single

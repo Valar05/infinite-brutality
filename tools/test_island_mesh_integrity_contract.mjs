@@ -140,6 +140,7 @@ const cases = [
   ['legacy-room', buildRoomIslandField([8.8, 5.2, 8.8], 1), buildSurfaceNetMeshData, { strictEdges: true }],
   ['legacy-bridge', buildRockBridgeField(28, 4.8, 1.6, 1), buildSurfaceNetMeshData, { strictEdges: true }],
   ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' }), buildSedimentaryMesaMeshData, { strictEdges: true }],
+  ['imperial-floating-strata', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'imperial_floating_strata', terraced: true, role: 'arena', rockSilhouette: 'fortress_plateau', imperialFunction: 'imperial_core_retaining_gate' }), buildSedimentaryMesaMeshData, { strictEdges: true }],
   ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1), buildSedimentaryMesaMeshData, { strictEdges: true }],
 ];
 

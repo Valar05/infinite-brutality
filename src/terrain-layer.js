@@ -37,6 +37,43 @@ function disposeObjectTree(root) {
   });
 }
 
+function normalizeTerrainGrammar(grammar) {
+  if (grammar === 'imperial_floating_strata') {
+    return {
+      requestedGrammar: 'imperial_floating_strata',
+      fieldGrammar: 'imperial_floating_strata',
+      process: 'imperial_roads_retaining_walls_strata',
+    };
+  }
+  return {
+    requestedGrammar: grammar || 'sedimentary_mesa',
+    fieldGrammar: grammar || 'sedimentary_mesa',
+    process: null,
+  };
+}
+
+function applyTerrainGrammarMetadata(field, metadata, spec = {}) {
+  if (!field?.rockGrammar) return field;
+  if (metadata.requestedGrammar === field.rockGrammar.grammar) {
+    field.rockGrammar = {
+      ...field.rockGrammar,
+      silhouette: spec.rockSilhouette || field.rockGrammar.silhouette,
+      imperialFunction: spec.imperialFunction || field.rockGrammar.imperialFunction,
+    };
+    return field;
+  }
+  field.rockGrammar = {
+    ...field.rockGrammar,
+    baseGrammar: field.rockGrammar.grammar,
+    grammar: metadata.requestedGrammar,
+    fieldGrammar: metadata.fieldGrammar,
+    silhouette: spec.rockSilhouette || field.rockGrammar.silhouette,
+    imperialFunction: spec.imperialFunction,
+    process: metadata.process || field.rockGrammar.process,
+  };
+  return field;
+}
+
 export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
   const group = new THREE.Group();
   group.name = 'terrain-layer';
@@ -83,11 +120,14 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
   const addIslandStamp = (spec) => {
     terrainSpecs.push({ type: 'islandStamp', ...spec });
     const seed = spec.seed ?? hashRoomKey('terrain-layer-island:' + spec.id);
+    const grammar = normalizeTerrainGrammar(spec.rockGrammar);
     const field = spec.terraced
       ? buildRoomIslandField(spec.size, seed, {
-        grammar: spec.rockGrammar || 'sedimentary_mesa',
+        grammar: grammar.fieldGrammar,
         terraced: true,
         role: spec.role || 'arena',
+        rockSilhouette: spec.rockSilhouette,
+        imperialFunction: spec.imperialFunction,
       })
       : buildIslandVoxelField({
         id: spec.id,
@@ -96,7 +136,11 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
         size: spec.size,
         yaw: spec.yaw || 0,
       }, seed);
-    const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';
+    applyTerrainGrammarMetadata(field, grammar, spec);
+    const isSedimentaryMesa = field.rockGrammar?.baseGrammar === 'sedimentary_mesa'
+      || field.rockGrammar?.fieldGrammar === 'sedimentary_mesa'
+      || field.rockGrammar?.grammar === 'sedimentary_mesa'
+      || field.rockGrammar?.grammar === 'imperial_floating_strata';
     const meshData = isSedimentaryMesa
       ? buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)
       : buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
@@ -119,9 +163,11 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual' }) {
     terrainSpecs.push({ type: 'connectorStamp', ...spec });
     const seed = spec.seed ?? hashRoomKey('terrain-layer-bridge:' + spec.id + ':' + Math.round(spec.length * 10));
     const thickness = spec.thickness || 1.45;
+    const grammar = normalizeTerrainGrammar(spec.rockGrammar);
     const field = spec.slabBridge === false
       ? buildRockBridgeField(spec.length, spec.width, thickness, seed)
       : buildSedimentaryMesaBridgeField(spec.length, spec.width, thickness, seed);
+    if (spec.slabBridge !== false) applyTerrainGrammarMetadata(field, grammar, spec);
     const meshData = spec.slabBridge === false
       ? buildRockBridgeMeshData(spec.length, spec.width, thickness, seed, MAT.islandRock?.userData?.uvScale ?? 0.12)
       : buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);

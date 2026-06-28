@@ -170,6 +170,8 @@ export function createDistrictGeometryApi(deps) {
         yaw: anchor.yaw || 0,
         terraced: !!anchor.terraced,
         rockGrammar: anchor.rockGrammar || 'sedimentary_mesa',
+        rockSilhouette: anchor.rockSilhouette,
+        imperialFunction: anchor.imperialFunction,
         seed: hashRoomKey((anchor.terraced ? 'district-terraced-island:' : 'district-island:') + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)),
         materialVariant: i,
         source: 'district-island-voxel:' + anchor.id,
@@ -194,6 +196,9 @@ export function createDistrictGeometryApi(deps) {
         thickness: 1.6,
         origin: [spec.center.x, spec.center.y, spec.center.z],
         yaw: spec.yaw,
+        rockGrammar: district.terrainGrammar || anchors[i].rockGrammar || 'sedimentary_mesa',
+        rockSilhouette: 'rail_cut_causeway',
+        imperialFunction: 'imperial_causeway_logistics',
         seed: hashRoomKey('district-island-bridge:' + district.id + ':' + i),
         source: 'district-island-bridge-voxel:' + district.id + ':' + i,
       });
@@ -247,6 +252,33 @@ export function createDistrictGeometryApi(deps) {
     }
   }
 
+  function addImperialCoreTerrainSignature(district) {
+    const anchor = district?.massAnchors?.[0];
+    if (anchor?.imperialFunction !== 'imperial_core_retaining_gate') return;
+    const [x, y, z] = anchor.pos;
+    const roadY = district.baseElevation + 2.36;
+    const wallBaseY = y + anchor.size[1] * 0.34 - 2.2;
+    const prefix = 'district-' + district.id + '-imperial-core';
+
+    addGroundedBeveledBox(roomGroup, prefix + '-parade-road-cap', [7.2, 0.18, 18.0], [x, roadY, z + 2.4], MAT.connectorFloor, false, 0.025, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-bronze-spine', [0.26, 0.08, 17.4], [x, roadY + 0.16, z + 2.4], MAT.bronze, false, 0.01, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-a', [7.4, 0.08, 0.18], [x, roadY + 0.18, z - 3.4], MAT.iron, false, 0.008, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-b', [7.4, 0.08, 0.18], [x, roadY + 0.18, z + 4.2], MAT.iron, false, 0.008, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-c', [7.4, 0.08, 0.18], [x, roadY + 0.18, z + 11.0], MAT.iron, false, 0.008, 1);
+
+    addWallBox(roomGroup, prefix + '-retaining-bite-west', [2.2, 6.6, 18.5], [x - 12.4, wallBaseY + 3.3, z + 2.0], MAT.wall, false);
+    addWallBox(roomGroup, prefix + '-retaining-bite-east', [2.2, 6.6, 18.5], [x + 12.4, wallBaseY + 3.3, z + 2.0], MAT.wall, false);
+    addGroundedBeveledBox(roomGroup, prefix + '-west-capstone', [3.0, 0.42, 19.0], [x - 12.4, wallBaseY + 6.65, z + 2.0], MAT.trim, false, 0.025, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-east-capstone', [3.0, 0.42, 19.0], [x + 12.4, wallBaseY + 6.65, z + 2.0], MAT.trim, false, 0.025, 1);
+
+    for (let i = 0; i < 4; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const pierZ = z - 5.8 + Math.floor(i / 2) * 15.2;
+      addGroundedCylinder(roomGroup, prefix + '-anchor-pylon-' + i, 0.42, 4.8, [x + side * 9.7, roadY - 1.8, pierZ], MAT.iron, 6);
+      addBeveledBox(roomGroup, prefix + '-pylon-bite-' + i, [2.3, 0.28, 0.28], [x + side * 10.8, roadY + 0.34, pierZ], MAT.bronze, false, 0.01, 1).rotation.z = side * 0.18;
+    }
+  }
+
   function addHangingMarketDistrictSkeleton(district) {
     const origin = district.origin;
     const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
@@ -258,6 +290,8 @@ export function createDistrictGeometryApi(deps) {
     const terraceHighCenter = [origin.x + 42, highBand - 0.18, origin.z + 228];
     const bridgeCenter = [origin.x + 78, highBand + 0.28, origin.z + 286];
     const undercroftCenter = [origin.x - 6, lowBand - 0.82, origin.z + 226];
+
+    addImperialCoreTerrainSignature(district);
 
     addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-low', [34, 0.52, 30], terraceLowCenter, MAT.stone2, false, 0.1);
     addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-mid', [46, 0.58, 38], terraceMidCenter, MAT.stone2, false, 0.1);
