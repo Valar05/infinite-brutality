@@ -74,7 +74,7 @@ function part({
     kind: hazard ? 'hazard' : kind,
     hazard,
     visible,
-    collisionPolicy: collisionPolicy || (visible === false ? 'none' : (traversalIntent === 'walkable' ? 'player' : 'visual_only')),
+    collisionPolicy: collisionPolicy || (visible === false ? 'none' : (traversalIntent === 'walkable' ? 'player' : 'solid')),
   };
 }
 

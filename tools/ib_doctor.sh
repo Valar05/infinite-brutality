@@ -26,6 +26,8 @@ node --input-type=module --check < src/main.js
 node --check src/district-assembly-emitter.js
 node --check src/district-intent-planner.js
 node --check src/carved-voxel-fortress-slice.js
+node --check tools/test_material_manifest_contract.mjs
+node tools/test_material_manifest_contract.mjs
 node tools/test_district_assembly_contract.mjs
 node tools/test_district_walkability_contract.mjs
 node tools/test_player_walkability_route_contract.mjs

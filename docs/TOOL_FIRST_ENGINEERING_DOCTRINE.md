@@ -39,6 +39,15 @@ movement, slope handling, contact normals, ray casts, or stable terrain contact.
 Prefer a proven browser-compatible physics layer over custom triangle tests in
 the frame loop.
 
+For texture/material work, do not ship locally synthesized placeholder art as
+final art direction. Use OpenAI image generation or another real texture source
+for albedo/emissive art, then use local tools only for technical channel
+derivation, resizing, manifest wiring, and validation.
+
+For visible architecture, the default contract is visible mesh implies collision.
+Only exempt explicitly decorative or hidden metadata parts. Do not create
+architecture that looks physical but is ghosted.
+
 ## Proposal Format
 
 When proposing a tool, be concrete:

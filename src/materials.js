@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+const MANIFEST_TEXTURE_VERSION = 'openai-pbr-20260628';
 
 const EDGE_DEFAULTS = {
   edgeColor: 0xb8afa0,
@@ -107,10 +108,13 @@ export function createMaterialResources(deps) {
   const { textureLoader, renderer, rngFromSeed } = deps;
 
   function makeMat(color, roughness = 0.86, metalness = 0.04, lift = 0.055) {
-      return new THREE.MeshLambertMaterial({
+      return new THREE.MeshStandardMaterial({
         color,
         fog: true,
         emissive: new THREE.Color(color).multiplyScalar(lift),
+        emissiveIntensity: 1.0,
+        roughness,
+        metalness,
         flatShading: true,
       });
     }
@@ -344,6 +348,8 @@ export function createMaterialResources(deps) {
         roughness: null,
         metalness: null,
         height: null,
+        ao: null,
+        emissive: null,
       };
       const entries = [
         ['albedo', config.albedo, THREE.SRGBColorSpace],
@@ -351,6 +357,8 @@ export function createMaterialResources(deps) {
         ['roughness', config.roughness, THREE.NoColorSpace],
         ['metalness', config.metalness, THREE.NoColorSpace],
         ['height', config.height, THREE.NoColorSpace],
+        ['ao', config.ao, THREE.NoColorSpace],
+        ['emissive', config.emissive, THREE.SRGBColorSpace],
       ];
       for (const [key, path, colorSpace] of entries) {
         if (!path) continue;
@@ -369,19 +377,74 @@ export function createMaterialResources(deps) {
       return result;
     }
 
-    function applyRockPbrSet(material, maps, options = {}) {
-      if (!material || !maps?.albedo) return;
-      material.map = maps.albedo;
-      material.normalMap = maps.normal || null;
-      material.roughnessMap = maps.roughness || null;
-      material.metalnessMap = maps.metalness || null;
-      material.bumpMap = maps.height || null;
+    function applyPbrSetToMaterial(material, maps, options = {}) {
+      if (!material || !(maps?.albedo || maps?.emissive)) return;
+      material.map = maps.albedo || maps.emissive || null;
+      if ('normalMap' in material) material.normalMap = maps.normal || null;
+      if ('roughnessMap' in material) material.roughnessMap = maps.roughness || null;
+      if ('metalnessMap' in material) material.metalnessMap = maps.metalness || null;
+      if ('bumpMap' in material) material.bumpMap = maps.height || null;
+      if ('aoMap' in material) material.aoMap = maps.ao || null;
+      if ('aoMapIntensity' in material) material.aoMapIntensity = options.aoMapIntensity ?? 0.72;
+      if ('emissiveMap' in material) material.emissiveMap = maps.emissive || null;
+      if (maps.emissive && 'emissive' in material) {
+        material.emissive = material.emissive || new THREE.Color(0xffffff);
+        material.emissive.setHex(options.emissive ?? 0xffffff);
+        material.emissiveIntensity = options.emissiveIntensity ?? material.emissiveIntensity ?? 0.35;
+      }
+      if ('alphaMap' in material && material.transparent && maps.emissive && !maps.albedo) {
+        material.alphaMap = maps.emissive;
+      }
       const normalScale = options.normalScale ?? material.userData?.normalScale ?? 0.46;
-      material.normalScale = new THREE.Vector2(normalScale, normalScale);
-      material.bumpScale = options.bumpScale ?? 0.035;
-      material.envMapIntensity = options.envMapIntensity ?? 0.56;
-      material.color.setHex(0xffffff);
+      if ('normalScale' in material) material.normalScale = new THREE.Vector2(normalScale, normalScale);
+      if ('bumpScale' in material) material.bumpScale = options.bumpScale ?? 0.035;
+      if ('envMapIntensity' in material) material.envMapIntensity = options.envMapIntensity ?? 0.56;
+      if ('roughness' in material && Number.isFinite(options.roughness)) material.roughness = options.roughness;
+      if ('metalness' in material && Number.isFinite(options.metalness)) material.metalness = options.metalness;
+      if (maps.albedo && material.color) material.color.setHex(0xffffff);
       material.needsUpdate = true;
+    }
+
+    function applyRockPbrSet(material, maps, options = {}) {
+      applyPbrSetToMaterial(material, maps, options);
+    }
+
+    function normalizeManifestAssetPath(assetPath) {
+      if (!assetPath) return null;
+      const normalized = assetPath.startsWith('assets/') ? `../${assetPath}` : assetPath;
+      if (normalized.includes('/ib_pbr/')) return `${normalized}?v=${MANIFEST_TEXTURE_VERSION}`;
+      return normalized;
+    }
+
+    async function applyManifestPbrMaterials() {
+      const manifestUrl = new URL('../assets/materials/ib_pbr_material_manifest.json', import.meta.url).href;
+      try {
+        const response = await fetch(manifestUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const manifest = await response.json();
+        for (const entry of manifest.materials || []) {
+          if (entry.runtimeApproved !== true) continue;
+          const runtimeKeys = Array.isArray(entry.runtimeKeys) ? entry.runtimeKeys : [];
+          const materials = runtimeKeys.map((key) => MAT[key]).filter(Boolean);
+          if (!materials.length) continue;
+          const channels = entry.channels || {};
+          const maps = loadPbrTextureSet({
+            albedo: normalizeManifestAssetPath(channels.albedo),
+            normal: normalizeManifestAssetPath(channels.normal),
+            roughness: normalizeManifestAssetPath(channels.roughness),
+            metalness: normalizeManifestAssetPath(channels.metalness),
+            height: normalizeManifestAssetPath(channels.height),
+            ao: normalizeManifestAssetPath(channels.ao),
+            emissive: normalizeManifestAssetPath(channels.emissive),
+          });
+          for (const material of materials) {
+            material.userData.pbrManifestId = entry.id;
+            applyPbrSetToMaterial(material, maps, entry.runtimeParams || {});
+          }
+        }
+      } catch (error) {
+        console.warn('IB PBR material manifest failed; generated/vector fallbacks remain', error);
+      }
     }
 
     function applyGeneratedSurfaceTextures() {
@@ -448,6 +511,7 @@ export function createMaterialResources(deps) {
     });
     applyRockPbrSet(MAT.islandRock, meshyRockMaps, { normalScale: 0.16, bumpScale: 0.01, envMapIntensity: 0.92 });
     applyRockPbrSet(MAT.islandRockDark, meshyRockMaps, { normalScale: 0.12, bumpScale: 0.008, envMapIntensity: 0.9 });
+    applyManifestPbrMaterials();
 
     function loadSkyDomeTexture(material) {
       const url = new URL('../assets/textures/ib-real-limbo-skybox-20260609.png', import.meta.url).href;

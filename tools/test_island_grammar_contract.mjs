@@ -59,9 +59,11 @@ assert.ok(
   !districtGeometry.includes("'-parade-spine'") && !districtGeometry.includes("'-fortress-court'") && !districtGeometry.includes("'-command-tower'"),
   'carved imperial structure must not be assembled from large walkable boxes or pasted box towers',
 );
+const buildTokenMatch = main.match(/const BUILD = '([^']+)';/);
+assert.ok(buildTokenMatch, 'runtime must expose a BUILD cache-bust token');
 assert.ok(
-  main.includes("const BUILD = '0.8.209';"),
-  'runtime build should be cache-busted for the playable sedimentary mesa slice',
+  main.includes(`./materials.js?v=${buildTokenMatch[1]}`),
+  'material module import must use the current runtime BUILD cache-bust token',
 );
 
 assert.ok(

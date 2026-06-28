@@ -56,7 +56,12 @@ assert.match(terrainLayerSource, /const addVoxelField = \(spec\) => \{/, 'Terrai
 assert.match(terrainLayerSource, /physicsWorld\?\.addTerrainMesh\?\.\(\{ meshData, origin, yaw, source, kind \}\)/, 'raw voxel field must register mesh collider through TerrainLayer');
 assert.match(mainSource, /createTerrainLayer \} from '\.\/terrain-layer\.js\?v=0\.8\.200'/, 'runtime must import cache-busted TerrainLayer with addVoxelField');
 assert.match(mainSource, /carved-voxel-fortress-slice\.js\?v=0\.8\.209'/, 'runtime must import cache-busted carved voxel slice');
-assert.match(mainSource, /district-intent-planner\.js\?v=0\.8\.209'/, 'runtime must import cache-busted district intent planner');
+const buildTokenMatch = mainSource.match(/const BUILD = '([^']+)';/);
+assert.ok(buildTokenMatch, 'runtime must expose a BUILD cache-bust token');
+assert.ok(
+  mainSource.includes(`./district-intent-planner.js?v=${buildTokenMatch[1]}`),
+  'runtime must import district intent planner with the current BUILD cache-bust token',
+);
 assert.match(mainSource, /const ACTIVE_SLICE = URL_PARAMS\.get\('slice'\) \|\| 'carved_voxel_fortress'/, 'carved voxel fortress must be the default slice');
 assert.match(mainSource, /function buildCarvedVoxelFortressSlice\(\)/, 'runtime must include carved slice builder');
 assert.match(mainSource, /function exitCompletionEnabled\(\) \{\n  return !useCarvedVoxelFortressSlice\(\);\n\}/, 'carved slice must not auto-complete and rebuild when the player walks on terrain near the final chamber');

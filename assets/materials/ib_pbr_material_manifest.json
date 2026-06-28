@@ -1,0 +1,988 @@
+{
+  "schemaVersion": 1,
+  "id": "infinite-brutality-pbr-material-manifest",
+  "date": "2026-06-28",
+  "purpose": "Defines the full-channel painterly PBR material targets for every active Infinite Brutality runtime material key.",
+  "referenceMaterial": {
+    "id": "readable_meshy_rock",
+    "description": "The existing readable Meshy-derived rock PBR set is the visual and channel completeness reference for new Infinite Brutality materials.",
+    "channels": {
+      "albedo": "assets/textures/openai-meshy-rock-albedo-20260615-readable.png",
+      "normal": "assets/textures/openai-meshy-rock-normal-20260615-readable.png",
+      "roughness": "assets/textures/openai-meshy-rock-roughness-20260615-readable.png",
+      "metalness": "assets/textures/openai-meshy-rock-metalness-20260615-readable.png",
+      "height": "assets/textures/openai-meshy-rock-height-20260615-readable.png"
+    }
+  },
+  "channelPolicy": {
+    "ordinarySurfaceRequiredChannels": [
+      "albedo",
+      "normal",
+      "roughness",
+      "metalness",
+      "height"
+    ],
+    "optionalChannels": [
+      "ao",
+      "emissive"
+    ],
+    "styleRules": [
+      "painterly but physically readable",
+      "imperial, mechanical, industrial, or carved-stone identity",
+      "no flat vector-only replacement as final material",
+      "no UI symbols, text, logos, watermarks, or decorative wallpaper",
+      "large forms must read on mobile before micro-detail"
+    ]
+  },
+  "materials": [
+    {
+      "id": "ib_carved_fortress_stone",
+      "runtimeKeys": [
+        "floor",
+        "stone",
+        "connectorFloor"
+      ],
+      "family": "stone",
+      "role": "primary walkable imperial fortress masonry and carved slab surfaces",
+      "surfaceRead": "broad dressed gray-blue stone blocks cut into fortress rock, worn edges, dust in seams, readable footing",
+      "palette": [
+        "#596879",
+        "#7b8790",
+        "#b8afa0"
+      ],
+      "uvScale": 0.125,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_carved_fortress_stone_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_carved_fortress_stone_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_carved_fortress_stone_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_carved_fortress_stone_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_carved_fortress_stone_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_carved_fortress_stone_height.png",
+        "ao": "assets/textures/ib_pbr/ib_carved_fortress_stone_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.86,
+        "metalness": 0.04,
+        "normalScale": 0.32,
+        "bumpScale": 0.018
+      },
+      "prompt": "Seamless tileable painterly PBR material, imperial sky-fortress dressed stone floor slabs carved from blue gray rock, broad block seams, chipped worn edges, quarry dust, low-poly readable forms, mobile game material, full albedo normal roughness metalness height intent.",
+      "negativePrompt": "text, letters, symbols, UI, wallpaper pattern, tiny cobbles, photoreal concrete, flat vector art, excessive cracks, high frequency noise",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_dark_casemate_wall",
+      "runtimeKeys": [
+        "wall",
+        "connectorWall"
+      ],
+      "family": "stone",
+      "role": "vertical casemate walls, trench sides, dark interior fortress stone",
+      "surfaceRead": "darker imperial masonry with sediment stains and battered vertical cuts",
+      "palette": [
+        "#202a35",
+        "#344252",
+        "#6f766f"
+      ],
+      "uvScale": 0.125,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_dark_casemate_wall_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_dark_casemate_wall_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_dark_casemate_wall_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_dark_casemate_wall_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_dark_casemate_wall_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_dark_casemate_wall_height.png",
+        "ao": "assets/textures/ib_pbr/ib_dark_casemate_wall_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.9,
+        "metalness": 0.02,
+        "normalScale": 0.34,
+        "bumpScale": 0.02
+      },
+      "prompt": "Seamless tileable painterly PBR material, dark imperial casemate wall stone, blue black dressed masonry, soot, mineral stains, vertical chisel planes, readable large stone blocks, mechanical fortress atmosphere.",
+      "negativePrompt": "text, glyphs, fantasy runes, brick wallpaper, tiny noisy pebbles, glossy plastic, pure black",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_light_platform_slab",
+      "runtimeKeys": [
+        "platform",
+        "stone2"
+      ],
+      "family": "stone",
+      "role": "raised ledges, readable platforms, pale structural caps",
+      "surfaceRead": "lighter worn stone cap slabs that separate playable platforms from dark walls",
+      "palette": [
+        "#7d8b96",
+        "#a7adb0",
+        "#d8d0bc"
+      ],
+      "uvScale": 0.125,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_light_platform_slab_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_light_platform_slab_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_light_platform_slab_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_light_platform_slab_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_light_platform_slab_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_light_platform_slab_height.png",
+        "ao": "assets/textures/ib_pbr/ib_light_platform_slab_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.82,
+        "metalness": 0.04,
+        "normalScale": 0.28,
+        "bumpScale": 0.014
+      },
+      "prompt": "Seamless tileable painterly PBR material, pale imperial stone platform cap slabs, worn beveled edges, dust, subtle chisel cuts, readable walkable surface, low-poly game material.",
+      "negativePrompt": "text, checkerboard, tiny tiles, marble luxury, glossy surface, busy ornamental pattern",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_readable_sedimentary_rock",
+      "runtimeKeys": [
+        "islandRock",
+        "islandRockDark"
+      ],
+      "family": "rock",
+      "role": "authoritative carved island rock and terrain mass material",
+      "surfaceRead": "readable layered rock with painterly PBR response and mobile-scale strata",
+      "palette": [
+        "#8c8069",
+        "#b7a98d",
+        "#e1d6bd"
+      ],
+      "uvScale": 0.125,
+      "status": "existing",
+      "sourceReferences": [
+        "assets/textures/openai-meshy-rock-albedo-20260615-readable.png",
+        "assets/textures/openai-meshy-rock-normal-20260615-readable.png",
+        "assets/textures/openai-meshy-rock-roughness-20260615-readable.png",
+        "assets/textures/openai-meshy-rock-metalness-20260615-readable.png",
+        "assets/textures/openai-meshy-rock-height-20260615-readable.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/openai-meshy-rock-albedo-20260615-readable.png",
+        "normal": "assets/textures/openai-meshy-rock-normal-20260615-readable.png",
+        "roughness": "assets/textures/openai-meshy-rock-roughness-20260615-readable.png",
+        "metalness": "assets/textures/openai-meshy-rock-metalness-20260615-readable.png",
+        "height": "assets/textures/openai-meshy-rock-height-20260615-readable.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.8,
+        "metalness": 0.02,
+        "normalScale": 0.16,
+        "bumpScale": 0.01
+      },
+      "prompt": "Existing reference material; do not regenerate without explicit art-direction approval.",
+      "negativePrompt": "replacement, flattening, vectorization",
+      "runtimeApproved": true
+    },
+    {
+      "id": "ib_strata_cut_rock",
+      "runtimeKeys": [
+        "sedimentaryRock",
+        "sedimentaryRockDark"
+      ],
+      "family": "rock",
+      "role": "secondary strata color family for carved cuts and darker rock surfaces",
+      "surfaceRead": "painterly sedimentary mesa rock with stronger horizontal strata and dark cut faces",
+      "palette": [
+        "#6f685b",
+        "#948873",
+        "#c0ad8e"
+      ],
+      "uvScale": 0.072,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_strata_cut_rock_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_strata_cut_rock_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_strata_cut_rock_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_strata_cut_rock_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_strata_cut_rock_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_strata_cut_rock_height.png",
+        "ao": "assets/textures/ib_pbr/ib_strata_cut_rock_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.92,
+        "metalness": 0.01,
+        "normalScale": 0.26,
+        "bumpScale": 0.016
+      },
+      "prompt": "Seamless tileable painterly PBR material, sedimentary sky-island cut rock, horizontal strata, warm gray tan layers, carved fortress foundation, readable natural stone, full-channel terrain material.",
+      "negativePrompt": "sand dunes, photographic cliffs, pure noise, black void, fantasy runes, tiny gravel",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_imperial_bronze_plate",
+      "runtimeKeys": [
+        "bronze",
+        "bridge",
+        "trim"
+      ],
+      "family": "metal",
+      "role": "imperial mechanical plates, trim, bridges, braces, and reinforced edges",
+      "surfaceRead": "aged brass and bronze panels with rivets, worn high points, tarnished seams",
+      "palette": [
+        "#61451e",
+        "#9a7937",
+        "#cbbd91",
+        "#35534a"
+      ],
+      "uvScale": 0.105,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_imperial_bronze_plate_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_imperial_bronze_plate_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_imperial_bronze_plate_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_imperial_bronze_plate_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_imperial_bronze_plate_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_imperial_bronze_plate_height.png",
+        "ao": "assets/textures/ib_pbr/ib_imperial_bronze_plate_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.74,
+        "metalness": 0.72,
+        "normalScale": 0.24,
+        "bumpScale": 0.012
+      },
+      "prompt": "Seamless tileable painterly PBR material, aged imperial bronze and brass mechanical plates, broad riveted panels, tarnished green seams, polished worn edges, Napoleonic industrial sky fortress, readable metalness roughness height.",
+      "negativePrompt": "gold jewelry, ornate wallpaper, tiny checker pattern, flat yellow, sci-fi chrome, text",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_blackened_gunmetal",
+      "runtimeKeys": [
+        "iron"
+      ],
+      "family": "metal",
+      "role": "iron braces, gun supports, grates, structural machinery",
+      "surfaceRead": "dark iron plates with blued edges, soot, hammered deformation, visible rivet logic",
+      "palette": [
+        "#1d2024",
+        "#2b2f34",
+        "#5d666a"
+      ],
+      "uvScale": 0.075,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_blackened_gunmetal_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_blackened_gunmetal_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_blackened_gunmetal_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_blackened_gunmetal_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_blackened_gunmetal_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_blackened_gunmetal_height.png",
+        "ao": "assets/textures/ib_pbr/ib_blackened_gunmetal_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.62,
+        "metalness": 0.85,
+        "normalScale": 0.22,
+        "bumpScale": 0.01
+      },
+      "prompt": "Seamless tileable painterly PBR material, blackened iron gunmetal plates, rivets, forged seams, soot, brushed worn edges, imperial mechanical fortress, not futuristic.",
+      "negativePrompt": "chrome mirror, sci-fi panels, text, flat black, high frequency scratches",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_execution_blood_residue",
+      "runtimeKeys": [
+        "blood",
+        "bloodDark"
+      ],
+      "family": "organic",
+      "role": "old blood stains, ritual grime, dark wet residue on execution architecture",
+      "surfaceRead": "dark red-brown residue embedded in stone, mostly rough with selective wet patches",
+      "palette": [
+        "#3c0b0e",
+        "#8a2020",
+        "#2b1110"
+      ],
+      "uvScale": 0.055,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_execution_blood_residue_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_execution_blood_residue_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_execution_blood_residue_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_execution_blood_residue_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_execution_blood_residue_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_execution_blood_residue_height.png",
+        "ao": "assets/textures/ib_pbr/ib_execution_blood_residue_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.8,
+        "metalness": 0.0,
+        "normalScale": 0.16,
+        "bumpScale": 0.006
+      },
+      "prompt": "Seamless tileable painterly PBR material, old dark blood residue and rust-red ritual grime on stone, dried matte patches with a few wet low-roughness streaks, brutal fortress execution surface.",
+      "negativePrompt": "gore photo, organs, text, bright candy red, glossy plastic, symbols",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_weathered_bone_ivory",
+      "runtimeKeys": [
+        "bone",
+        "bonePlain"
+      ],
+      "family": "organic",
+      "role": "bone architecture, old ivory accents, skull gate pieces",
+      "surfaceRead": "aged ivory bone with cracks, pores, dirt in creases, broad readable grain",
+      "palette": [
+        "#b9aa88",
+        "#d4c8ab",
+        "#695f4b"
+      ],
+      "uvScale": 0.112,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_weathered_bone_ivory_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_weathered_bone_ivory_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_weathered_bone_ivory_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_weathered_bone_ivory_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_weathered_bone_ivory_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_weathered_bone_ivory_height.png",
+        "ao": "assets/textures/ib_pbr/ib_weathered_bone_ivory_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.84,
+        "metalness": 0.0,
+        "normalScale": 0.2,
+        "bumpScale": 0.008
+      },
+      "prompt": "Seamless tileable painterly PBR material, weathered old bone ivory, broad pores, cracks, dirty creases, carved structural bone slabs, dark fantasy fortress material, mobile readable.",
+      "negativePrompt": "repeating teeth rows, skull drawings, text, honeycomb, bright white plastic",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_dead_flesh_hide",
+      "runtimeKeys": [
+        "flesh"
+      ],
+      "family": "organic",
+      "role": "dead flesh panels, corpse architecture accents, soft horror material",
+      "surfaceRead": "desaturated dead hide, scar tissue, rough stretched organic material, not gore-forward",
+      "palette": [
+        "#8f6652",
+        "#c7a183",
+        "#4d2e2b"
+      ],
+      "uvScale": 0.1,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_dead_flesh_hide_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_dead_flesh_hide_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_dead_flesh_hide_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_dead_flesh_hide_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_dead_flesh_hide_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_dead_flesh_hide_height.png",
+        "ao": "assets/textures/ib_pbr/ib_dead_flesh_hide_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.84,
+        "metalness": 0.0,
+        "normalScale": 0.18,
+        "bumpScale": 0.006
+      },
+      "prompt": "Seamless tileable painterly PBR material, desaturated dead flesh hide stretched over old machinery, scars, matte leathery surface, subtle bruising, brutal but not graphic.",
+      "negativePrompt": "graphic gore, organs, faces, text, glossy candy texture, medical photo",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_oiled_timber_beam",
+      "runtimeKeys": [
+        "timber"
+      ],
+      "family": "wood",
+      "role": "old beams, braces, service platforms, temporary imperial supports",
+      "surfaceRead": "dark oiled wood beams with cuts, grime, and worn corners",
+      "palette": [
+        "#4f3322",
+        "#71533b",
+        "#a27b55"
+      ],
+      "uvScale": 0.105,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_oiled_timber_beam_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_oiled_timber_beam_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_oiled_timber_beam_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_oiled_timber_beam_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_oiled_timber_beam_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_oiled_timber_beam_height.png",
+        "ao": "assets/textures/ib_pbr/ib_oiled_timber_beam_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.82,
+        "metalness": 0.0,
+        "normalScale": 0.18,
+        "bumpScale": 0.01
+      },
+      "prompt": "Seamless tileable painterly PBR material, old oiled timber beams, broad grain, saw cuts, blackened corners, imperial military scaffold wood, mobile readable.",
+      "negativePrompt": "fresh pine, cartoon planks, text, tiny repeated knots, parquet pattern",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_campaign_canvas",
+      "runtimeKeys": [
+        "cloth"
+      ],
+      "family": "fabric",
+      "role": "campaign cloth, banners, wrapped machinery, tent remnants",
+      "surfaceRead": "worn ochre-orange military canvas, dirty folds and stitched seams",
+      "palette": [
+        "#6e3d2c",
+        "#9d5f43",
+        "#c69064"
+      ],
+      "uvScale": 0.092,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_campaign_canvas_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_campaign_canvas_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_campaign_canvas_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_campaign_canvas_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_campaign_canvas_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_campaign_canvas_height.png",
+        "ao": "assets/textures/ib_pbr/ib_campaign_canvas_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.88,
+        "metalness": 0.0,
+        "normalScale": 0.14,
+        "bumpScale": 0.005
+      },
+      "prompt": "Seamless tileable painterly PBR material, worn imperial campaign canvas, ochre orange fabric, stitched seams, dirt, folds, sun faded military cloth.",
+      "negativePrompt": "modern nylon, text, flags, logos, checker weave too small, glossy plastic",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_lime_plaster_repair",
+      "runtimeKeys": [
+        "plaster"
+      ],
+      "family": "masonry",
+      "role": "patched interior walls, repaired masonry, old surface coating",
+      "surfaceRead": "cream lime plaster over stone with cracks, chips, and exposed underlayer",
+      "palette": [
+        "#9f8f77",
+        "#d2c0a8",
+        "#f0dfc1"
+      ],
+      "uvScale": 0.125,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_lime_plaster_repair_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_lime_plaster_repair_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_lime_plaster_repair_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_lime_plaster_repair_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_lime_plaster_repair_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_lime_plaster_repair_height.png",
+        "ao": "assets/textures/ib_pbr/ib_lime_plaster_repair_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.9,
+        "metalness": 0.0,
+        "normalScale": 0.16,
+        "bumpScale": 0.007
+      },
+      "prompt": "Seamless tileable painterly PBR material, old lime plaster repair over fortress masonry, chipped cream surface, exposed gray stone, hairline cracks, matte mineral finish.",
+      "negativePrompt": "modern drywall, wallpaper, floral pattern, text, pure beige flat fill",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_industrial_ceramic",
+      "runtimeKeys": [
+        "ceramic"
+      ],
+      "family": "ceramic",
+      "role": "insulators, old tiles, machinery housings, heat-resistant panels",
+      "surfaceRead": "worn gray ceramic with chipped glaze and soot in cracks",
+      "palette": [
+        "#858877",
+        "#b7baa8",
+        "#e1dec7"
+      ],
+      "uvScale": 0.112,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_industrial_ceramic_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_industrial_ceramic_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_industrial_ceramic_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_industrial_ceramic_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_industrial_ceramic_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_industrial_ceramic_height.png",
+        "ao": "assets/textures/ib_pbr/ib_industrial_ceramic_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.76,
+        "metalness": 0.0,
+        "normalScale": 0.14,
+        "bumpScale": 0.006
+      },
+      "prompt": "Seamless tileable painterly PBR material, old industrial ceramic insulator panels, gray off-white glaze, chipped edges, soot stains, Napoleonic mechanical laboratory.",
+      "negativePrompt": "bathroom tile, modern subway tile, text, glossy clean plastic, tiny grid",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_overgrown_bronze_garden",
+      "runtimeKeys": [
+        "foliage",
+        "green"
+      ],
+      "family": "natural",
+      "role": "hanging garden growth, mossy machine seams, readable green accents",
+      "surfaceRead": "desaturated moss and hardy plants growing through bronze and stone joints",
+      "palette": [
+        "#465a32",
+        "#6b8448",
+        "#79d49a"
+      ],
+      "uvScale": 0.09,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_overgrown_bronze_garden_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_overgrown_bronze_garden_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_overgrown_bronze_garden_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_overgrown_bronze_garden_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_overgrown_bronze_garden_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_overgrown_bronze_garden_height.png",
+        "ao": "assets/textures/ib_pbr/ib_overgrown_bronze_garden_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.82,
+        "metalness": 0.0,
+        "normalScale": 0.18,
+        "bumpScale": 0.006
+      },
+      "prompt": "Seamless tileable painterly PBR material, hardy moss and small leaves growing in imperial bronze and stone seams, muted green, damp roughness, sky fortress hanging garden overgrowth.",
+      "negativePrompt": "lush jungle photo, flowers, text, flat green, repeating leaf wallpaper",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_tar_water_channel",
+      "runtimeKeys": [
+        "water"
+      ],
+      "family": "liquid",
+      "role": "dark water channels, cisterns, damp industrial basins",
+      "surfaceRead": "dark blue-green water with painterly ripples and grimy oil sheen",
+      "palette": [
+        "#183238",
+        "#32545d",
+        "#6f8b8c"
+      ],
+      "uvScale": 0.08,
+      "status": "openai_generated",
+      "specialCaseReason": "Water needs animated or shader-driven response later; manifest still declares PBR-adjacent source maps for static fallback.",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_tar_water_channel_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_tar_water_channel_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_tar_water_channel_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_tar_water_channel_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_tar_water_channel_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_tar_water_channel_height.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.52,
+        "metalness": 0.0,
+        "normalScale": 0.1,
+        "bumpScale": 0.002
+      },
+      "prompt": "Seamless tileable painterly PBR fallback material, dark blue green industrial water, subtle tar oil sheen, shallow ripples, grimy fortress basin.",
+      "negativePrompt": "clear tropical water, waves, text, foam pattern, bright blue swimming pool",
+      "generatedAssetNote": "Generated declared special-case texture masks/fallback channels from manifest.",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_hemp_iron_rope",
+      "runtimeKeys": [
+        "rope"
+      ],
+      "family": "fiber",
+      "role": "ropes, lashings, pulley rigging, service ties",
+      "surfaceRead": "coarse hemp rope with grease, soot, and stretched fibers",
+      "palette": [
+        "#6b4e2f",
+        "#9e7d52",
+        "#c4a26d"
+      ],
+      "uvScale": 0.065,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_hemp_iron_rope_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_hemp_iron_rope_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_hemp_iron_rope_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_hemp_iron_rope_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_hemp_iron_rope_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_hemp_iron_rope_height.png",
+        "ao": "assets/textures/ib_pbr/ib_hemp_iron_rope_ao.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.84,
+        "metalness": 0.0,
+        "normalScale": 0.2,
+        "bumpScale": 0.01
+      },
+      "prompt": "Seamless tileable painterly PBR material, coarse old hemp rope, pulley grease, soot, frayed fibers, imperial sky dock rigging, broad readable strands.",
+      "negativePrompt": "modern nylon, tiny stripes, text, decorative knot diagrams, glossy cord",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_cyan_aether_crystal",
+      "runtimeKeys": [
+        "crystal",
+        "crystalDark"
+      ],
+      "family": "mineral",
+      "role": "crystal power elements, corpsefire mineral accents, ritual machinery",
+      "surfaceRead": "cyan mineral crystal with rough chipped facets and subtle inner glow",
+      "palette": [
+        "#3f6f73",
+        "#7ac9c0",
+        "#b6f3ed"
+      ],
+      "uvScale": 0.082,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_cyan_aether_crystal_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_cyan_aether_crystal_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_cyan_aether_crystal_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_cyan_aether_crystal_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_cyan_aether_crystal_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_cyan_aether_crystal_height.png",
+        "emissive": "assets/textures/ib_pbr/ib_cyan_aether_crystal_emissive.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.68,
+        "metalness": 0.0,
+        "normalScale": 0.18,
+        "bumpScale": 0.006,
+        "emissiveIntensity": 0.45
+      },
+      "prompt": "Seamless tileable painterly PBR material, cyan aether crystal facets, chipped mineral planes, subtle inner corpsefire glow, dark fortress machinery accent.",
+      "negativePrompt": "jewelry gemstone, rainbow crystal, text, UI icons, smooth glass only",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_heat_corruption_plate",
+      "runtimeKeys": [
+        "hazard",
+        "orange"
+      ],
+      "family": "hazard",
+      "role": "hot hazard plates, corruption zones, orange warning surface",
+      "surfaceRead": "scorched orange iron and stone with heat-stained seams",
+      "palette": [
+        "#6a2418",
+        "#c24d27",
+        "#ff8b35"
+      ],
+      "uvScale": 0.1,
+      "status": "openai_generated",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_heat_corruption_plate_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_heat_corruption_plate_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_heat_corruption_plate_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_heat_corruption_plate_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_heat_corruption_plate_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_heat_corruption_plate_height.png",
+        "emissive": "assets/textures/ib_pbr/ib_heat_corruption_plate_emissive.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.66,
+        "metalness": 0.18,
+        "normalScale": 0.2,
+        "bumpScale": 0.008,
+        "emissiveIntensity": 0.35
+      },
+      "prompt": "Seamless tileable painterly PBR material, scorched imperial hazard plate, orange heat in seams, blackened iron, cracked stone, corruption warning surface, readable but not UI-like.",
+      "negativePrompt": "warning signs, arrows, text, neon grid, lava photo, flat orange",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_void_depth",
+      "runtimeKeys": [
+        "void"
+      ],
+      "family": "utility",
+      "role": "non-walkable depth void and abyss border material",
+      "surfaceRead": "deep blue-black atmospheric depth, not a physical textured floor",
+      "palette": [
+        "#101622",
+        "#202735",
+        "#3a4151"
+      ],
+      "uvScale": 0.1,
+      "status": "special_case",
+      "specialCaseReason": "Void is atmospheric non-walkable depth; it uses an OpenAI-generated albedo only, not fake physical PBR channels.",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_void_depth_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_void_depth_albedo.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.95,
+        "metalness": 0.0,
+        "emissiveIntensity": 0.0
+      },
+      "prompt": "No texture generation by default; keep void readable as atmospheric non-geometry.",
+      "negativePrompt": "walkable floor, detailed texture, symbols",
+      "runtimeApproved": true,
+      "generatedBy": "OpenAI image generation plus local crop/resize",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "processing": "OpenAI-generated atmospheric depth albedo source copied into project assets for non-walkable void material."
+    },
+    {
+      "id": "ib_exit_aether_light",
+      "runtimeKeys": [
+        "exit"
+      ],
+      "family": "emissive",
+      "role": "exit marker surface and goal light",
+      "surfaceRead": "mint-green aether-lit metal or stone exit material, strong silhouette without UI iconography",
+      "palette": [
+        "#3f866f",
+        "#8de2b5",
+        "#c5ffe1"
+      ],
+      "uvScale": 0.1,
+      "status": "openai_generated",
+      "specialCaseReason": "Exit should combine a physical base material with emissive map so it reads as a goal without becoming a UI panel.",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_exit_aether_light_openai_albedo_source.png"
+      ],
+      "channels": {
+        "albedo": "assets/textures/ib_pbr/ib_exit_aether_light_albedo.png",
+        "normal": "assets/textures/ib_pbr/ib_exit_aether_light_normal.png",
+        "roughness": "assets/textures/ib_pbr/ib_exit_aether_light_roughness.png",
+        "metalness": "assets/textures/ib_pbr/ib_exit_aether_light_metalness.png",
+        "height": "assets/textures/ib_pbr/ib_exit_aether_light_height.png",
+        "emissive": "assets/textures/ib_pbr/ib_exit_aether_light_emissive.png"
+      },
+      "runtimeParams": {
+        "roughness": 0.66,
+        "metalness": 0.08,
+        "normalScale": 0.16,
+        "bumpScale": 0.004,
+        "emissiveIntensity": 0.65
+      },
+      "prompt": "Seamless tileable painterly PBR material, mint green aether-lit imperial stone and brass exit surface, subtle glowing seams, physical chipped edges, no symbols.",
+      "negativePrompt": "exit sign, arrows, text, UI marker, sci-fi panel",
+      "generatedAssetNote": "Generated declared special-case texture masks/fallback channels from manifest.",
+      "generatedBy": "OpenAI image generation plus tools/derive_ib_pbr_from_albedo.py",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated painterly albedo source copied into project assets; technical normal, roughness, metalness, height, ao, and emissive channels derived locally."
+    },
+    {
+      "id": "ib_fire_light_materials",
+      "runtimeKeys": [
+        "flame",
+        "corpsefire",
+        "flamePool",
+        "corpsefirePool",
+        "hazardPool"
+      ],
+      "family": "emissive",
+      "role": "runtime additive light and flame pool surfaces",
+      "surfaceRead": "additive glow planes and unlit flame materials, not ordinary PBR surfaces",
+      "palette": [
+        "#ffb04a",
+        "#8ee8df",
+        "#b85a22"
+      ],
+      "uvScale": 0.1,
+      "status": "special_case",
+      "specialCaseReason": "Fire/corpsefire materials are additive emissive masks; they use an OpenAI-generated emissive texture, not fake physical PBR channels.",
+      "sourceReferences": [
+        "assets/source/generated_textures/ib_pbr_openai/ib_fire_light_materials_openai_emissive_source.png"
+      ],
+      "channels": {
+        "emissive": "assets/textures/ib_pbr/ib_fire_light_materials_emissive.png"
+      },
+      "runtimeParams": {
+        "toneMapped": false,
+        "blending": "additive",
+        "depthWrite": false
+      },
+      "prompt": "Optional later: painterly emissive noise mask for orange flame, cyan corpsefire, and hazard light pools; no surface PBR target required for this slice.",
+      "negativePrompt": "physical floor material, text, icons",
+      "generatedAssetNote": "Generated declared special-case texture masks/fallback channels from manifest.",
+      "generatedBy": "OpenAI image generation plus local crop/resize",
+      "generatedTextureSize": [
+        1024,
+        1024
+      ],
+      "runtimeApproved": true,
+      "processing": "OpenAI-generated emissive mask source copied into project assets and cropped/resized for runtime additive fire and corpsefire materials."
+    }
+  ],
+  "generatedTextureSet": {
+    "tool": "tools/generate_ib_pbr_manifest_textures.py",
+    "textureSize": [
+      512,
+      512
+    ],
+    "generatedChannelFiles": 114,
+    "generatedMaterialEntries": 20,
+    "processing": "Deterministic local Pillow generation from manifest palettes, families, roles, surfaceRead fields, and runtime params. Produces painterly tileable albedo, normal, roughness, metalness, height, ao, and emissive channels as declared.",
+    "status": "rejected_placeholder",
+    "runtimeUse": "forbidden",
+    "rejectionReason": "Output read as procedural placeholder/crayon texture and replaced existing rock direction when hooked up."
+  }
+}

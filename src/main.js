@@ -4,10 +4,10 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 import { QUAKE_M1E1_SLICE } from './quake-m1e1-slice.js?v=0.8.197';
 import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.209';
-import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.209';
-import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.209';
+import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.212';
+import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.212';
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
-import { createMaterialResources } from './materials.js?v=0.8.179';
+import { createMaterialResources } from './materials.js?v=0.8.212';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js?v=0.8.200';
 import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.200';
@@ -32,7 +32,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.209';
+const BUILD = '0.8.212';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'carved_voxel_fortress';
 const ACTIVE_DISTRICT_ID = URL_PARAMS.get('district') || 'artillery_battery';
@@ -4836,8 +4836,8 @@ function emitDistrictAssemblyPlan(assemblyPlan) {
   if (!assemblyPlan?.parts?.length) return assemblyPlan || null;
   for (const part of assemblyPlan.parts) {
     if (part.visible === false) continue;
-    const hasPlayerCollider = part.collisionPolicy === 'player';
-    const mesh = (hasPlayerCollider ? addFortressSolid : addFortressVisualOnly)(
+    const hasPhysicalCollider = part.collisionPolicy === 'player' || part.collisionPolicy === 'solid';
+    const mesh = (hasPhysicalCollider ? addFortressSolid : addFortressVisualOnly)(
       roomGroup,
       'assembly-' + part.id,
       part.size,

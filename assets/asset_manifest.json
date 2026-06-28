@@ -616,6 +616,38 @@
       "tool": "built-in image_gen",
       "processing": "center-cropped if needed, resized to 1024x1024 RGB PNG, loaded on dedicated lightweight sedimentary terrain materials",
       "prompt_summary": "seamless muted ancient sedimentary rock albedo with warm gray, dirty tan, pale limestone, ochre, charcoal cracks, sparse rust seams, and horizontal strata; avoided old vector tile, bricks, cobbles, and random Voronoi patches"
+    },
+    {
+      "path": "assets/materials/ib_pbr_material_manifest.json",
+      "source": "Project-authored material planning manifest derived from src/materials.js runtime keys and existing Infinite Brutality texture provenance.",
+      "role": "canonical generated-set manifest for OpenAI-derived full-channel painterly PBR material replacements covering every active Infinite Brutality runtime material key",
+      "tool": "OpenAI image generation for albedo/emissive sources plus tools/derive_ib_pbr_from_albedo.py and tools/test_material_manifest_contract.mjs validation",
+      "processing": "records OpenAI source references, derived PBR channel paths, runtime material aliases, prompts, special-case exemptions, and runtime approval policy for the active ib_pbr material set",
+      "prompt_summary": "Infinite Brutality material direction: full-channel painterly PBR like the readable rock set, but imperial and mechanical where appropriate"
+    },
+    {
+      "path": "assets/textures/ib_pbr/*.png",
+      "source": "assets/source/generated_textures/ib_pbr_openai/*_source.png and existing readable rock PBR maps",
+      "role": "active full-channel painterly PBR texture set for Infinite Brutality runtime materials",
+      "tool": "OpenAI image generation for source art plus tools/derive_ib_pbr_from_albedo.py local technical-channel derivation",
+      "processing": "OpenAI-generated albedo/emissive sources were copied into project assets, normalized to 1024x1024, and converted into declared albedo, normal, roughness, metalness, height, ao, and emissive maps as appropriate; local procedural placeholder output is not runtime-approved",
+      "prompt_summary": "imperial mechanical painterly materials: carved fortress stone, casemate walls, bronze plates, blackened gunmetal, blood residue, bone ivory, dead flesh hide, timber, canvas, plaster, ceramic, overgrowth, tar water, rope, crystal, heat corruption, exit light, and emissive fire masks"
+    },
+    {
+      "path": "assets/materials/ib_pbr_material_preview.png",
+      "source": "runtime-approved assets/textures/ib_pbr/*_albedo.png and emissive special-case entries",
+      "role": "contact-sheet preview for runtime-approved OpenAI-derived Infinite Brutality PBR material surfaces",
+      "tool": "local Pillow contact sheet generation from approved material outputs",
+      "processing": "assembled runtime-approved material thumbnails into a review sheet after OpenAI source generation and channel derivation",
+      "prompt_summary": "preview of generated manifest texture families, not a runtime texture"
+    },
+    {
+      "path": "assets/source/generated_textures/ib_pbr_openai/*_source.png",
+      "source": "/data/data/com.termux/files/home/.codex/generated_images/019efa97-f9b1-7e32-9cb5-0a35c8aea053/*.png selected per material",
+      "role": "project-bound OpenAI-generated source images for Infinite Brutality PBR material derivation",
+      "tool": "built-in image_gen / OpenAI image generation",
+      "processing": "copied non-destructively from Codex generated_images into project source assets, then normalized and channel-derived by tools/derive_ib_pbr_from_albedo.py",
+      "prompt_summary": "painterly seamless material albedo/emissive sources for imperial mechanical fortress stone, metal, organics, utility surfaces, void, and fire masks"
     }
   ]
 }

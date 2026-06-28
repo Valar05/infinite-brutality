@@ -51,8 +51,16 @@ for (const id of DISTRICT_INTENT_IDS) {
   }
 }
 
-assert.match(mainSource, /import \{ buildDistrictIntentPlan \} from '\.\/district-intent-planner\.js\?v=0\.8\.209'/, 'runtime must import the district intent planner with cache bust');
-assert.match(mainSource, /import \{ buildDistrictAssemblyPlan \} from '\.\/district-assembly-emitter\.js\?v=0\.8\.209'/, 'runtime must import the district assembly emitter with cache bust');
+const buildTokenMatch = mainSource.match(/const BUILD = '([^']+)';/);
+assert.ok(buildTokenMatch, 'runtime must expose a BUILD cache-bust token');
+assert.ok(
+  mainSource.includes(`./district-intent-planner.js?v=${buildTokenMatch[1]}`),
+  'runtime must import the district intent planner with the current BUILD cache-bust token',
+);
+assert.ok(
+  mainSource.includes(`./district-assembly-emitter.js?v=${buildTokenMatch[1]}`),
+  'runtime must import the district assembly emitter with the current BUILD cache-bust token',
+);
 assert.match(mainSource, /const ACTIVE_DISTRICT_ID = URL_PARAMS\.get\('district'\) \|\| 'artillery_battery'/, 'runtime must expose ?district= selection with artillery battery default');
 assert.match(mainSource, /const districtIntent = buildDistrictIntentPlan\(hashRoomKey\(ACTIVE_DISTRICT_ID \+ ':' \+ roomState\.levelIndex\), ACTIVE_DISTRICT_ID\)/, 'carved slice must build district intent before terrain data');
 assert.match(mainSource, /addDistrictIntentReadabilityProps\(districtIntent\)/, 'runtime must emit screenshot-visible district identity props');
