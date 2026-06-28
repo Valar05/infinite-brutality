@@ -3,9 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 import { QUAKE_M1E1_SLICE } from './quake-m1e1-slice.js?v=0.8.197';
-import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.205';
-import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.205';
-import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.205';
+import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.209';
+import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.209';
+import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.209';
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
 import { createMaterialResources } from './materials.js?v=0.8.179';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
@@ -32,7 +32,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.205';
+const BUILD = '0.8.209';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'carved_voxel_fortress';
 const ACTIVE_DISTRICT_ID = URL_PARAMS.get('district') || 'artillery_battery';
@@ -4697,6 +4697,11 @@ function addFortressSolid(parent, name, size, center, mat = MAT.connectorWall, o
   });
 }
 
+function addFortressVisualOnly(parent, name, size, center, mat = MAT.connectorWall, options = {}) {
+  const baseY = center.y - size[1] * 0.5;
+  return addGroundedBeveledBox(parent, name, size, [center.x, baseY, center.z], mat, true, options.bevel ?? 0.035, 1);
+}
+
 function addFortressRoomShell(parent, room) {
   const center = slicePoint(room.center);
   const floorY = center.y;
@@ -4831,7 +4836,8 @@ function emitDistrictAssemblyPlan(assemblyPlan) {
   if (!assemblyPlan?.parts?.length) return assemblyPlan || null;
   for (const part of assemblyPlan.parts) {
     if (part.visible === false) continue;
-    const mesh = addFortressSolid(
+    const hasPlayerCollider = part.collisionPolicy === 'player';
+    const mesh = (hasPlayerCollider ? addFortressSolid : addFortressVisualOnly)(
       roomGroup,
       'assembly-' + part.id,
       part.size,
@@ -4839,7 +4845,7 @@ function emitDistrictAssemblyPlan(assemblyPlan) {
       districtAssemblyMaterial(part.material),
       {
         margin: 0.01,
-        kind: part.kind || (part.hazard ? 'hazard' : 'structure'),
+        kind: part.traversalIntent || part.kind || (part.hazard ? 'hazard' : 'structure'),
       },
     );
     Object.assign(mesh.userData, {
@@ -4852,6 +4858,8 @@ function emitDistrictAssemblyPlan(assemblyPlan) {
       supportedBy: part.supportedBy,
       serviceAccess: part.serviceAccess,
       silhouette: part.silhouette,
+      traversalIntent: part.traversalIntent,
+      collisionPolicy: part.collisionPolicy,
     });
   }
   return assemblyPlan;

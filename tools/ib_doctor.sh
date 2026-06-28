@@ -28,6 +28,9 @@ node --check src/district-intent-planner.js
 node --check src/carved-voxel-fortress-slice.js
 node tools/test_district_assembly_contract.mjs
 node tools/test_district_walkability_contract.mjs
+node tools/test_player_walkability_route_contract.mjs
+node tools/test_foundry_invisible_collider_contract.mjs
+node tools/test_foundry_zfight_contract.mjs
 node tools/test_district_intent_planner_contract.mjs
 node tools/test_carved_voxel_fortress_contract.mjs
 node tools/test_island_grammar_contract.mjs

@@ -160,3 +160,11 @@ Build `0.8.205` confirmed the next useful layer after district intent: assembly 
 Do not treat this as final proof of playability. A structure can look supported while still failing traversal affordance. District identity now needs two contracts: an assembly contract that rejects naked parts, and a walkability contract that proves service landings, catwalk spans, and route pieces are wide, reachable, and visibly terminated.
 
 Use `tools/assembly_workbench.html` for fast top-down assembly review before booting the full game. Use `tools/ib_doctor.sh` before handoff to catch cache-bust drift, stale server state, and broken district contracts.
+
+## Walkability-First Correction
+
+Build `0.8.208` makes player walkability the first contract for district assembly. The foundry route must pass a Rapier capsule traversal probe before district machinery, hazards, supports, or skyline work can count as progress. Metadata such as `routeOrder` and `traversalIntent` is only useful when the player can actually walk the ordered surfaces without jump-scale steps, blocker contact traps, or fall recovery.
+
+Implementation rule: build the primary route as broad, flat, visible walkable surfaces first. Then place supports and process machinery outside that route corridor. If a support post, rim, hazard, or vent improves the silhouette but blocks the capsule probe, the geometry is wrong.
+
+Build `0.8.209` corrects the `0.8.208` blind spot: walkability tests alone do not prove visible collision truth. Foundry assemblies now require explicit player-collider opt-in. Host slabs, supports, rims, hazards, and process machinery can be visible without becoming Rapier player walls. Climb remains unchanged; if climb attaches in a foundry route, the collider source is wrong unless the source is an intentional visible climbable wall.
