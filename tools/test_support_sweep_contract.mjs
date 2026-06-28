@@ -19,6 +19,9 @@ assert.match(source, /function playerBodyBlockedAtPosition\(x, z, positionY\)/, 
 assert.match(source, /function playerBlockedInBand\(x, z, minY, maxY, radius\)/, 'spawn logic must expose a reusable vertical overlap check');
 assert.match(source, /function measurePlayerHeadroomAtPosition\(x, z, positionY, maxProbe = 2\.4\)/, 'spawn logic must measure headroom above the camera');
 assert.match(source, /function supportAtPlayerFeet\(x, z, feetY\)/, 'spawn logic must sample support directly from the runtime support map');
+assert.match(source, /function playerHasFallSafeTerrainSupport\(\)/, 'fall recovery must distinguish unsupported void fall from supported terrain below global kill height');
+assert.match(source, /if \(player\.position\.y < KILL_Y && !playerHasFallSafeTerrainSupport\(\)\)/, 'fall recovery must not teleport while the player is grounded or supported by terrain');
+assert.match(source, /roomState\.terrainLayer\?\.supportAt\(player\.position\.x, player\.position\.z, feetY/, 'fall recovery guard must query visible terrain support');
 assert.match(source, /function evaluatePlayerAnchorCandidate\(x, z, baseFeetY\)/, 'spawn logic must evaluate candidate top surfaces');
 assert.match(source, /measureHeadroom: measurePlayerHeadroomAtPosition/, 'spawn candidate evaluation must wire headroom into the chooser');
 assert.match(source, /findSpawnAnchor as findBestSpawnAnchor/, 'main runtime must use the shared spawn-anchor helper');

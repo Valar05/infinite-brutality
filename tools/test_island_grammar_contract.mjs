@@ -60,7 +60,7 @@ assert.ok(
   'carved imperial structure must not be assembled from large walkable boxes or pasted box towers',
 );
 assert.ok(
-  main.includes("const BUILD = '0.8.197';"),
+  main.includes("const BUILD = '0.8.203';"),
   'runtime build should be cache-busted for the playable sedimentary mesa slice',
 );
 

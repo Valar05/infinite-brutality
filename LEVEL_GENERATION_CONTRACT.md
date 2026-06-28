@@ -5,7 +5,8 @@ This project should use Quake-style route grammar as an abstraction, not copy Qu
 ## Current State
 
 - Current reference room: authored skull guillotine triple-bridge hall.
-- Current default first playable slice: `quake_m1e1_slice`, a compact fortress-rock route using `start casemate -> battery court -> locked gate face -> key trench branch -> upper overlook -> optional secret ledge -> final gun room -> exit`.
+- Previous hand-authored comparison slice: `quake_m1e1_slice`, a compact fortress-rock route using `start casemate -> battery court -> locked gate face -> key trench branch -> upper overlook -> optional secret ledge -> final gun room -> exit`, available with `?slice=quake_m1e1`.
+- Current default playable slice direction: `carved_voxel_fortress`, a single solid voxel rock mass with route spaces cut out of it. The fortress is carved negative space plus minimal reinforcement, not primitive rooms placed on rock.
 - Previous broad generated gauntlet remains available with `?slice=generated`.
 - Main experimental direction after `quake_m1e1_slice`: ingest Quake-style spatial structure through `tools/quake_geometry_ingest/`, then rebuild it as Infinite Brutality-owned voxels/primitives. Use neutral or local-analysis geometry as tooling input; do not ship copied Quake map data.
 - Current training artifact: `data/level_route_templates.json`.

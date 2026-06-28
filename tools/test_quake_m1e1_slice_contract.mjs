@@ -38,7 +38,7 @@ assert.ok(QUAKE_M1E1_SLICE.terrainStamps.length >= QUAKE_M1E1_SLICE.rooms.length
 assert.match(mainSource, /import \{ QUAKE_M1E1_SLICE \}/);
 assert.match(mainSource, /const ACTIVE_SLICE = URL_PARAMS\.get\('slice'\)/);
 assert.match(mainSource, /function buildQuakeM1E1Slice\(\)/);
-assert.match(mainSource, /ACTIVE_SLICE !== 'generated'/);
+assert.match(mainSource, /ACTIVE_SLICE === 'quake_m1e1'/);
 assert.match(mainSource, /createActiveTerrainLayer\(\)/);
 assert.match(mainSource, /addIslandStamp/);
 

@@ -203,6 +203,24 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     });
   };
 
+  const addVoxelField = (spec) => {
+    if (!spec?.field) return null;
+    terrainSpecs.push({ type: 'voxelField', id: spec.id, source: spec.source, kind: spec.kind });
+    const field = spec.field;
+    applyTerrainGrammarMetadata(field, normalizeTerrainGrammar(spec.rockGrammar || field.rockGrammar?.grammar), spec);
+    const meshData = spec.meshData || buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);
+    const material = spec.material || MAT.sedimentaryRockDark;
+    return addFieldMesh({
+      field,
+      meshData,
+      origin: spec.origin || [0, 0, 0],
+      yaw: spec.yaw || 0,
+      material,
+      source: spec.source || 'terrain-voxel-field:' + (spec.id || 'unnamed'),
+      kind: spec.kind || 'carved_voxel_field',
+    });
+  };
+
   const supportAt = (x, z, feetY, options = {}) => {
     const radius = options.radius ?? 0.38;
     const stepUp = options.stepUp ?? 0.92;
@@ -268,6 +286,7 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     visualMeshes,
     meshColliders,
     terrainSpecs,
+    addVoxelField,
     addIslandStamp,
     addBridgeSpan,
     supportAt,

@@ -23,6 +23,15 @@ function toFloat32Positions(positions) {
   return new Float32Array(positions || []);
 }
 
+function vectorRecord(value) {
+  if (!value) return null;
+  return {
+    x: Number(value.x) || 0,
+    y: Number(value.y) || 0,
+    z: Number(value.z) || 0,
+  };
+}
+
 export function createPhysicsWorld(options = {}) {
   const gravity = options.gravity || { x: 0, y: -14.4, z: 0 };
   const world = new World(gravity);
@@ -44,6 +53,7 @@ export function createPhysicsWorld(options = {}) {
   let lastMoveMs = 0;
   let lastContactCount = 0;
   let lastGrounded = false;
+  let lastCollisions = [];
   let collidersDirty = false;
 
   const registerCollider = (collider, source, kind, record = {}) => {
@@ -126,6 +136,25 @@ export function createPhysicsWorld(options = {}) {
     lastMoveMs = performance.now() - moveStart;
     lastContactCount = controller.numComputedCollisions();
     lastGrounded = controller.computedGrounded();
+    lastCollisions = [];
+    for (let i = 0; i < lastContactCount; i += 1) {
+      const collision = controller.computedCollision(i);
+      if (!collision) continue;
+      const normal = vectorRecord(collision.normal1);
+      const point = vectorRecord(collision.witness2 || collision.witness1);
+      const horizontalLength = normal ? Math.hypot(normal.x, normal.z) : 0;
+      const collider = collision.collider || null;
+      const userData = collider?.userData || {};
+      lastCollisions.push({
+        source: userData.source || '',
+        kind: userData.kind || 'unknown',
+        normal,
+        point,
+        toi: Number(collision.toi) || 0,
+        isWall: !!normal && Math.abs(normal.y) < 0.55 && horizontalLength > 0.35,
+        isGround: !!normal && normal.y > 0.55,
+      });
+    }
     const nextCenter = {
       x: center.x + computed.x,
       y: center.y + computed.y,
@@ -145,6 +174,7 @@ export function createPhysicsWorld(options = {}) {
       movement: computed,
       grounded: lastGrounded,
       contactCount: lastContactCount,
+      collisions: lastCollisions.map((collision) => ({ ...collision })),
       moveMs: lastMoveMs,
       stepMs: lastStepMs,
     };
@@ -162,6 +192,7 @@ export function createPhysicsWorld(options = {}) {
       colliders: colliderRecords.map((record) => ({ ...record })),
       ownerlessColliders: ownerless.map((record) => ({ ...record })),
       contactCount: lastContactCount,
+      collisions: lastCollisions.map((collision) => ({ ...collision })),
       grounded: lastGrounded,
       moveMs: lastMoveMs,
       stepMs: lastStepMs,

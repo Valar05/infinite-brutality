@@ -3,14 +3,15 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 import { QUAKE_M1E1_SLICE } from './quake-m1e1-slice.js?v=0.8.197';
+import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.203';
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
 import { createMaterialResources } from './materials.js?v=0.8.179';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
-import { createPlayerClimbApi } from './player-climb.js?v=0.8.185';
-import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.196';
+import { createPlayerClimbApi } from './player-climb.js?v=0.8.200';
+import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.200';
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
-import { createTerrainLayer } from './terrain-layer.js?v=0.8.191';
+import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
@@ -29,9 +30,9 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.197';
+const BUILD = '0.8.203';
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const ACTIVE_SLICE = URL_PARAMS.get('slice') || QUAKE_M1E1_SLICE.id;
+const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'carved_voxel_fortress';
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;
 const USE_DYNAMIC_SHADOWS = false;
@@ -376,6 +377,8 @@ const playerClimb = createPlayerClimbApi({
     CLIMB_MANTLE_FORWARD,
     CLIMB_SPEED_HORIZONTAL,
     CLIMB_SPEED_VERTICAL,
+    CLIMB_TERRAIN_LATERAL_SPAN: 3.4,
+    CLIMB_TERRAIN_VERTICAL_SPAN: 3.1,
   },
 });
 const { tryBeginClimb, startMantleFromClimb, updatePlayerClimb, updatePlayerMantle } = playerClimb;
@@ -3550,7 +3553,11 @@ function activeRoomSpecs() {
 }
 
 function useQuakeM1E1Slice() {
-  return ACTIVE_SLICE !== 'generated';
+  return ACTIVE_SLICE === 'quake_m1e1';
+}
+
+function useCarvedVoxelFortressSlice() {
+  return ACTIVE_SLICE === 'carved_voxel_fortress';
 }
 
 function playableRoomSpec(index) {
@@ -4806,6 +4813,93 @@ function sliceEdgeLink(edge) {
   };
 }
 
+function buildCarvedVoxelFortressSlice() {
+  const layer = createActiveTerrainLayer();
+  const carved = buildCarvedVoxelFortressData();
+  layer.addVoxelField({
+    id: carved.id,
+    field: carved.field,
+    material: MAT.sedimentaryRockDark,
+    rockGrammar: 'carved_imperial_structure',
+    source: 'carved-voxel-fortress:single-mass',
+    kind: 'carved_voxel_fortress',
+  });
+
+  addFortressSolid(roomGroup, 'carved-gate-bars', [0.28, 3.2, 4.8], makeVec(-7.8, 1.6, 6.4), MAT.iron, { margin: 0.01 });
+  addFortressSolid(roomGroup, 'carved-void-brace-a', [0.34, 3.8, 0.34], makeVec(7.2, 1.9, -7.5), MAT.iron, { margin: 0.01 });
+  addFortressSolid(roomGroup, 'carved-void-brace-b', [0.34, 4.6, 0.34], makeVec(7.6, 2.3, 8.0), MAT.iron, { margin: 0.01 });
+  addFortressSolid(roomGroup, 'carved-final-gun-plinth', [4.8, 0.7, 2.0], makeVec(4.5, 4.1, 24.0), MAT.iron, { margin: 0.01 });
+  addMarker(roomGroup, makeVec(carved.anchors.exit[0], carved.anchors.exit[1], carved.anchors.exit[2]), MAT.exit, 1.15);
+
+  const district = {
+    id: 'carved-voxel-fortress',
+    name: 'Carved Voxel Fortress',
+    purpose: 'single solid floating rock mass cut into an imperial fortress fragment',
+    archetype: 'carved_voxel_fortress',
+    roomStart: 0,
+    roomCount: carved.anchors.rooms.length,
+    layoutId: carved.id,
+    elevationBand: 'carved ascent',
+    baseElevation: 0,
+    topElevation: 6,
+    macroTemplateId: 'subtractive_fortress_fragment',
+    approachType: 'spawn_alcove',
+    departureType: 'final_chamber',
+    supportStyle: 'single_voxel_field',
+    landmarkRole: 'overlook_window_back_to_court',
+    requiresVisibleBelow: true,
+    requiresVisibleAbove: true,
+    skeletonType: 'solid_mass_subtractive_cuts',
+    patchStyle: 'carved_negative_space',
+    silhouetteRule: 'one floating rock mass with route voids carved through it',
+    segmentRoles: carved.cuts.map((cut) => cut.tacticalRole),
+    validation: { implemented: true, passes: true, failedChecks: [] },
+    repairsApplied: [],
+    landmarkSchemas: [],
+    storyNookPlacements: [],
+    requiredStructuralReads: ['battery_court_void', 'trench_cut', 'overlook_window', 'secret_side_cut'],
+  };
+  const plan = {
+    levelIndex: roomState.levelIndex,
+    seed: hashRoomKey(carved.id + ':' + roomState.levelIndex),
+    sliceId: carved.id,
+    districts: [district],
+    mainSpineEdges: carved.metrics.routeConnections.map((edge) => ({ ...edge, kind: 'carved_connection' })),
+    returnEdges: [{ from: 'secret_side_cut', to: 'overlook_window', kind: 'secret_return' }],
+    landmarkViews: [{ from: 'overlook_window', to: 'battery_court' }],
+  };
+  const rooms = carved.anchors.rooms.map((entry, index) => ({
+    id: entry.id,
+    spec: carved.cuts.find((cut) => cut.id === entry.id),
+    district,
+    districtIndex: 0,
+    spawn: makeVec(entry.center[0], entry.center[1], entry.center[2]),
+    exit: makeVec(entry.center[0], entry.center[1], entry.center[2]),
+    center: makeVec(entry.center[0], entry.center[1], entry.center[2]),
+    enemyPositions: [],
+    sockets: entry.sockets || {},
+    bounds: entry.bounds,
+    index,
+  }));
+  return {
+    rooms,
+    plan,
+    spawn: makeVec(carved.anchors.spawn[0], carved.anchors.spawn[1], carved.anchors.spawn[2]),
+    exit: makeVec(carved.anchors.exit[0], carved.anchors.exit[1], carved.anchors.exit[2]),
+    exitRadius: 2.8,
+    enemyPositions: carved.anchors.enemies.map((pos) => makeVec(pos[0], pos[1], pos[2])),
+    bounds: {
+      minX: carved.field.min.x,
+      maxX: carved.field.max.x,
+      minZ: carved.field.min.z,
+      maxZ: carved.field.max.z,
+    },
+    connectivity: { repairs: [], unresolved: [] },
+    branchLinks: [],
+    carved,
+  };
+}
+
 function buildQuakeM1E1Slice() {
   const layer = createActiveTerrainLayer();
   addSliceTerrain(layer);
@@ -5006,6 +5100,30 @@ function updateCurrentGauntletRoom() {
     setNodeIndex(bestIndex);
     const specs = activeRoomSpecs();
     const spec = specs[bestIndex] || playableRoomSpec(bestIndex);
+    if (useCarvedVoxelFortressSlice()) {
+      const district = roomState.districtPlan?.districts?.[0] || {};
+      roomState.spec = {
+        index: bestIndex,
+        connector: spec.id,
+        type: spec.cutShape,
+        roomRole: spec.tacticalRole,
+        landmark: spec.readabilityCue,
+        routeSentence: [spec.connectsFrom, spec.id, spec.connectsTo].filter(Boolean),
+        districtId: district.id || 'carved-voxel-fortress',
+        districtName: district.name || 'Carved Voxel Fortress',
+        districtPurpose: district.purpose || 'single mass carved fortress fragment',
+        districtIndex: 0,
+        districtRoomIndex: bestIndex,
+        districtElevationBand: district.elevationBand || 'carved ascent',
+        districtBaseElevation: district.baseElevation || 0,
+        districtTopElevation: district.topElevation || 6,
+        districtMacroTemplateId: district.macroTemplateId || 'subtractive_fortress_fragment',
+        districtSkeletonType: district.skeletonType || 'solid_mass_subtractive_cuts',
+        districtSegmentRole: spec.tacticalRole,
+      };
+      setStatus('carved_voxel_fortress | ' + spec.id + ' | ' + (spec.readabilityCue || spec.purpose));
+      return;
+    }
     if (useQuakeM1E1Slice()) {
       const district = roomState.districtPlan?.districts?.[0] || {};
       roomState.spec = {
@@ -5063,6 +5181,10 @@ function completeGeneratedGauntlet() {
   buildRoom(true);
 }
 
+function exitCompletionEnabled() {
+  return !useCarvedVoxelFortressSlice();
+}
+
 function buildRoom(movePlayer = true) {
   ensureNookTtsLevelState();
   stopNookTtsPlayback();
@@ -5073,6 +5195,100 @@ function buildRoom(movePlayer = true) {
   resetWalkableBounds();
   createActivePhysicsWorld();
   roomState.transitionLock = 0.7;
+  if (useCarvedVoxelFortressSlice()) {
+    const built = buildCarvedVoxelFortressSlice();
+    const districtPlan = built.plan;
+    const district = districtPlan.districts[0];
+    const spec = built.carved.cuts[0];
+    roomState.districtPlan = districtPlan;
+    roomState.sliceSpecs = built.carved.cuts;
+    roomState.plan = {
+      levelIndex: roomState.levelIndex,
+      seed: districtPlan.seed,
+      sliceId: built.carved.id,
+      routeTemplateId: 'subtractive_fortress_fragment',
+      districts: districtPlan.districts.map((entry) => ({ ...entry })),
+      mainSpineEdges: districtPlan.mainSpineEdges.map((edge) => ({ ...edge })),
+      returnEdges: districtPlan.returnEdges.map((edge) => ({ ...edge })),
+      landmarkViews: districtPlan.landmarkViews.map((view) => ({ ...view })),
+      nodes: built.carved.cuts.map((cut, index) => ({
+        index,
+        connector: cut.id,
+        type: cut.cutShape,
+        districtId: district.id,
+        districtName: district.name,
+        districtPurpose: district.purpose,
+        districtElevationBand: district.elevationBand,
+        districtBaseElevation: district.baseElevation,
+        districtTopElevation: district.topElevation,
+        districtMacroTemplateId: district.macroTemplateId,
+        districtSkeletonType: district.skeletonType,
+        districtSegmentRole: cut.tacticalRole,
+        routeSentence: [cut.connectsFrom, cut.id, cut.connectsTo].filter(Boolean),
+        combatPurpose: cut.purpose,
+      })),
+      carvedMetrics: built.carved.metrics,
+    };
+    roomState.gauntletRooms = built.rooms;
+    roomState.navGraph = buildRoomTraversalGraph(built.rooms, built.carved.cuts, built.branchLinks);
+    roomState.connectivityRepair = built.connectivity;
+    refreshNavGraphDebug(roomState.navGraph);
+    roomState.nodeIndex = 0;
+    setNodeIndex(0);
+    roomState.spec = {
+      index: 0,
+      connector: spec.id,
+      type: spec.cutShape,
+      roomRole: spec.tacticalRole,
+      landmark: spec.readabilityCue,
+      routeSentence: [spec.connectsFrom, spec.id, spec.connectsTo].filter(Boolean),
+      districtId: district.id,
+      districtName: district.name,
+      districtPurpose: district.purpose,
+      districtIndex: 0,
+      districtRoomIndex: 0,
+      districtElevationBand: district.elevationBand,
+      districtBaseElevation: district.baseElevation,
+      districtTopElevation: district.topElevation,
+      districtMacroTemplateId: district.macroTemplateId,
+      districtSkeletonType: district.skeletonType,
+      districtSegmentRole: spec.tacticalRole,
+      districtValidationImplemented: true,
+      districtValidationPasses: true,
+      districtValidationFailedChecks: [],
+      districtRepairsApplied: [],
+      districtLandmarks: [],
+    };
+    roomState.seed = hashRoomKey(built.carved.id);
+    roomState.spawn.copy(built.spawn);
+    roomState.exit.copy(built.exit);
+    roomState.exitRadius = built.exitRadius;
+    roomState.enemyPositions = built.enemyPositions.map((pos) => resolveEnemySpawnPoint(pos));
+    roomState.levelBounds = built.bounds;
+    if (roomState.enemyPositions.length > 0) {
+      positionEnemy(roomState.enemyPositions[0]);
+    } else if (enemy) {
+      enemy.visible = false;
+    }
+    applyAttackLabSetup();
+
+    if (movePlayer) {
+      player.position.copy(bootPlayerOverride && Number.isFinite(bootPlayerOverride.x) && Number.isFinite(bootPlayerOverride.y) && Number.isFinite(bootPlayerOverride.z)
+        ? bootPlayerOverride
+        : roomState.spawn);
+      player.visualPosition.copy(player.position);
+      player.velocity.set(0, 0, 0);
+      input.smoothMoveX = 0;
+      input.smoothMoveY = 0;
+      player.grounded = true;
+      player.runCharge = 0;
+      player.lastRunIntent = false;
+      player.attack = null;
+      player.attackTimer = 0;
+    }
+    setStatus('carved_voxel_fortress | single mass -> subtractive cuts | air ' + built.carved.metrics.airVolumeCreated);
+    return;
+  }
   if (useQuakeM1E1Slice()) {
     const built = buildQuakeM1E1Slice();
     const districtPlan = built.plan;
@@ -6732,19 +6948,34 @@ function faceYawFromNormal(normal) {
   return Math.atan2(-normal.x, -normal.z);
 }
 
+function playerHasFallSafeTerrainSupport() {
+  if (player.grounded) return true;
+  const physics = roomState.physicsWorld?.snapshot?.();
+  if (physics?.grounded) return true;
+  const feetY = player.position.y - PLAYER_EYE_HEIGHT;
+  const terrainSupport = roomState.terrainLayer?.supportAt(player.position.x, player.position.z, feetY, {
+    radius: PLAYER_SOLID_RADIUS,
+    stepUp: SUPPORT_SNAP_UP,
+    stepDown: Math.max(SUPPORT_SNAP_DOWN, 2.6),
+    velocityY: player.velocity.y,
+    prevFeetY: feetY,
+  });
+  return !!terrainSupport;
+}
+
 function finalizePlayerFrame(dt, now, stickMagnitude) {
   player.position.x = clamp(player.position.x, roomState.levelBounds?.minX ?? -14, roomState.levelBounds?.maxX ?? 14);
   player.position.z = clamp(player.position.z, roomState.levelBounds?.minZ ?? -18, roomState.levelBounds?.maxZ ?? 18);
   if (player.grounded && player.runCharge < RUN_BUILD_TIME && stickMagnitude < 0.18) player.runCharge = Math.max(0, player.runCharge - dt * 0.4);
   if (roomState.transitionLock > 0) roomState.transitionLock = Math.max(0, roomState.transitionLock - dt);
-  if (player.grounded && roomState.transitionLock <= 0) {
+  if (exitCompletionEnabled() && player.grounded && roomState.transitionLock <= 0) {
     const dx = player.position.x - roomState.exit.x;
     const dz = player.position.z - roomState.exit.z;
     const dy = player.position.y - roomState.exit.y;
     if (Math.hypot(dx, dz) < roomState.exitRadius && Math.abs(dy) < 1.8) completeGeneratedGauntlet();
   }
   updateCurrentGauntletRoom();
-  if (player.position.y < KILL_Y) {
+  if (player.position.y < KILL_Y && !playerHasFallSafeTerrainSupport()) {
     player.position.copy(roomState.spawn);
     player.visualPosition.copy(player.position);
     player.velocity.set(0, 0, 0);
@@ -7331,6 +7562,10 @@ function roomTraversalKindForSpec(spec) {
     spec?.semanticRole,
     spec?.batch_prompt,
     spec?.label,
+    spec?.cutShape,
+    spec?.verticalRole,
+    spec?.tacticalRole,
+    spec?.readabilityCue,
     ...(spec?.route_sentence || []),
     ...(spec?.routeSentence || []),
   ].join(' ').toLowerCase();
@@ -8915,7 +9150,7 @@ function updatePlayer(dt) {
     } else {
       player.grounded = false;
       player.mode = 'air';
-      if (tryBeginClimb(true)) {
+      if (tryBeginClimb(true, physicsMove.collisions)) {
         finalizePlayerFrame(dt, now, stickMagnitude);
         return;
       }
