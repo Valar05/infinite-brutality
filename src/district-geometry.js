@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildIslandBridgeSpec, buildIslandVoxelField, buildSurfaceNetMeshData, buildSedimentaryMesaMeshData, buildRoomIslandField, buildRoomIslandMeshData, buildSedimentaryMesaBridgeField } from './island-geometry.js?v=0.8.175';
+import { buildIslandBridgeSpec } from './island-geometry.js?v=0.8.179';
 
 export function createDistrictGeometryApi(deps) {
   const {
@@ -44,8 +44,7 @@ export function createDistrictGeometryApi(deps) {
     addBrakeLeverStand,
     addScreenWallSegment,
     addBeveledBox,
-    registerMeshSupportCollider,
-    registerVoxelSupportCollider,
+    activeTerrainLayer,
   } = deps;
 
   function addDistrictCrystalGrowths(district) {
@@ -154,27 +153,6 @@ export function createDistrictGeometryApi(deps) {
 
   function addDistrictRouteIslands(district, contract) {
     return;
-    const offsets = district?.roomOffsets || [];
-    const roles = district?.segmentRoles || [];
-    for (let i = 0; i < offsets.length; i += 1) {
-      const point = offsets[i];
-      if (!point) continue;
-      const role = roles[i] || 'route';
-      const size = routeIslandSizeForRole(role);
-      const worldPos = [district.origin.x + point[0], district.origin.y + (point[2] || 0), district.origin.z + point[1]];
-      const field = buildRoomIslandField(size, hashRoomKey('district-room-island:' + district.id + ':' + i + ':' + role));
-      const meshData = buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
-      const group = new THREE.Group();
-      group.name = 'district-' + district.id + '-room-island-' + i;
-      group.position.set(worldPos[0], worldPos[1], worldPos[2]);
-      roomGroup.add(group);
-      const mesh = buildRuntimeIslandMesh(meshData, i % 2 === 0 ? MAT.islandRock : MAT.islandRockDark);
-      group.add(mesh);
-      registerMeshSupportCollider(group, { source: 'district-room-island-mesh:' + district.id + ':' + i });
-      registerVoxelSupportCollider(field, { origin: worldPos, source: 'district-room-island-voxel:' + district.id + ':' + i });
-      contract.visibleIslandCount += 1;
-      contract.islandMeshCount += 1;
-    }
   }
 
   function addDistrictIslandMasses(district, contract) {
@@ -182,26 +160,22 @@ export function createDistrictGeometryApi(deps) {
     if (!anchors.length) return;
     for (let i = 0; i < anchors.length; i += 1) {
       const anchor = anchors[i];
-      const group = new THREE.Group();
-      group.name = 'district-' + district.id + '-island-' + anchor.id;
-      group.position.set(anchor.pos[0], anchor.pos[1], anchor.pos[2]);
-      group.rotation.y = anchor.yaw || 0;
-      roomGroup.add(group);
-      const field = anchor.terraced
-        ? buildRoomIslandField(anchor.size, hashRoomKey('district-terraced-island:' + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)), {
-          grammar: anchor.rockGrammar || 'sedimentary_mesa',
-          terraced: true,
-          role: anchor.role || 'arena',
-        })
-        : buildIslandVoxelField(anchor, hashRoomKey('district-island:' + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)));
-      const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';
-      const meshData = isSedimentaryMesa
-        ? buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)
-        : buildSurfaceNetMeshData(field, MAT.islandRock?.userData?.uvScale ?? 0.12);
-      const mesh = buildRuntimeIslandMesh(meshData, isSedimentaryMesa ? (i % 2 === 0 ? MAT.sedimentaryRock : MAT.sedimentaryRockDark) : (i % 2 === 0 ? MAT.islandRock : MAT.islandRockDark));
-      group.add(mesh);
-      registerMeshSupportCollider(group, { source: 'district-island-mesh:' + anchor.id });
-      registerVoxelSupportCollider(field, { origin: anchor.pos, yaw: anchor.yaw || 0, source: 'district-island-voxel:' + anchor.id });
+      const terrain = activeTerrainLayer?.();
+      if (!terrain) throw new Error('TerrainLayer is required before district island terrain can be emitted');
+      terrain.addIslandStamp({
+        id: anchor.id,
+        role: anchor.role || 'arena',
+        origin: anchor.pos,
+        size: anchor.size,
+        yaw: anchor.yaw || 0,
+        terraced: !!anchor.terraced,
+        rockGrammar: anchor.rockGrammar || 'sedimentary_mesa',
+        rockSilhouette: anchor.rockSilhouette,
+        imperialFunction: anchor.imperialFunction,
+        seed: hashRoomKey((anchor.terraced ? 'district-terraced-island:' : 'district-island:') + district.id + ':' + anchor.id + ':' + district.baseElevation.toFixed(2)),
+        materialVariant: i,
+        source: 'district-island-voxel:' + anchor.id,
+      });
       contract.visibleIslandCount += 1;
       contract.islandMeshCount += 1;
     }
@@ -213,17 +187,21 @@ export function createDistrictGeometryApi(deps) {
     for (let i = 0; i < anchors.length - 1; i += 1) {
       const spec = buildIslandBridgeSpec(anchors[i], anchors[i + 1]);
       if (!spec.visible) continue;
-      const group = new THREE.Group();
-      group.name = 'district-' + district.id + '-island-bridge-' + i;
-      group.position.set(spec.center.x, spec.center.y, spec.center.z);
-      group.rotation.y = spec.yaw;
-      roomGroup.add(group);
-      const field = buildSedimentaryMesaBridgeField(spec.horizontalLength, spec.deckSize[0], 1.6, hashRoomKey('district-island-bridge:' + district.id + ':' + i));
-      const meshData = buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072);
-      const mesh = buildRuntimeIslandMesh(meshData, MAT.sedimentaryRockDark);
-      group.add(mesh);
-      registerMeshSupportCollider(group, { source: 'district-island-bridge-mesh:' + district.id + ':' + i });
-      registerVoxelSupportCollider(field, { origin: [spec.center.x, spec.center.y, spec.center.z], yaw: spec.yaw, source: 'district-island-bridge-voxel:' + district.id + ':' + i });
+      const terrain = activeTerrainLayer?.();
+      if (!terrain) throw new Error('TerrainLayer is required before district bridge terrain can be emitted');
+      terrain.addBridgeSpan({
+        id: district.id + '-island-bridge-' + i,
+        length: spec.horizontalLength,
+        width: spec.deckSize[0],
+        thickness: 1.6,
+        origin: [spec.center.x, spec.center.y, spec.center.z],
+        yaw: spec.yaw,
+        rockGrammar: district.terrainGrammar || anchors[i].rockGrammar || 'sedimentary_mesa',
+        rockSilhouette: 'rail_cut_causeway',
+        imperialFunction: 'imperial_causeway_logistics',
+        seed: hashRoomKey('district-island-bridge:' + district.id + ':' + i),
+        source: 'district-island-bridge-voxel:' + district.id + ':' + i,
+      });
       contract.visibleBridgeCount += 1;
       contract.bridgeMeshCount += 1;
     }
@@ -274,6 +252,73 @@ export function createDistrictGeometryApi(deps) {
     }
   }
 
+  function addImperialCoreTerrainSignature(district) {
+    const anchor = district?.massAnchors?.[0];
+    if (anchor?.imperialFunction !== 'imperial_core_retaining_gate') return;
+    const [x, y, z] = anchor.pos;
+    const roadY = district.baseElevation + 2.36;
+    const wallBaseY = y + anchor.size[1] * 0.34 - 2.2;
+    const prefix = 'district-' + district.id + '-imperial-core';
+
+    addGroundedBeveledBox(roomGroup, prefix + '-parade-road-cap', [7.2, 0.18, 18.0], [x, roadY, z + 2.4], MAT.connectorFloor, false, 0.025, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-bronze-spine', [0.26, 0.08, 17.4], [x, roadY + 0.16, z + 2.4], MAT.bronze, false, 0.01, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-a', [7.4, 0.08, 0.18], [x, roadY + 0.18, z - 3.4], MAT.iron, false, 0.008, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-b', [7.4, 0.08, 0.18], [x, roadY + 0.18, z + 4.2], MAT.iron, false, 0.008, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-road-crossbar-c', [7.4, 0.08, 0.18], [x, roadY + 0.18, z + 11.0], MAT.iron, false, 0.008, 1);
+
+    addWallBox(roomGroup, prefix + '-retaining-bite-west', [2.2, 6.6, 18.5], [x - 12.4, wallBaseY + 3.3, z + 2.0], MAT.wall, false);
+    addWallBox(roomGroup, prefix + '-retaining-bite-east', [2.2, 6.6, 18.5], [x + 12.4, wallBaseY + 3.3, z + 2.0], MAT.wall, false);
+    addGroundedBeveledBox(roomGroup, prefix + '-west-capstone', [3.0, 0.42, 19.0], [x - 12.4, wallBaseY + 6.65, z + 2.0], MAT.trim, false, 0.025, 1);
+    addGroundedBeveledBox(roomGroup, prefix + '-east-capstone', [3.0, 0.42, 19.0], [x + 12.4, wallBaseY + 6.65, z + 2.0], MAT.trim, false, 0.025, 1);
+
+    for (let i = 0; i < 4; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const pierZ = z - 5.8 + Math.floor(i / 2) * 15.2;
+      addGroundedCylinder(roomGroup, prefix + '-anchor-pylon-' + i, 0.42, 4.8, [x + side * 9.7, roadY - 1.8, pierZ], MAT.iron, 6);
+      addBeveledBox(roomGroup, prefix + '-pylon-bite-' + i, [2.3, 0.28, 0.28], [x + side * 10.8, roadY + 0.34, pierZ], MAT.bronze, false, 0.01, 1).rotation.z = side * 0.18;
+    }
+  }
+
+  function addCarvedImperialStructure(district, contract) {
+    const origin = district.origin;
+    const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation - 0.8;
+    const buildBand = district.circulationBands?.[1]?.y ?? district.baseElevation + 0.1;
+    const highBand = district.circulationBands?.[2]?.y ?? district.baseElevation + 2.8;
+    const prefix = 'district-' + district.id + '-carved';
+    const terrain = activeTerrainLayer?.();
+    if (!terrain) throw new Error('TerrainLayer is required before carved imperial structure terrain can be emitted');
+
+    terrain.addIslandStamp({
+      id: district.id + '-carved-imperial-structure',
+      role: 'carved_imperial_structure',
+      origin: [origin.x, district.baseElevation - 5.5, origin.z + 22],
+      size: district.structureSize || [40, 12, 50],
+      yaw: district.structureYaw || 0,
+      terraced: true,
+      rockGrammar: 'carved_imperial_structure',
+      rockSilhouette: 'fortress_cavern_logistics_spine',
+      imperialFunction: 'imperial_airship_logistics_fortress',
+      seed: hashRoomKey('district-carved-structure:' + district.id + ':' + district.baseElevation.toFixed(2)),
+      materialVariant: district.index || 0,
+      source: 'district-carved-structure-voxel:' + district.id,
+      kind: 'structure',
+    });
+    contract.visibleIslandCount += 1;
+    contract.islandMeshCount += 1;
+
+    for (const side of [-1, 1]) {
+      addGroundedBeveledBox(roomGroup, prefix + '-embedded-rail-' + side, [0.32, 0.16, 54], [origin.x + side * 4.8, buildBand + 0.36, origin.z + 22], MAT.iron, false, 0.008, 1);
+      addGroundedCylinder(roomGroup, prefix + '-mooring-socket-a-' + side, 0.34, 3.4, [origin.x + side * 20.6, district.baseElevation - 2.8, origin.z + 4], MAT.iron, 6);
+      addGroundedCylinder(roomGroup, prefix + '-mooring-socket-b-' + side, 0.34, 4.2, [origin.x + side * 20.8, district.baseElevation - 3.4, origin.z + 48], MAT.iron, 6);
+    }
+
+    for (let i = 0; i < 4; i += 1) {
+      const z = origin.z - 4 + i * 12;
+      addGroundedBeveledBox(roomGroup, prefix + '-inlaid-sleeper-' + i, [8.8, 0.06, 0.22], [origin.x, buildBand + 0.42, z], MAT.bronze, false, 0.006, 1);
+      addGroundedCylinder(roomGroup, prefix + '-vent-stack-' + i, 0.28, 2.4 + (i % 2) * 0.9, [origin.x + 8.8 + (i % 2) * 1.8, buildBand + 0.12, z + 3.8], MAT.iron, 6);
+    }
+  }
+
   function addHangingMarketDistrictSkeleton(district) {
     const origin = district.origin;
     const lowBand = district.circulationBands?.[0]?.y ?? district.baseElevation + 3.2;
@@ -285,6 +330,8 @@ export function createDistrictGeometryApi(deps) {
     const terraceHighCenter = [origin.x + 42, highBand - 0.18, origin.z + 228];
     const bridgeCenter = [origin.x + 78, highBand + 0.28, origin.z + 286];
     const undercroftCenter = [origin.x - 6, lowBand - 0.82, origin.z + 226];
+
+    addImperialCoreTerrainSignature(district);
 
     addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-low', [34, 0.52, 30], terraceLowCenter, MAT.stone2, false, 0.1);
     addWalkableBox(roomGroup, 'district-' + district.id + '-terrace-mid', [46, 0.58, 38], terraceMidCenter, MAT.stone2, false, 0.1);
@@ -467,6 +514,11 @@ export function createDistrictGeometryApi(deps) {
   function addDistrictSkeletonGeometry(district) {
     if (!district) return;
     const contract = beginDistrictVisualCollisionContract(district);
+    if (district.terrainMode === 'carved_imperial_structure') {
+      addCarvedImperialStructure(district, contract);
+      finalizeDistrictVisualCollisionContract(contract);
+      return;
+    }
     addDistrictIslandMasses(district, contract);
     addDistrictIslandBridges(district, contract);
     addDistrictRouteIslands(district, contract);

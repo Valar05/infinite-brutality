@@ -147,3 +147,8 @@ After a meaningful Infinite Brutality level-design pass, record:
 - whether the lesson should also be promoted into the general Thunder note
 
 Do this as part of the same task when the lesson is durable.
+
+
+## Carved Structure Correction
+
+When the Napoleon sky-kingdom slice reads as floating rocks, the generator is solving the wrong problem. The proof slice should begin from a place with a job: an imperial logistics/fortress structure caved from rock. Terrain should supply the carved mass and voids; architecture should explain use, circulation, defense, and airship support. Disconnected rocks and terrain bridge chains are regressions unless a later district explicitly proves why they exist.

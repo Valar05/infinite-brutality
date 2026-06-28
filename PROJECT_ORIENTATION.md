@@ -43,6 +43,7 @@ python3 -m json.tool assets/asset_manifest.json >/dev/null
 - `docs/DISTRICT_RUNTIME_CONTRACT.md`: authoritative runtime contract for district build order, skeleton geometry, support snapping, spawns, and enemy traversal.
 - `docs/ROCK_SHAPE_GRAMMAR.md`: terrain shape grammar for floating geological fragments, readable island silhouettes, and rock/architecture fusion.
 - `docs/TERRAIN_GENERATION_TECHNIQUES.md`: implementation map of current and historical terrain generators still present in code.
+- `docs/IMPERIAL_FLOATING_STRATA_GRAMMAR.md`: Napoleon's Floating Kingdom terrain grammar, district archetypes, forbidden outputs, mobile constraints, and TerrainLayer ownership notes.
 
 ## Direction
 
@@ -66,6 +67,7 @@ Level-design workflow is split in two places:
 - project-specific workflow: `docs/LEVEL_DESIGN_WORKFLOW.md`
 - level-design bible: `docs/LEVEL_DESIGN_BIBLE.md`
 - rock shape grammar: `docs/ROCK_SHAPE_GRAMMAR.md`
+- imperial floating strata grammar: `docs/IMPERIAL_FLOATING_STRATA_GRAMMAR.md`
 - realization plan: `docs/VERTICAL_DISTRICT_REALIZATION_PLAN.md`
 - district graph implementation plan: `docs/DISTRICT_GRAPH_IMPLEMENTATION_PLAN.md`
 - runtime contract: `docs/DISTRICT_RUNTIME_CONTRACT.md`

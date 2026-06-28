@@ -137,22 +137,24 @@ function countEnclosedAir(field) {
 }
 
 const cases = [
-  ['legacy-room', buildRoomIslandField([8.8, 5.2, 8.8], 1), buildSurfaceNetMeshData],
-  ['legacy-bridge', buildRockBridgeField(28, 4.8, 1.6, 1), buildSurfaceNetMeshData],
-  ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' }), buildSedimentaryMesaMeshData],
-  ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1), buildSedimentaryMesaMeshData],
+  ['legacy-room', buildRoomIslandField([8.8, 5.2, 8.8], 1), buildSurfaceNetMeshData, { strictEdges: true }],
+  ['legacy-bridge', buildRockBridgeField(28, 4.8, 1.6, 1), buildSurfaceNetMeshData, { strictEdges: true }],
+  ['sedimentary-mesa', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'sedimentary_mesa', terraced: true, role: 'arena' }), buildSedimentaryMesaMeshData, { strictEdges: true }],
+  ['imperial-floating-strata', buildRoomIslandField([30, 11, 26], 1000, { grammar: 'imperial_floating_strata', terraced: true, role: 'arena', rockSilhouette: 'fortress_plateau', imperialFunction: 'imperial_core_retaining_gate' }), buildSedimentaryMesaMeshData, { strictEdges: true }],
+  ['sedimentary-bridge', buildSedimentaryMesaBridgeField(28, 4.8, 1.6, 1), buildSedimentaryMesaMeshData, { strictEdges: true }],
 ];
 
 const failures = [];
-for (const [label, field, meshFactory] of cases) {
+for (const [label, field, meshFactory, options] of cases) {
   const mesh = meshFactory(field);
   const stats = triangleStats(field, mesh);
   const enclosedAir = countEnclosedAir(field);
   if (enclosedAir > 0) failures.push(label + ' field encloses ' + enclosedAir + ' air voxels; no interior cavities are allowed');
-  if (stats.openEdges > 0) failures.push(label + ' mesh has ' + stats.openEdges + ' open edges; mesh must be watertight');
-  if (stats.nonManifoldEdges > 0) failures.push(label + ' mesh has ' + stats.nonManifoldEdges + ' non-manifold edges');
-  if (stats.badFacing > 0) failures.push(label + ' mesh has ' + stats.badFacing + '/' + stats.triangleCount + ' triangles facing the wrong solid/air side');
+  if (options.strictEdges && stats.openEdges > 0) failures.push(label + ' mesh has ' + stats.openEdges + ' open edges; mesh must be watertight');
+  if (options.strictEdges && stats.nonManifoldEdges > 0) failures.push(label + ' mesh has ' + stats.nonManifoldEdges + ' non-manifold edges');
+  const badFacingRatio = stats.badFacing / Math.max(1, stats.triangleCount);
+  if (badFacingRatio > (options.maxBadFacingRatio ?? 0)) failures.push(label + ' mesh has bad-facing ratio ' + badFacingRatio.toFixed(3) + ' > ' + (options.maxBadFacingRatio ?? 0));
 }
 
-assert.deepEqual(failures, [], 'island meshes must be watertight, cavity-free, and consistently face solid vs air');
+assert.deepEqual(failures, [], 'active visible terrain meshes must be cavity-free, edge-watertight, and consistently face solid vs air');
 console.log(JSON.stringify({ ok: true, contract: 'island-mesh-integrity' }));

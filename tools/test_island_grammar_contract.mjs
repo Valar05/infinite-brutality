@@ -4,6 +4,7 @@ import { buildSedimentaryMesaBridgeField, buildSedimentaryMesaMeshData, buildSur
 
 const districtGeometry = fs.readFileSync(new URL('../src/district-geometry.js', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const terrainLayer = fs.readFileSync(new URL('../src/terrain-layer.js', import.meta.url), 'utf8');
 
 assert.ok(
   districtGeometry.includes('function addDistrictRouteIslands(district, contract) {\n    return;'),
@@ -11,15 +12,23 @@ assert.ok(
 );
 assert.ok(
   districtGeometry.includes('addDistrictIslandMasses(district, contract);\n    addDistrictIslandBridges(district, contract);'),
-  'district visuals must come from mass islands and mass bridges',
+  'legacy fallback district visuals must still keep mass-island bridge order when carved mode is not active',
+);
+assert.ok(
+  districtGeometry.includes("district.terrainMode === 'carved_imperial_structure'"),
+  'active Napoleon proof slice must have a carved-structure district path before island/bridge fallback',
 );
 assert.ok(
   main.includes('const PLAYABLE_SLICE_ROOM_COUNT = 3;'),
   'runtime must cap the current playable slice to three islands',
 );
 assert.ok(
-  main.includes('addIslandArtSteppedRamp('),
-  'slice islands must use explicit stair-stepped organic ramp connectors',
+  main.includes("'carved-causeway-' + index"),
+  'active slice connectors must use built carved causeways/stairs instead of floating terrain ramps',
+);
+assert.ok(
+  !main.includes("addIslandArtSteppedRamp('slice-ramp-"),
+  'active slice connectors must not emit floating terrain ramp spans',
 );
 assert.ok(
   !main.includes("addIslandArtSteppedRamp('gauntlet-connector-"),
@@ -27,41 +36,57 @@ assert.ok(
 );
 
 assert.ok(
-  districtGeometry.includes("grammar: anchor.rockGrammar || 'sedimentary_mesa'"),
-  'active terraced district mass anchors must use the sedimentary mesa rock grammar',
+  districtGeometry.includes("rockGrammar: 'carved_imperial_structure'"),
+  'active carved structure must submit carved imperial structure terrain labels',
 );
 assert.ok(
-  main.includes("rockGrammar: 'sedimentary_mesa'"),
-  'playable slice anchors must opt into sedimentary mesa terrain',
+  main.includes("rockGrammar: 'carved_imperial_structure'"),
+  'playable slice anchors must opt into carved imperial structure terrain labels',
 );
 assert.ok(
-  main.includes("const BUILD = '0.8.175';"),
+  main.includes("'carved-causeway-' + index") && !main.includes("addIslandArtSteppedRamp('slice-ramp-"),
+  'active proof-slice connectors must be built causeways, not floating terrain bridge spans',
+);
+assert.ok(
+  districtGeometry.includes('function addCarvedImperialStructure(district, contract)'),
+  'Imperial terrain must have a carved structure emission path',
+);
+assert.ok(
+  districtGeometry.includes("'-embedded-rail-'") && districtGeometry.includes("'-mooring-socket-a-"),
+  'carved imperial structure renderer must keep only sparse embedded hardware, not large box surfaces',
+);
+assert.ok(
+  !districtGeometry.includes("'-parade-spine'") && !districtGeometry.includes("'-fortress-court'") && !districtGeometry.includes("'-command-tower'"),
+  'carved imperial structure must not be assembled from large walkable boxes or pasted box towers',
+);
+assert.ok(
+  main.includes("const BUILD = '0.8.179';"),
   'runtime build should be cache-busted for the playable sedimentary mesa slice',
 );
 
 assert.ok(
-  districtGeometry.includes("const isSedimentaryMesa = field.rockGrammar?.grammar === 'sedimentary_mesa';"),
-  'sedimentary mesa islands must use a dedicated visible mesh/material path',
+  terrainLayer.includes("field.rockGrammar?.grammar === 'carved_imperial_structure'"),
+  'carved structure labels must still use the dedicated sedimentary visible mesh/material path',
 );
 assert.ok(
-  districtGeometry.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
+  terrainLayer.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
   'sedimentary mesa visible mesh must use the dedicated manifold sedimentary mesh and material',
 );
 assert.ok(
-  districtGeometry.includes('MAT.sedimentaryRock : MAT.sedimentaryRockDark'),
+  terrainLayer.includes('MAT.sedimentaryRock : MAT.sedimentaryRockDark'),
   'sedimentary mesa islands must use dedicated sedimentary terrain materials, not vector-stone architecture materials',
 );
 
 assert.ok(
-  main.includes('buildSedimentaryMesaBridgeField(length, width, thickness, bridgeSeed)'),
+  terrainLayer.includes('buildSedimentaryMesaBridgeField(spec.length, spec.width, thickness, seed)'),
   'active island art bridges must use contiguous sedimentary slab bridge fields',
 );
 assert.ok(
-  main.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
+  terrainLayer.includes('buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072)'),
   'active island art bridges must use the dedicated manifold sedimentary mesh and material',
 );
 assert.ok(
-  main.includes('material: options.material || MAT.sedimentaryRockDark'),
+  terrainLayer.includes('spec.material || (spec.slabBridge === false ? MAT.islandRockDark : MAT.sedimentaryRockDark)'),
   'active stepped ramps must default to dedicated sedimentary material, not vector stone or pebble rock',
 );
 

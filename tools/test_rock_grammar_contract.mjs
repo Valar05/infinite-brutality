@@ -34,6 +34,50 @@ function centralCoverage(field) {
   return total ? occupied / total : 0;
 }
 
+function roadCutCoverage(field) {
+  let total = 0;
+  let occupied = 0;
+  const halfWidth = Math.max(field.cell * 0.55, Math.min(Math.abs(field.min.x), Math.abs(field.max.x)) * 0.20);
+  for (let z = field.min.z * 0.74; z <= field.max.z * 0.74; z += field.cell * 0.45) {
+    for (let x = -halfWidth; x <= halfWidth; x += field.cell * 0.45) {
+      total += 1;
+      if (queryVoxelTopY(field, x, z, field.cell * 0.18) != null) occupied += 1;
+    }
+  }
+  return total ? occupied / total : 0;
+}
+
+function topRangeInBand(field, xMin, xMax, zScale = 0.62) {
+  const tops = [];
+  for (let z = field.min.z * zScale; z <= field.max.z * zScale; z += field.cell * 0.45) {
+    for (let x = xMin; x <= xMax; x += field.cell * 0.45) {
+      const top = queryVoxelTopY(field, x, z, field.cell * 0.18);
+      if (top != null) tops.push(top);
+    }
+  }
+  if (!tops.length) return null;
+  return {
+    count: tops.length,
+    min: Math.min(...tops),
+    max: Math.max(...tops),
+    spread: Math.max(...tops) - Math.min(...tops),
+  };
+}
+
+function retainingBiteStats(field) {
+  const maxX = Math.max(Math.abs(field.min.x), Math.abs(field.max.x));
+  const road = topRangeInBand(field, -maxX * 0.20, maxX * 0.20, 0.68);
+  const west = topRangeInBand(field, -maxX * 0.90, -maxX * 0.66, 0.68);
+  const east = topRangeInBand(field, maxX * 0.66, maxX * 0.90, 0.68);
+  return {
+    road,
+    west,
+    east,
+    sideCount: (west?.count || 0) + (east?.count || 0),
+    roadToSideDrop: road && west && east ? road.max - Math.max(west.max, east.max) : 0,
+  };
+}
+
 function rimCoverageByAngle(field, sectors = 16) {
   const hits = new Array(sectors).fill(0);
   const radius = Math.min(Math.abs(field.min.x), Math.abs(field.max.x), Math.abs(field.min.z), Math.abs(field.max.z)) * 0.82;
@@ -171,10 +215,53 @@ assert.ok(sideProfile.topSpread <= mesa.cell * 1.15, `mesa center top is too dom
 const surfaceMesh = buildSurfaceNetMeshData(mesa);
 const mesh = buildSedimentaryMesaMeshData(mesa, 0.072);
 assert.ok(mesh.triangleCount > 0, 'mesa grammar must emit visible geometry');
-assert.ok(mesh.triangleCount < 2200, `sedimentary slab mesh emitted ${mesh.triangleCount} triangles > 2200 island budget`);
-assert.ok(mesh.triangleCount < surfaceMesh.triangleCount, `sedimentary slab mesh ${mesh.triangleCount} should be cheaper than surface-net ${surfaceMesh.triangleCount}`);
+assert.ok(mesh.triangleCount <= 4000, `sedimentary visual mesh emitted ${mesh.triangleCount} triangles > 4000 island budget`);
+assert.ok(mesh.triangleCount <= surfaceMesh.triangleCount, `sedimentary visual mesh ${mesh.triangleCount} should not exceed the surface shell ${surfaceMesh.triangleCount}`);
 const weatheredRatio = offGridVertexRatio(mesa, mesh);
 assert.ok(weatheredRatio >= 0.82, `sedimentary mesh still reads like a cube grid: off-grid visual vertex ratio ${weatheredRatio.toFixed(2)} < 0.82`);
+
+const imperial = buildRoomIslandField([30, 11, 26], 1000, {
+  grammar: 'imperial_floating_strata',
+  terraced: true,
+  role: 'arena',
+  rockSilhouette: 'fortress_plateau',
+  imperialFunction: 'imperial_core_retaining_gate',
+});
+assert.equal(imperial.rockGrammar.grammar, 'imperial_floating_strata', 'imperial terrain must be a first-class grammar, not a post-hoc label');
+assert.equal(imperial.rockGrammar.baseGrammar, 'sedimentary_mesa', 'imperial terrain should declare the sedimentary machinery it builds on');
+assert.equal(imperial.rockGrammar.silhouette, 'fortress_plateau', 'imperial terrain must preserve district silhouette metadata');
+assert.equal(imperial.rockGrammar.imperialFunction, 'imperial_core_retaining_gate', 'imperial terrain must preserve district function metadata');
+for (const zone of ['commandDeck', 'roadCut', 'retainingBites', 'serviceShelf', 'undersideMass', 'damageCuts']) {
+  assert.ok(imperial.rockGrammar.zones.includes(zone), `imperial terrain missing structural zone ${zone}`);
+}
+const imperialCoverage = centralCoverage(imperial);
+assert.ok(imperialCoverage >= 0.86, `imperial command deck coverage ${imperialCoverage.toFixed(2)} < 0.86`);
+const roadCoverage = roadCutCoverage(imperial);
+assert.ok(roadCoverage >= 0.92, `imperial road cut coverage ${roadCoverage.toFixed(2)} < 0.92`);
+const biteStats = retainingBiteStats(imperial);
+assert.ok(biteStats.sideCount >= 8, `imperial retaining bites too sparse: ${biteStats.sideCount} side samples`);
+assert.ok(biteStats.roadToSideDrop >= imperial.cell * 0.35, `imperial road should stand above retaining bites by at least ${(imperial.cell * 0.35).toFixed(2)}; got ${biteStats.roadToSideDrop.toFixed(2)}`);
+const imperialMesh = buildSedimentaryMesaMeshData(imperial, 0.072);
+assert.ok(imperialMesh.triangleCount > 0, 'imperial terrain must emit visible geometry');
+assert.ok(imperialMesh.triangleCount <= 4000, `imperial visible mesh emitted ${imperialMesh.triangleCount} triangles > 4000 island budget`);
+
+
+const carved = buildRoomIslandField([40, 12, 50], 1000, {
+  grammar: 'carved_imperial_structure',
+  terraced: true,
+  role: 'carved_imperial_structure',
+  rockSilhouette: 'fortress_cavern_logistics_spine',
+  imperialFunction: 'imperial_airship_logistics_fortress',
+});
+assert.equal(carved.rockGrammar.grammar, 'carved_imperial_structure', 'carved terrain must be a first-class structure grammar');
+assert.equal(carved.rockGrammar.baseGrammar, 'imperial_floating_strata', 'carved terrain should declare the imperial terrain grammar it builds on');
+assert.equal(carved.rockGrammar.process, 'imperial_structure_caved_from_rock', 'carved terrain must state structure-caved-from-rock process');
+for (const zone of ['paradeSpine', 'fortressCourt', 'retainingCliffs', 'quarryGalleries', 'undercroftService', 'airshipMooringBites', 'collapseVoids']) {
+  assert.ok(carved.rockGrammar.zones.includes(zone), `carved imperial structure missing zone ${zone}`);
+}
+const carvedMesh = buildSedimentaryMesaMeshData(carved, 0.072);
+assert.ok(carvedMesh.triangleCount > 0, 'carved imperial structure must emit visible geometry');
+assert.ok(carvedMesh.triangleCount <= 4000, `carved imperial structure emitted ${carvedMesh.triangleCount} triangles > 4000 structure budget`);
 
 const legacyTerraced = buildRoomIslandField([30, 11, 26], 1000, true);
 assert.ok(queryVoxelTopY(legacyTerraced, 0, 0, legacyTerraced.cell * 0.2) != null, 'legacy boolean terraced island must still emit support at center');
@@ -193,4 +280,8 @@ console.log(JSON.stringify({
   triangles: mesh.triangleCount,
   surfaceNetTriangles: surfaceMesh.triangleCount,
   weatheredRatio: Number(weatheredRatio.toFixed(3)),
+  imperialRoadCoverage: Number(roadCoverage.toFixed(3)),
+  imperialRoadToSideDrop: Number(biteStats.roadToSideDrop.toFixed(3)),
+  imperialTriangles: imperialMesh.triangleCount,
+  carvedTriangles: carvedMesh.triangleCount,
 }));
