@@ -1,0 +1,278 @@
+{
+  "schema": "BOXCRAFT MANTLE COURSE 1",
+  "profile": {
+    "id": "product-one",
+    "eyeHeight": 1.68,
+    "radius": 0.38,
+    "autostepHeight": 0.62,
+    "jumpSpeed": 7.1,
+    "gravity": 14.4,
+    "mantleMinFeetToLip": 0.2,
+    "mantleMaxFeetToLip": 1,
+    "mantleForward": 0.48
+  },
+  "fixtures": [
+    {
+      "id": "mantle-course-grounded-step",
+      "role": "grounded-step-control",
+      "shape": "cuboid",
+      "center": [
+        0,
+        0.2625,
+        0
+      ],
+      "size": [
+        4.549465,
+        0.525,
+        4.526941
+      ],
+      "topY": 0.525,
+      "color": 7309210,
+      "walkableTop": true
+    },
+    {
+      "id": "mantle-course-low-mantle",
+      "role": "low-mantle",
+      "shape": "cuboid",
+      "center": [
+        6.596195,
+        0.3575,
+        0
+      ],
+      "size": [
+        4.549465,
+        0.715,
+        4.526941
+      ],
+      "topY": 0.715,
+      "color": 9085787,
+      "walkableTop": true
+    },
+    {
+      "id": "mantle-course-high-mantle",
+      "role": "high-mantle",
+      "shape": "cuboid",
+      "center": [
+        13.19239,
+        0.8875,
+        0
+      ],
+      "size": [
+        4.549465,
+        1.775,
+        4.526941
+      ],
+      "topY": 1.775,
+      "color": 11700821,
+      "walkableTop": true
+    },
+    {
+      "id": "mantle-course-impossible",
+      "role": "impossible-control",
+      "shape": "cuboid",
+      "center": [
+        19.788585,
+        1.422673,
+        0
+      ],
+      "size": [
+        4.549465,
+        2.845347,
+        4.526941
+      ],
+      "topY": 2.845347,
+      "color": 9395305,
+      "walkableTop": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "scenario-grounded-step-control",
+      "fixtureId": "mantle-course-grounded-step",
+      "expected": "grounded-autostep",
+      "input": "forward",
+      "approach": {
+        "spawn": [
+          0,
+          0,
+          -6.26347
+        ],
+        "distance": 4,
+        "facing": [
+          0,
+          0,
+          1
+        ],
+        "clearWidth": 4.549465
+      },
+      "successBounds": {
+        "min": [
+          -1.894732,
+          0.525,
+          -1.78347
+        ],
+        "max": [
+          1.894732,
+          0.905,
+          -1.02347
+        ]
+      },
+      "relation": {
+        "feetToLipAtGround": 0.525,
+        "ballisticApexRise": 1.750347,
+        "relativeReach": [
+          0.2,
+          1
+        ],
+        "stillRisingRequired": false,
+        "contactFacingRequired": false,
+        "supportAndClearanceRequired": false
+      }
+    },
+    {
+      "id": "scenario-low-mantle",
+      "fixtureId": "mantle-course-low-mantle",
+      "expected": "jump-mantle",
+      "input": "forward+jump",
+      "approach": {
+        "spawn": [
+          6.596195,
+          0,
+          -6.26347
+        ],
+        "distance": 4,
+        "facing": [
+          0,
+          0,
+          1
+        ],
+        "clearWidth": 4.549465
+      },
+      "successBounds": {
+        "min": [
+          4.701462,
+          0.715,
+          -1.78347
+        ],
+        "max": [
+          8.490927,
+          1.095,
+          -1.02347
+        ]
+      },
+      "relation": {
+        "feetToLipAtGround": 0.715,
+        "ballisticApexRise": 1.750347,
+        "relativeReach": [
+          0.2,
+          1
+        ],
+        "stillRisingRequired": true,
+        "contactFacingRequired": true,
+        "supportAndClearanceRequired": true
+      }
+    },
+    {
+      "id": "scenario-high-mantle",
+      "fixtureId": "mantle-course-high-mantle",
+      "expected": "jump-mantle",
+      "input": "forward+jump",
+      "approach": {
+        "spawn": [
+          13.19239,
+          0,
+          -6.26347
+        ],
+        "distance": 4,
+        "facing": [
+          0,
+          0,
+          1
+        ],
+        "clearWidth": 4.549465
+      },
+      "successBounds": {
+        "min": [
+          11.297658,
+          1.775,
+          -1.78347
+        ],
+        "max": [
+          15.087122,
+          2.155,
+          -1.02347
+        ]
+      },
+      "relation": {
+        "feetToLipAtGround": 1.775,
+        "ballisticApexRise": 1.750347,
+        "relativeReach": [
+          0.2,
+          1
+        ],
+        "stillRisingRequired": true,
+        "contactFacingRequired": true,
+        "supportAndClearanceRequired": true
+      }
+    },
+    {
+      "id": "scenario-impossible-control",
+      "fixtureId": "mantle-course-impossible",
+      "expected": "reject-unreachable",
+      "input": "forward+jump",
+      "approach": {
+        "spawn": [
+          19.788585,
+          0,
+          -6.26347
+        ],
+        "distance": 4,
+        "facing": [
+          0,
+          0,
+          1
+        ],
+        "clearWidth": 4.549465
+      },
+      "successBounds": {
+        "min": [
+          17.893853,
+          2.845347,
+          -1.78347
+        ],
+        "max": [
+          21.683318,
+          3.225347,
+          -1.02347
+        ]
+      },
+      "relation": {
+        "feetToLipAtGround": 2.845347,
+        "ballisticApexRise": 1.750347,
+        "relativeReach": [
+          0.2,
+          1
+        ],
+        "stillRisingRequired": false,
+        "contactFacingRequired": false,
+        "supportAndClearanceRequired": false
+      }
+    }
+  ],
+  "provenance": {
+    "generator": "punnett-boxcraft-judgment-mcp.generateMantleCourse",
+    "policy": "profile-relative-not-absolute-height-category",
+    "deterministicSeed": 3136503993,
+    "derivations": {
+      "ballisticApexRise": "jumpSpeed^2 / (2 * gravity)",
+      "margin": "max(0.05, radius * 0.25)",
+      "groundedStepTop": "autostepHeight - margin",
+      "lowMantleTop": "autostepHeight + margin",
+      "highMantleTop": "eyeHeight + margin; valid only when <= ballisticApexRise + mantleMaxFeetToLip",
+      "impossibleTop": "ballisticApexRise + mantleMaxFeetToLip + margin",
+      "mantleTarget": "contacted lip + radius + mantleForward",
+      "approach": "clear ground distance >= 4m"
+    }
+  },
+  "courseHash": "b4fbadc14e0b5be04285e02a21e361a5666d917b989bb99753b379f2cdfff969"
+}

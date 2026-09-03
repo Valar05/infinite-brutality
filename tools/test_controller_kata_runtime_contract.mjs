@@ -7,8 +7,13 @@ const index = file('../index.html');
 const main = file('../src/main.js');
 const arena = file('../src/controller-kata.js');
 const climb = file('../src/player-climb.js');
+const productOne = file('../src/product-one-controller.js');
+const productInput = file('../src/product-one-input-adapter.js');
 const gridMaterial = file('../src/controller-grid-material.js');
 const physics = file('../src/physics-world.js');
+const simulator = file('../tools/qa_product_one_controller_simulator.mjs');
+const mantleCourse = file('../src/generated/product-one-mantle-course.mjs');
+const mantlePin = JSON.parse(file('../src/generated/product-one-mantle-course.pin.json'));
 const license = file('../vendor/three/LICENSE');
 const cloudWorkflow = file('../.github/workflows/controller-grid-visual-qa.yml');
 const cloudCapture = file('../tools/github_controller_grid_visual_capture.mjs');
@@ -46,7 +51,7 @@ for (const id of [
   assert.match(html, new RegExp(`id=["']${id}["']`), `controller shell must preserve main.js DOM id: ${id}`);
 }
 
-assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.218["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.222["']/, 'controller page must load the authoritative runtime');
 assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
@@ -61,16 +66,50 @@ assert.match(main, /CONTROLLER_KATA_BASE_SEED = URL_PARAMS\.get\('seed'\) \|\| '
 assert.match(arena, /DEFAULT_ARENA_SEED = 'controller-proof'/);
 assert.doesNotMatch(`${html}\n${main}\n${arena}`, new RegExp(forbiddenLegacySeed, 'i'));
 
-assert.match(main, /createPhysicsWorld, ensurePhysicsReady \} from '\.\/physics-world\.js\?v=0\.8\.218'/);
+assert.match(main, /createPhysicsWorld, ensurePhysicsReady \} from '\.\/physics-world\.js\?v=0\.8\.222'/);
 assert.match(main, /generateControllerArena/);
 assert.doesNotMatch(arena, /createDirectMantlePlan|advanceDirectMantle/, 'arena module must not reinvent mantle mechanics');
 assert.match(climb, /export function createBoundedContactMantlePlan/);
 assert.match(climb, /export function advanceConstrainedMantle/);
-assert.match(main, /createBoundedContactMantlePlan/);
-assert.match(main, /tryBeginControllerKataDirectMantle\(physicsMove, moveY\)/);
+assert.match(main, /createProductOneController, PRODUCT_ONE_CAPABILITY_PROFILE, PRODUCT_ONE_PHYSICS_OPTIONS/);
+assert.match(main, /productOneController\.input\.pressJump/);
+assert.match(main, /productOneController\.input\.setMove/);
+assert.match(main, /productOneController\.input\.update\(dt\)/);
+assert.match(productInput, /@qa-production-adapter-v1 product-one-input move jump step/);
+assert.match(productOne, /createProductOneInputAdapter/);
+assert.doesNotMatch(productOne, /^\s+queueJump,$/m, 'controller must not expose direct jump bypass');
+assert.match(arena, /product-one-mantle-course\.mjs/, 'arena must consume the Boxcraft data-only course');
+assert.equal(mantlePin.commit, 'b4ff8625a0981ed39eb6d25a6ba88642b974e9b4');
+assert.equal(mantlePin.courseHash, 'b4fbadc14e0b5be04285e02a21e361a5666d917b989bb99753b379f2cdfff969');
+assert.match(mantleCourse, /BOXCRAFT MANTLE COURSE 1/);
+assert.match(productOne, /export const PRODUCT_ONE_CAPABILITY_PROFILE/);
+assert.match(productOne, /physicsWorld\.getWalkableCuboid/);
+assert.doesNotMatch(productOne, /options\.fixture/, 'controller must not accept one privileged fixture');
+assert.doesNotMatch(main, /arena\.directMantle|fixture: roomState\.controllerKataMantleProof\.fixture/, 'runtime must not privilege a directMantle fixture');
+assert.match(productOne, /Product One owner boundary/);
+assert.match(productOne, /export const PRODUCT_ONE_FIXED_DT = 1 \/ 60/);
+assert.match(productOne, /gravity: Object\.freeze\(\{ x: 0, y: -PRODUCT_ONE_CAPABILITY_PROFILE\.gravity, z: 0 \}\)/);
+assert.match(productOne, /characterOffset: 0\.035/);
+assert.match(productOne, /playerFootInset: 0/);
+assert.match(productOne, /autostepHeight: PRODUCT_ONE_CAPABILITY_PROFILE\.autostepHeight/);
+assert.match(productOne, /autostepMinWidth: 0\.646/);
+assert.match(productOne, /snapToGround: 0\.48/);
+assert.match(productOne, /physicsWorld\.movePlayer/);
+assert.match(productOne, /createBoundedContactMantlePlan/);
+assert.match(productOne, /advanceConstrainedMantle/);
 assert.match(main, /if \(!useControllerKataSlice\(\) && tryBeginClimb/);
-assert.match(main, /controller kata entered forbidden CLIMB state/);
-assert.match(main, /arena\.directMantle\.id/);
+assert.match(productOne, /Product One entered forbidden CLIMB state/);
+assert.match(main, /for \(const fixture of arena\.traversal\.fixtures\)/);
+assert.match(main, /addWalkableBox\(rootGroup, fixture\.id, fixture\.size, fixture\.center, fixtureMaterial/);
+assert.match(simulator, /const arena = generateControllerArena\(\{ seed:/);
+assert.match(simulator, /for \(const fixture of fixtures\)/);
+assert.match(simulator, /mount\(arena\.floor, "controller-kata-floor"\)/);
+assert.match(simulator, /physics\.addCuboid\(\{ size: record\.size, position: record\.center, source, kind: "walkable" \}\)/);
+assert.doesNotMatch(simulator, /qa-low-edge|qa-stair-|qa-tall-ledge/, "simulator must not invent nearby traversal geometry");
+assert.match(simulator, /playable course fixture withheld/);
+assert.match(simulator, /single-fixture-only/);
+assert.match(simulator, /randomMantleFixture/);
+
 assert.match(main, /applyWorldGridOverlay/);
 assert.match(main, /new THREE\.GridHelper\(arena\.floor\.size\[0\], arena\.floor\.size\[0\] \/ arena\.grid\.step,/);
 assert.match(main, /grid\.name = 'controller-kata-grid-helper'/, 'controller proof must expose the visible GridHelper marker');
@@ -84,15 +123,21 @@ assert.match(main, /function addWalkableBox[\s\S]*?addBeveledBox\(parent, name, 
 assert.match(gridMaterial, /export function applyWorldGridOverlay/);
 assert.match(physics, /world\.timestep = 1 \/ 60/);
 assert.match(physics, /controller\.computeColliderMovement/);
+assert.match(physics, /options\.playerFootInset \?\? 0\.15/);
+assert.match(physics, /Math\.max\(playerFootInset, 0\.001\)/);
+assert.match(physics, /const getWalkableCuboid/);
 assert.match(physics, /const findCuboidTopSupport/);
 assert.match(physics, /const isCapsuleClearAt/);
-assert.match(main, /physicsWorld\?\.findCuboidTopSupport/);
-assert.match(main, /physicsWorld\?\.isCapsuleClearAt/);
+assert.match(productOne, /physicsWorld\.findCuboidTopSupport/);
+assert.match(productOne, /physicsWorld\.isCapsuleClearAt/);
 
 assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*updateAttack\(dt\);/s);
-assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*renderer\.clearDepth\(\);\s*renderer\.render\(armsScene, armsCamera\);/s);
+assert.match(main, /updateArms\(dt\);/);
+assert.match(main, /renderer\.clearDepth\(\);\s*renderer\.render\(armsScene, armsCamera\);/s);
 assert.match(main, /if \(useControllerKataSlice\(\)\) \{\s*attackButton\.hidden = true;/s);
-assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*loadArms\(\);\s*loadOrcBerserkerEnemy\(\);/s);
+assert.match(main, /loadArms\(\);\s*if \(!useControllerKataSlice\(\)\) \{\s*loadOrcBerserkerEnemy\(\);/s);
+assert.doesNotMatch(main, /input\.lookPointer = event\.pointerId;\s*input\.lastLookX[\s\S]{0,120}if \(button === attackButton\)/, 'action buttons must not steal look pointer ownership');
+assert.match(arena, /PLAYABLE_MANTLE_SCENARIO[\s\S]*scenario-high-mantle/);
 
 assert.match(license, /The MIT License/);
 assert.match(license, /Copyright © 2010-2026 three\.js authors/);
@@ -114,11 +159,17 @@ assert.match(cloudCapture, /grid\.type !== 'GridHelper'/);
 assert.match(cloudCapture, /!grid\.visibleInScene/);
 assert.match(cloudCapture, /page\.keyboard\.down\('w'\)/);
 assert.match(cloudCapture, /window\.__infiniteBrutalityControllerMantle/);
-assert.match(cloudCapture, /proof\?\.starts === 0 && proof\.phase === 'approach-ready'/);
+assert.match(cloudCapture, /entry\.role === 'high-mantle'/);
+assert.match(cloudCapture, /mantleProof\.currentPosition/);
+assert.match(cloudCapture, /page\.keyboard\.down\('a'\)/);
+assert.match(cloudCapture, /proof\?\.starts === 0 && Array\.isArray\(proof\.currentPosition\)/);
+assert.match(cloudCapture, /Boxcraft dynamic mantle proof instrumentation is missing/);
 assert.match(cloudCapture, /proof\?\.starts >= 1/);
 assert.match(cloudCapture, /proof\?\.completions >= 1/);
 assert.ok(
-  cloudCapture.indexOf("proof?.starts === 0 && proof.phase === 'approach-ready'")
+  cloudCapture.indexOf("page.keyboard.down('a')")
+    < cloudCapture.indexOf("page.keyboard.down('w')")
+  && cloudCapture.indexOf("page.keyboard.down('w')")
     < cloudCapture.indexOf("page.keyboard.press('Space')")
   && cloudCapture.indexOf("page.keyboard.press('Space')")
     < cloudCapture.indexOf("proof?.starts >= 1"),
@@ -126,6 +177,7 @@ assert.ok(
 );
 assert.match(cloudCapture, /completed mantle violated constrained contact\/support bounds/);
 assert.match(cloudCapture, /mantleStartSurface/);
+assert.doesNotMatch(cloudCapture, /controller-kata-direct-mantle/);
 assert.match(cloudCapture, /entered forbidden CLIMB state/);
 assert.match(cloudCapture, /page\.keyboard\.press\('Space'\)/);
 assert.match(cloudCapture, /initial-hosted\.png/);

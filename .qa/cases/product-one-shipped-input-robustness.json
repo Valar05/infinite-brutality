@@ -1,0 +1,145 @@
+{
+  "assertions": [
+    {
+      "op": "eq",
+      "path": "metrics.evidence.classification",
+      "value": "machine-guardrail"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.evidence.visualAcceptance",
+      "value": false
+    },
+    {
+      "op": "eq",
+      "path": "metrics.productionAdapter",
+      "value": "src/product-one-input-adapter.js"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.inputDomainSource",
+      "value": "qa-engine-generated"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.fixtureId",
+      "value": "mantle-course-high-mantle"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.pageStart.completed",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.pageStart.jumpCommitted",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.pageStart.realContact",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.stick.successes",
+      "value": 7
+    },
+    {
+      "op": "eq",
+      "path": "metrics.angles.successes",
+      "value": 9
+    },
+    {
+      "op": "eq",
+      "path": "metrics.timing.successes",
+      "value": 7
+    },
+    {
+      "op": "eq",
+      "path": "metrics.frames.successes",
+      "value": 7
+    }
+  ],
+  "command": "product-one-input-robustness",
+  "evidence_classification": "machine-guardrail",
+  "id": "product-one-shipped-input-robustness",
+  "negative_controls": [
+    {
+      "argv_append": [
+        "--negative-control",
+        "direct-queue-bypass"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "direct-queue-bypass rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.directBypass.jumpCommitted",
+          "value": false
+        },
+        {
+          "op": "eq",
+          "path": "metrics.directBypass.completed",
+          "value": false
+        }
+      ],
+      "id": "direct-queue-bypass"
+    },
+    {
+      "argv_append": [
+        "--negative-control",
+        "out-of-contact-domain"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "out-of-contact-domain rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.outOfContactDomain.jumpCommitted",
+          "value": true
+        },
+        {
+          "op": "eq",
+          "path": "metrics.outOfContactDomain.realContact",
+          "value": false
+        },
+        {
+          "op": "eq",
+          "path": "metrics.outOfContactDomain.completed",
+          "value": false
+        },
+        {
+          "op": "eq",
+          "path": "metrics.outOfContactDomain.safelyContained",
+          "value": true
+        }
+      ],
+      "id": "out-of-contact-domain"
+    }
+  ],
+  "quick": true,
+  "schema": "qa-case-v1",
+  "source_globs": [
+    "controller-kata.html",
+    "index.html",
+    "src/main.js",
+    "src/product-one-input-adapter.js",
+    "src/product-one-controller.js",
+    "src/physics-world.js",
+    "src/player-climb.js",
+    "src/controller-kata.js",
+    "src/generated/product-one-mantle-course.mjs",
+    "tools/qa_product_one_input_adapter_harness.mjs",
+    "vendor/rapier3d/rapier.mjs",
+    "vendor/three/build/three.module.js"
+  ],
+  "status": "bound",
+  "title": "Shipped Product One input adapter robustness guardrail"
+}

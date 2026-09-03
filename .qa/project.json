@@ -1,0 +1,105 @@
+{
+  "commands": {
+    "product-one-controller": {
+      "adapter": {
+        "kind": "final-json"
+      },
+      "argv": [
+        "node",
+        "--no-warnings",
+        "tools/qa_product_one_controller_simulator.mjs",
+        "--seed",
+        "{seed}",
+        "--tick-hz",
+        "{param.tick_hz}"
+      ],
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "parameters": {
+        "tick_hz": [
+          60
+        ]
+      },
+      "seeds": [
+        "controller-proof"
+      ],
+      "timeout_seconds": 30
+    },
+    "product-one-input-robustness": {
+      "adapter": {
+        "kind": "final-json"
+      },
+      "argv": [
+        "node",
+        "--no-warnings",
+        "tools/qa_product_one_input_adapter_harness.mjs",
+        "--seed",
+        "{seed}",
+        "--qa-robustness-json",
+        "{qa.robustness}"
+      ],
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "parameters": {},
+      "robustness_domains": {
+        "approach_angle_degrees": {
+          "kind": "float",
+          "max": 60,
+          "min": -60,
+          "samples": 9
+        },
+        "frame_hz": {
+          "kind": "float",
+          "max": 120,
+          "min": 30,
+          "samples": 7
+        },
+        "jump_lead_fraction": {
+          "kind": "float",
+          "max": 0.5,
+          "min": 0,
+          "samples": 7
+        },
+        "stick": {
+          "kind": "float",
+          "max": 1,
+          "min": 0.2,
+          "samples": 7
+        }
+      },
+      "seeds": [
+        "controller-proof"
+      ],
+      "timeout_seconds": 30
+    }
+  },
+  "id": "infinite-brutality",
+  "ignore_globs": [
+    ".continue/**",
+    ".github/**",
+    ".qa/**",
+    ".tmp/**",
+    "assets/**",
+    "data/**",
+    "docs/**",
+    "generated/boxcraft_blocks/**",
+    "ib",
+    "src/controller-kata-runtime.js",
+    "src/controller-kata.css",
+    "tools/boxcraft-judgment-mcp/**",
+    "tools/ib.mjs",
+    "tools/start_local_server.sh",
+    "tools/test_boxcraft_judgment_mcp.sh"
+  ],
+  "risk_preflight_required": true,
+  "runtime_globs": [
+    "src/**",
+    "controller-kata.html",
+    "index.html"
+  ],
+  "schema": "qa-project-v1"
+}

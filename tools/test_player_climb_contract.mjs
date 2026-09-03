@@ -1,148 +1,92 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { generateControllerArena } from '../src/controller-kata.js';
-import { advanceConstrainedMantle, createBoundedContactMantlePlan } from '../src/player-climb.js';
-import { createPhysicsWorld, ensurePhysicsReady } from '../src/physics-world.js';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { advanceConstrainedMantle } from '../src/player-climb.js';
+
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
+const simulatorPath = fileURLToPath(new URL('./qa_product_one_controller_simulator.mjs', import.meta.url));
+const observation = JSON.parse(execFileSync(process.execPath, [
+  '--no-warnings',
+  simulatorPath,
+  '--seed',
+  'controller-proof',
+  '--tick-hz',
+  '60',
+], {
+  cwd: repositoryRoot,
+  encoding: 'utf8',
+}).trim());
+
+assert.equal(observation.schema, 'qa-observation-v1');
+assert.equal(observation.ok, true, observation.failures?.join('; '));
+const metrics = observation.metrics;
+assert.equal(metrics.sharedOwner, 'src/product-one-controller.js');
+assert.equal(metrics.arenaOwner, 'src/controller-kata.js');
+assert.equal(metrics.physicsOwner, 'src/physics-world.js');
+assert.equal(metrics.courseHash, 'b4fbadc14e0b5be04285e02a21e361a5666d917b989bb99753b379f2cdfff969');
+assert.equal(metrics.highMantle.topY > metrics.capabilityProfile.eyeHeight, true);
+for (const label of ['lowMantle', 'highMantle', 'randomMantle']) {
+  const result = metrics[label];
+  assert.deepEqual(result.sequence, ['ground', 'air', 'mantle', 'ground'], label);
+  assert.equal(result.realSharedJump, true, label);
+  assert.equal(result.sharedPhysicsContact, true, label);
+  assert.equal(result.contactSource, result.fixtureId, label);
+  assert.equal(result.finalGrounded, true, label);
+  assert.deepEqual(result.completionVelocity, [0, 0, 0], label);
+  assert.equal(result.climbEntries, 0, label);
+}
+assert.equal(metrics.groundedBoost.mantleStarts, 0);
+assert.equal(metrics.groundedBoost.groundBoost, false);
+assert.equal(metrics.impossible.rejected, true);
+assert.equal(metrics.randomMantle.fixtureId, metrics.randomMantleFixtureId);
+assert.ok(metrics.randomMantle.fixtureId.startsWith('cube-'));
+
+const plan = {
+  start: [0, 2.1, -1],
+  end: [0, 3.455, 0],
+  elapsed: 0,
+  duration: 0.34,
+};
+let frame = null;
+for (let step = 0; step < 60 && !frame?.complete; step += 1) {
+  frame = advanceConstrainedMantle({ ...plan, elapsed: frame?.elapsed || 0 }, 1 / 60);
+  assert.deepEqual(frame.velocity, [0, 0, 0], 'shared mantle interpolation must not grant launch velocity');
+}
+assert.equal(frame?.complete, true);
+assert.deepEqual(frame.position, plan.end);
+assert.equal(frame.grounded, true);
 
 const mainSource = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const climbSource = fs.readFileSync(new URL('../src/player-climb.js', import.meta.url), 'utf8');
-const arena = generateControllerArena({ seed: 'controller-proof:0' });
-const fixture = arena.directMantle;
-const eyeHeight = 1.68;
-const radius = 0.38;
-const mantleForward = 0.48;
-
-await ensurePhysicsReady();
-const physics = createPhysicsWorld({ gravity: { x: 0, y: -14.4, z: 0 }, autostepHeight: 0.62, autostepMinWidth: 0.646, snapToGround: 0.48 });
-physics.addCuboid({ size: arena.floor.size, position: arena.floor.center, source: 'controller-kata-floor', kind: 'walkable' });
-physics.addCuboid({ size: fixture.size, position: fixture.center, source: fixture.id, kind: 'walkable' });
-
-let eyePosition = { x: arena.spawn[0], y: eyeHeight, z: arena.spawn[2] };
-let groundedContact = null;
-for (let frame = 0; frame < 120; frame += 1) {
-  const move = physics.movePlayer({ eyePosition, desiredDelta: { x: 0, y: -0.24, z: 5.2 / 60 }, eyeHeight, radius });
-  eyePosition = move.eyePosition;
-  if (move.collisions.some((collision) => collision.isWall && collision.source === fixture.id)) {
-    groundedContact = move;
-    break;
-  }
-}
-assert.ok(groundedContact?.grounded, 'real Rapier forward motion must reach the fixture while grounded');
-
-const supportCalls = [];
-const clearanceCalls = [];
-const findMantleTopSupport = (x, z, targetTopY) => {
-  supportCalls.push({ x, z, targetTopY });
-  return physics.findCuboidTopSupport({ x, z, targetTopY, radius, source: fixture.id });
-};
-const isBodyClear = (x, z, eyeY) => {
-  clearanceCalls.push({ x, z, eyeY });
-  return physics.isCapsuleClearAt({ x, z, eyeY, eyeHeight, radius });
-};
-const optionsFor = (move, position, overrides = {}) => ({
-  fixture,
-  eyePosition: [position.x, position.y, position.z],
-  inputMoveY: 1,
-  collisions: move.collisions,
-  eyeHeight,
-  radius,
-  mantleForward,
-  playerMode: move.grounded ? 'ground' : 'air',
-  grounded: move.grounded,
-  velocityY: 0,
-  facing: [0, 0, 1],
-  faceYaw: Math.PI,
-  findMantleTopSupport,
-  isBodyClear,
-  ...overrides,
-});
-
-assert.equal(createBoundedContactMantlePlan(optionsFor(groundedContact, eyePosition)), null, 'grounded forward collision cannot activate Product One mantle');
-
-let velocityY = 7.1;
-let airborneContact = null;
-let plan = null;
-for (let frame = 0; frame < 20 && !plan; frame += 1) {
-  velocityY -= 14.4 / 60;
-  const move = physics.movePlayer({ eyePosition, desiredDelta: { x: 0, y: velocityY / 60, z: 5.2 / 60 }, eyeHeight, radius });
-  eyePosition = move.eyePosition;
-  const wall = move.collisions.find((collision) => collision.isWall && collision.source === fixture.id);
-  if (!move.grounded && wall) {
-    airborneContact = move;
-    plan = createBoundedContactMantlePlan(optionsFor(move, eyePosition, { playerMode: 'air', grounded: false, velocityY }));
-  }
-}
-assert.ok(airborneContact, 'jump approach must produce a real airborne Rapier wall contact');
-assert.ok(plan, 'airborne forward contact within the feet-to-lip window must activate');
-assert.equal(plan.kind, 'controller-direct');
-assert.equal(plan.contactSource, fixture.id);
-assert.equal(plan.supportSource, fixture.id);
-assert.ok(plan.feetToLip >= fixture.minFeetToLip && plan.feetToLip <= fixture.maxFeetToLip);
-assert.ok(plan.faceDot >= fixture.minFacingDot);
-assert.ok(plan.verticalDisplacement <= fixture.maxVerticalDisplacement);
-assert.ok(plan.horizontalDisplacement <= fixture.maxHorizontalDisplacement);
-assert.ok(plan.end.z > plan.contactPoint.z, 'landing must be beyond the contacted lip');
-assert.notEqual(plan.end.z, fixture.center[2], 'landing target must not be the box center');
-assert.ok(Math.abs((plan.end.z - plan.contactPoint.z) - (radius + mantleForward)) < 0.02, 'landing inset must reuse radius plus CLIMB_MANTLE_FORWARD');
-assert.ok(supportCalls.length > 0, 'landing support must be queried');
-assert.ok(clearanceCalls.length > 0, 'landing body clearance must be queried');
-
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, { playerMode: 'air', grounded: false, velocityY, facing: [0, 0, -1] })), null, 'facing away from the actual contact normal must reject');
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, {
-  playerMode: 'air',
-  grounded: false,
-  velocityY,
-  collisions: airborneContact.collisions.map((collision) => collision.source === fixture.id ? { ...collision, normal: { x: 0, y: 0, z: 1 } } : collision),
-})), null, 'a reversed Rapier wall normal must reject even with forward input');
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, { playerMode: 'air', grounded: false, velocityY, findMantleTopSupport: () => null })), null, 'missing landing support must reject');
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, { playerMode: 'air', grounded: false, velocityY, isBodyClear: () => false })), null, 'blocked landing body volume must reject');
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, { playerMode: 'climb', grounded: false, velocityY })), null, 'Product One must reject CLIMB as a mantle precursor');
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, { playerMode: 'air', grounded: false, velocityY, inputMoveY: 0 })), null, 'mantle must require forward input');
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, eyePosition, { playerMode: 'air', grounded: false, velocityY, collisions: [] })), null, 'mantle must require actual owned-fixture contact');
-
-const groundLaunchEye = [plan.start.x, fixture.topY + eyeHeight - 1.2, plan.start.z];
-assert.equal(createBoundedContactMantlePlan(optionsFor(airborneContact, { x: groundLaunchEye[0], y: groundLaunchEye[1], z: groundLaunchEye[2] }, {
-  eyePosition: groundLaunchEye,
-  playerMode: 'air',
-  grounded: false,
-  velocityY: 0.1,
-})), null, 'the 1.2m ground-to-top launch must exceed the vertical bound');
-
-let motion = null;
-let elapsed = 0;
-let steps = 0;
-while (!motion?.complete && steps < 60) {
-  motion = advanceConstrainedMantle({ ...plan, elapsed }, 1 / 60);
-  elapsed = motion.elapsed;
-  steps += 1;
-  assert.deepEqual(motion.velocity, [0, 0, 0], 'mantle motion must never grant launch velocity');
-}
-assert.ok(motion?.complete, 'direct mantle must complete within its bounded duration');
-assert.ok(steps <= Math.ceil(fixture.duration * 60) + 1);
-assert.deepEqual(motion.position, [plan.end.x, plan.end.y, plan.end.z]);
-assert.equal(motion.grounded, true);
-assert.equal(createBoundedContactMantlePlan(optionsFor(groundedContact, { x: plan.end.x, y: plan.end.y, z: plan.end.z }, {
-  eyePosition: [plan.end.x, plan.end.y, plan.end.z],
-  playerMode: 'ground',
-  grounded: true,
-  velocityY: 0,
-})), null, 'completed mantle must not repeat while grounded on top');
-
-assert.match(mainSource, /createBoundedContactMantlePlan/, 'authoritative runtime must use the shared constrained mantle owner');
-assert.equal((mainSource.match(/if \(!useControllerKataSlice\(\) && tryBeginClimb/g) || []).length, 2, 'Product One must bypass both general climb entry paths');
-assert.match(mainSource, /controller kata entered forbidden CLIMB state/, 'Product One must fail closed if CLIMB is ever entered');
-assert.match(climbSource, /export function createBoundedContactMantlePlan/, 'bounded contact planning must live with the original mantle owner');
-assert.match(climbSource, /export function advanceConstrainedMantle/, 'Product One motion must share the original mantle interpolation owner');
-physics.dispose();
+const controllerSource = fs.readFileSync(new URL('../src/product-one-controller.js', import.meta.url), 'utf8');
+assert.match(mainSource, /createProductOneController/, 'authoritative runtime must use the shared Product One controller');
+assert.equal((mainSource.match(/if \(!useControllerKataSlice\(\) && tryBeginClimb/g) || []).length, 2, 'Product One must bypass both full-game CLIMB entry paths');
+assert.match(controllerSource, /physicsWorld\.getWalkableCuboid\(contact\.source\)/, 'mantle candidates must resolve actual Rapier collider sources');
+assert.match(controllerSource, /type: 'jump-commit'/, 'mantle arming must originate in the shared jump input path');
+assert.match(controllerSource, /createProductOneInputAdapter/, 'controller must construct the shipped input adapter');
+assert.doesNotMatch(controllerSource, /^\s+queueJump,$/m, 'direct queue bypass must not be public');
+assert.match(controllerSource, /if \(jumpArmed\)/, 'generic mantle planning must require a committed jump');
+assert.match(controllerSource, /velocityY: player\.velocity\.y/, 'planner must observe still-rising velocity');
+assert.match(controllerSource, /localeCompare\(right\.fixture\.source\)/, 'candidate selection must be deterministic by source after contact time and reach');
+assert.doesNotMatch(controllerSource, /options\.fixture|directMantle/, 'Product One must not privilege an authored fixture');
+assert.match(controllerSource, /Product One entered forbidden CLIMB state/, 'Product One must fail closed on CLIMB');
+assert.match(climbSource, /export function createBoundedContactMantlePlan/, 'constrained planning must remain with the original climb owner');
+assert.match(climbSource, /export function advanceConstrainedMantle/, 'mantle interpolation must remain with the original climb owner');
 
 console.log(JSON.stringify({
   ok: true,
-  contract: 'product-one-constrained-direct-mantle',
-  contactSource: plan.contactSource,
-  feetToLip: plan.feetToLip,
-  faceDot: plan.faceDot,
-  verticalDisplacement: plan.verticalDisplacement,
-  horizontalDisplacement: plan.horizontalDisplacement,
-  completionSteps: steps,
-  modes: ['air', 'mantle', 'ground'],
+  contract: 'product-one-generic-constrained-mantle',
+  courseHash: metrics.courseHash,
+  fixtures: {
+    low: metrics.lowMantle.fixtureId,
+    high: metrics.highMantle.fixtureId,
+    random: metrics.randomMantle.fixtureId,
+    impossible: metrics.impossible.fixtureId,
+  },
+  sequences: {
+    low: metrics.lowMantle.sequence,
+    high: metrics.highMantle.sequence,
+    random: metrics.randomMantle.sequence,
+  },
 }));

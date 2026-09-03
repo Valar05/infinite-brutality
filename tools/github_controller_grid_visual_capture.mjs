@@ -69,7 +69,12 @@ async function inspectSurface(page) {
       title: document.title,
       status,
       controllerMantle: mantleProof ? {
-        fixtureId: mantleProof.fixture?.id || '',
+        fixtureId: mantleProof.contactSource || '',
+        courseHash: mantleProof.courseHash || '',
+        fixtureIds: [...(mantleProof.fixtureIds || [])],
+        courseFixtures: (mantleProof.courseFixtures || []).map((fixture) => ({ ...fixture, center: [...fixture.center], size: [...fixture.size] })),
+        courseScenarios: JSON.parse(JSON.stringify(mantleProof.courseScenarios || {})),
+        currentPosition: [...(mantleProof.currentPosition || [])],
         phase: mantleProof.phase,
         starts: mantleProof.starts,
         completions: mantleProof.completions,
@@ -84,11 +89,11 @@ async function inspectSurface(page) {
         horizontalDisplacement: mantleProof.horizontalDisplacement,
         targetPosition: mantleProof.targetPosition,
         bounds: {
-          minFacingDot: mantleProof.fixture?.minFacingDot,
-          minFeetToLip: mantleProof.fixture?.minFeetToLip,
-          maxFeetToLip: mantleProof.fixture?.maxFeetToLip,
-          maxVerticalDisplacement: mantleProof.fixture?.maxVerticalDisplacement,
-          maxHorizontalDisplacement: mantleProof.fixture?.maxHorizontalDisplacement,
+          minFacingDot: 0.72,
+          minFeetToLip: mantleProof.capabilityProfile?.mantleMinFeetToLip,
+          maxFeetToLip: mantleProof.capabilityProfile?.mantleMaxFeetToLip,
+          maxVerticalDisplacement: mantleProof.capabilityProfile?.mantleMaxFeetToLip,
+          maxHorizontalDisplacement: (mantleProof.capabilityProfile?.radius || 0) * 2 + (mantleProof.capabilityProfile?.mantleForward || 0) + 0.035,
         },
         startedAt: mantleProof.startedAt,
         completedAt: mantleProof.completedAt,
@@ -130,8 +135,8 @@ function requireReadySurface(surface, label) {
     throw new Error(`${label} controller GridHelper is not attached and visible in the scene`);
   }
   const mantle = surface?.controllerMantle;
-  if (!mantle || mantle.fixtureId !== 'controller-kata-direct-mantle') {
-    throw new Error(`${label} direct mantle proof instrumentation is missing`);
+  if (!mantle || mantle.courseHash !== 'b4fbadc14e0b5be04285e02a21e361a5666d917b989bb99753b379f2cdfff969' || mantle.fixtureIds.length !== 4) {
+    throw new Error(`${label} Boxcraft dynamic mantle proof instrumentation is missing`);
   }
   if (mantle.climbEntries !== 0 || mantle.modeHistory.includes('climb')) {
     throw new Error(`${label} entered forbidden CLIMB state`);
@@ -158,6 +163,7 @@ let initialScreenshot = null;
 let mantleStartScreenshot = null;
 let inputScreenshot = null;
 let inputHeld = false;
+let lateralHeld = false;
 
 try {
   browser = await chromium.launch(launchOptions);
@@ -183,14 +189,32 @@ try {
   const initialBytes = await page.screenshot({ path: initialPath, fullPage: false });
   initialScreenshot = { file: path.basename(initialPath), sha256: sha256(initialBytes) };
 
+  const captureTarget = await page.evaluate(() => {
+    const proof = window.__infiniteBrutalityControllerMantle;
+    const fixture = proof?.courseFixtures?.find((entry) => entry.role === 'high-mantle');
+    const scenario = fixture ? proof?.courseScenarios?.[fixture.id] : null;
+    return fixture && scenario ? { fixture, scenario } : null;
+  });
+  if (!captureTarget) throw new Error('Boxcraft high-mantle capture scenario is missing');
+  await page.keyboard.down('a');
+  lateralHeld = true;
+  await page.waitForFunction((targetX) => {
+    const position = window.__infiniteBrutalityControllerMantle?.currentPosition;
+    return Array.isArray(position) && position[0] >= targetX - 0.15;
+  }, captureTarget.scenario.spawn[0], { polling: 'raf', timeout: args.timeoutMs });
+  await page.keyboard.up('a');
+  lateralHeld = false;
   await page.keyboard.down('w');
   inputHeld = true;
-  await page.waitForFunction(() => {
+  const frontZ = captureTarget.fixture.center[2] - captureTarget.fixture.size[2] * 0.5;
+  const profile = initialSurface.controllerMantle.bounds;
+  const jumpTriggerDistance = Math.max(0.38 + 0.035 * 2, Math.min(1, captureTarget.fixture.topY - profile.minFeetToLip));
+  await page.waitForFunction((triggerZ) => {
     const proof = window.__infiniteBrutalityControllerMantle;
-    return proof?.starts === 0 && proof.phase === 'approach-ready';
-  }, null, { polling: 'raf', timeout: args.timeoutMs });
+    return proof?.starts === 0 && Array.isArray(proof.currentPosition) && proof.currentPosition[2] >= triggerZ;
+  }, frontZ - jumpTriggerDistance, { polling: 'raf', timeout: args.timeoutMs });
   approachSurface = await inspectSurface(page);
-  requireReadySurface(approachSurface, 'approach-ready');
+  requireReadySurface(approachSurface, 'jump-approach');
   if (approachSurface.controllerMantle.starts !== 0) throw new Error('grounded approach incorrectly started a mantle');
   await page.keyboard.press('Space');
 
@@ -200,7 +224,7 @@ try {
   }, null, { polling: 'raf', timeout: args.timeoutMs });
   mantleStartSurface = await inspectSurface(page);
   requireReadySurface(mantleStartSurface, 'mantle-start');
-  if (mantleStartSurface.controllerMantle.starts < 1) throw new Error('direct mantle start was not observed');
+  if (mantleStartSurface.controllerMantle.starts < 1) throw new Error('dynamic cuboid mantle start was not observed');
   const mantleStartPath = path.join(outDir, 'mantle-start.png');
   const mantleStartBytes = await page.screenshot({ path: mantleStartPath, fullPage: false });
   mantleStartScreenshot = { file: path.basename(mantleStartPath), sha256: sha256(mantleStartBytes) };
@@ -216,7 +240,7 @@ try {
   finalSurface = await inspectSurface(page);
   requireReadySurface(finalSurface, 'after-input');
   if (finalSurface.controllerMantle.completions < 1 || finalSurface.controllerMantle.phase !== 'completed') {
-    throw new Error('direct mantle completion was not observed');
+    throw new Error('dynamic cuboid mantle completion was not observed');
   }
   const completedMantle = finalSurface.controllerMantle;
   if (completedMantle.supportSource !== completedMantle.fixtureId
@@ -232,13 +256,16 @@ try {
   inputScreenshot = { file: path.basename(inputPath), sha256: sha256(inputBytes) };
 
   if (initialScreenshot.sha256 === mantleStartScreenshot.sha256 || initialScreenshot.sha256 === inputScreenshot.sha256) {
-    throw new Error('direct mantle evidence screenshots are byte-identical');
+    throw new Error('dynamic mantle evidence screenshots are byte-identical');
   }
 } catch (error) {
   fatalError = String(error?.stack || error?.message || error).slice(0, 4000);
 } finally {
   if (inputHeld && page) {
     try { await page.keyboard.up('w'); } catch {}
+  }
+  if (lateralHeld && page) {
+    try { await page.keyboard.up('a'); } catch {}
   }
 }
 
@@ -270,6 +297,7 @@ const manifest = {
     afterKeyboardInput: inputScreenshot,
   },
   inputExercise: {
+    lateralApproachKey: 'a',
     forwardKey: 'w',
     jumpKey: 'Space',
     groundedApproachBeforeJump: true,

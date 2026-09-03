@@ -9,12 +9,13 @@ import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
 import { createMaterialResources } from './materials.js?v=0.8.213';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
-import { createBoundedContactMantlePlan, createPlayerClimbApi } from './player-climb.js?v=0.8.218';
-import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.218';
+import { createPlayerClimbApi } from './player-climb.js?v=0.8.218';
+import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.222';
+import { createProductOneController, PRODUCT_ONE_CAPABILITY_PROFILE, PRODUCT_ONE_PHYSICS_OPTIONS } from './product-one-controller.js?v=0.8.222';
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
-import { generateControllerArena } from './controller-kata.js?v=0.8.218';
+import { generateControllerArena } from './controller-kata.js?v=0.8.222';
 import { applyWorldGridOverlay } from './controller-grid-material.js?v=0.8.214';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
@@ -34,7 +35,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.218';
+const BUILD = '0.8.222';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
 const CONTROLLER_KATA_BASE_SEED = URL_PARAMS.get('seed') || 'controller-proof';
@@ -283,6 +284,7 @@ const roomState = {
   connectivityRepair: null,
   terrainLayer: null,
   physicsWorld: null,
+  productOneController: null,
   controllerKataMantleProof: null,
   lastFrameMs: 0,
   lastRenderMs: 0,
@@ -1481,6 +1483,7 @@ function disposeActiveTerrainLayer() {
 }
 
 function disposeActivePhysicsWorld() {
+  roomState.productOneController = null;
   if (!roomState.physicsWorld) return;
   roomState.physicsWorld.dispose();
   roomState.physicsWorld = null;
@@ -1488,13 +1491,16 @@ function disposeActivePhysicsWorld() {
 
 function createActivePhysicsWorld() {
   disposeActivePhysicsWorld();
-  roomState.physicsWorld = createPhysicsWorld({
-    gravity: { x: 0, y: -14.4, z: 0 },
-    characterOffset: 0.035,
-    autostepHeight: Math.min(0.62, SUPPORT_SNAP_UP),
-    autostepMinWidth: PLAYER_SOLID_RADIUS * 1.7,
-    snapToGround: 0.48,
-  });
+  const options = useControllerKataSlice()
+    ? PRODUCT_ONE_PHYSICS_OPTIONS
+    : {
+        gravity: { x: 0, y: -14.4, z: 0 },
+        characterOffset: 0.035,
+        autostepHeight: Math.min(0.62, SUPPORT_SNAP_UP),
+        autostepMinWidth: PLAYER_SOLID_RADIUS * 1.7,
+        snapToGround: 0.48,
+      };
+  roomState.physicsWorld = createPhysicsWorld(options);
   return roomState.physicsWorld;
 }
 
@@ -5306,64 +5312,40 @@ function updateCurrentGauntletRoom() {
 }
 
 
-function tryBeginControllerKataDirectMantle(physicsMove, moveY) {
+function recordProductOneControllerEvent(event) {
   const proof = roomState.controllerKataMantleProof;
-  if (!proof || player.mode === 'mantle') return false;
-  const collisions = physicsMove?.collisions || [];
-  const fixtureContact = collisions.find((entry) => entry?.isWall && entry.source === proof.fixture.id);
-  if (fixtureContact && (player.grounded || physicsMove?.grounded)) proof.phase = 'approach-ready';
-  const plan = createBoundedContactMantlePlan({
-    fixture: proof.fixture,
-    eyePosition: player.position,
-    inputMoveY: moveY,
-    collisions,
-    eyeHeight: PLAYER_EYE_HEIGHT,
-    radius: PLAYER_SOLID_RADIUS,
-    mantleForward: CLIMB_MANTLE_FORWARD,
-    playerMode: player.mode,
-    grounded: player.grounded || !!physicsMove?.grounded,
-    velocityY: player.velocity.y,
-    facing: cameraForwardYaw(player.yaw),
-    faceYaw: player.yaw,
-    findMantleTopSupport: (x, z, targetTopY) => roomState.physicsWorld?.findCuboidTopSupport({ x, z, targetTopY, radius: PLAYER_SOLID_RADIUS, source: proof.fixture.id }),
-    isBodyClear: (x, z, eyeY) => !!roomState.physicsWorld?.isCapsuleClearAt({ x, z, eyeY, eyeHeight: PLAYER_EYE_HEIGHT, radius: PLAYER_SOLID_RADIUS }),
-  });
-  if (!plan) return false;
-  player.mode = 'mantle';
-  player.climb = null;
-  player.mantle = plan;
-  player.velocity.set(0, 0, 0);
-  player.grounded = false;
-  proof.phase = 'started';
-  proof.starts += 1;
-  proof.startedAt = performance.now();
-  proof.contactSource = plan.contactSource;
-  proof.contactNormal = [...plan.contactNormal];
-  proof.faceDot = plan.faceDot;
-  proof.feetToLip = plan.feetToLip;
-  proof.supportSource = plan.supportSource;
-  proof.verticalDisplacement = plan.verticalDisplacement;
-  proof.horizontalDisplacement = plan.horizontalDisplacement;
-  proof.startPosition = plan.start.toArray();
-  proof.targetPosition = plan.end.toArray();
-  proof.modeHistory.push('mantle');
-  return true;
-}
-
-function updateControllerKataDirectMantle(dt) {
-  const proof = roomState.controllerKataMantleProof;
-  const mantle = player.mantle;
-  if (!proof || !mantle || mantle.kind !== 'controller-direct') {
-    throw new Error('controller kata direct mantle state is missing');
+  if (!proof) return;
+  if (event.type === 'forbidden-climb') proof.climbEntries += 1;
+  if (event.type === 'wall-contact' && event.grounded) proof.phase = 'approach-ready';
+  if (event.type === 'jump-commit') {
+    if (proof.modeHistory[proof.modeHistory.length - 1] !== 'air') proof.modeHistory.push('air');
+    if (jumpAction) playArmAction(jumpAction, 0.045, true);
+    playThud(event.running ? 0.55 : 0.42);
   }
-  const frame = updatePlayerMantle(dt);
-  proof.phase = frame?.complete ? 'completed' : 'mantling';
-  proof.progress = frame?.progress || 0;
-  if (!frame?.complete) return;
-  proof.completions += 1;
-  proof.completedAt = performance.now();
-  proof.endPosition = mantle.end.toArray();
-  proof.modeHistory.push('ground');
+  if (event.type === 'mantle-start') {
+    const plan = event.plan;
+    proof.phase = 'started';
+    proof.starts += 1;
+    proof.startedAt = performance.now();
+    proof.contactSource = plan.contactSource;
+    proof.contactNormal = [...plan.contactNormal];
+    proof.faceDot = plan.faceDot;
+    proof.feetToLip = plan.feetToLip;
+    proof.supportSource = plan.supportSource;
+    proof.verticalDisplacement = plan.verticalDisplacement;
+    proof.horizontalDisplacement = plan.horizontalDisplacement;
+    proof.startPosition = plan.start.toArray();
+    proof.targetPosition = plan.end.toArray();
+    proof.modeHistory.push('mantle');
+  }
+  if (event.type === 'mantle-complete') {
+    proof.phase = 'completed';
+    proof.progress = 1;
+    proof.completions += 1;
+    proof.completedAt = performance.now();
+    proof.endPosition = event.plan.end.toArray();
+    proof.modeHistory.push('ground');
+  }
 }
 
 function applyControllerKataState(arena, movePlayer) {
@@ -5381,7 +5363,12 @@ function applyControllerKataState(arena, movePlayer) {
   roomState.levelBounds = { minX: -48, maxX: 48, minZ: -48, maxZ: 48 };
   roomState.controllerKataStartedAt = performance.now();
   roomState.controllerKataMantleProof = {
-    fixture: { ...arena.directMantle, center: [...arena.directMantle.center], size: [...arena.directMantle.size], approach: [...arena.directMantle.approach] },
+    courseHash: arena.boxcraftCourse.courseHash,
+    fixtureIds: [...arena.boxcraftCourse.fixtureIds],
+    courseFixtures: arena.traversal.fixtures.filter((fixture) => arena.boxcraftCourse.fixtureIds.includes(fixture.id)).map((fixture) => ({ id: fixture.id, role: fixture.role, center: [...fixture.center], size: [...fixture.size], topY: fixture.topY })),
+    courseScenarios: Object.fromEntries(arena.boxcraftCourse.fixtureIds.map((id) => [id, JSON.parse(JSON.stringify(arena.traversal.scenarios[id]))])),
+    capabilityProfile: { ...PRODUCT_ONE_CAPABILITY_PROFILE },
+    currentPosition: [...arena.spawn],
     phase: 'ready',
     starts: 0,
     completions: 0,
@@ -5418,6 +5405,13 @@ function applyControllerKataState(arena, movePlayer) {
     player.attack = null;
     player.attackTimer = 0;
   }
+  roomState.productOneController = createProductOneController({
+    player,
+    physicsWorld: roomState.physicsWorld,
+    forwardForYaw: cameraForwardYaw,
+    rightForYaw: cameraRightYaw,
+    onEvent: recordProductOneControllerEvent,
+  });
   setNodeIndex(0);
   setStatus(`controller kata | seed ${arena.seedText} | mantle ready | reach cyan exit`);
 }
@@ -5433,8 +5427,10 @@ function buildControllerKataSlice(movePlayer, rootGroup) {
   grid.renderOrder = 2;
   rootGroup.add(grid);
   window.__infiniteBrutalityControllerGrid = grid;
-  const mantleMaterial = new THREE.MeshStandardMaterial({ color: 0xd6a642, roughness: 0.72, metalness: 0.05 });
-  addWalkableBox(rootGroup, arena.directMantle.id, arena.directMantle.size, arena.directMantle.center, mantleMaterial, true, 0.04);
+  for (const fixture of arena.traversal.fixtures) {
+    const fixtureMaterial = new THREE.MeshStandardMaterial({ color: fixture.color, roughness: 0.72, metalness: 0.05 });
+    addWalkableBox(rootGroup, fixture.id, fixture.size, fixture.center, fixtureMaterial, true, 0.04);
+  }
   const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x7899a3, roughness: 0.76, metalness: 0.06 });
   for (const cube of arena.cubes) addWalkableBox(rootGroup, cube.id, cube.size, cube.center, cubeMaterial, true, 0.04);
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 4, 12), new THREE.MeshBasicMaterial({ color: 0x63e7ff }));
@@ -9077,6 +9073,12 @@ function beginAttackDef(def) {
 }
 
 function jump(pointerId = null) {
+  if (useControllerKataSlice() && roomState.productOneController) {
+    ensureAudio();
+    roomState.productOneController.input.pressJump({ source: pointerId === null ? 'keyboard' : 'touch' });
+    setActionPadVisible(true);
+    return;
+  }
   if (player.mode === 'climb') {
     const normal = player.climb?.normal || cameraForwardYaw(player.yaw).multiplyScalar(-1);
     player.mode = 'air';
@@ -9177,9 +9179,8 @@ function setupTouch() {
     button.addEventListener('pointerdown', (event) => {
       ensureAudio();
       setActionPadVisible(true);
-      input.lookPointer = event.pointerId;
-      input.lastLookX = event.clientX;
-      input.lastLookY = event.clientY;
+      // Action buttons are not look gestures; a jump finger must not rotate or
+      // relocate the right-side action pad while another pointer steers.
       if (button === attackButton) {
         const pointerId = event.pointerId;
         let holdTriggered = false;
@@ -9320,6 +9321,14 @@ function endStick(event) {
 
 function updatePlayer(dt) {
   const now = performance.now();
+  if (useControllerKataSlice() && roomState.productOneController) {
+    roomState.productOneController.input.setMove({ moveX: input.moveX, moveY: input.moveY, source: 'page-frame' });
+    const frame = roomState.productOneController.input.update(dt);
+    input.smoothMoveX = frame.input.moveX;
+    input.smoothMoveY = frame.input.moveY;
+    finalizePlayerFrame(dt, now, Math.hypot(frame.input.moveX, frame.input.moveY));
+    return;
+  }
   const smoothRate = player.grounded ? MOVE_INPUT_SMOOTH_GROUND : MOVE_INPUT_SMOOTH_AIR;
   const smoothBlend = 1 - Math.exp(-smoothRate * dt);
   input.smoothMoveX += (input.moveX - input.smoothMoveX) * smoothBlend;
@@ -9346,8 +9355,7 @@ function updatePlayer(dt) {
     return;
   }
   if (player.mode === 'mantle') {
-    if (useControllerKataSlice()) updateControllerKataDirectMantle(dt);
-    else updatePlayerMantle(dt);
+    updatePlayerMantle(dt);
     finalizePlayerFrame(dt, now, stickMagnitude);
     return;
   }
@@ -9441,10 +9449,6 @@ function updatePlayer(dt) {
       player.velocity.z = physicsMove.movement.z / dt;
       if (physicsMove.grounded && player.velocity.y <= 0) player.velocity.y = 0;
       else player.velocity.y = physicsMove.movement.y / dt;
-    }
-    if (useControllerKataSlice() && tryBeginControllerKataDirectMantle(physicsMove, moveY)) {
-      finalizePlayerFrame(dt, now, stickMagnitude);
-      return;
     }
     if (physicsMove.grounded) {
       if (!player.grounded && player.velocity.y < -1.2) playThud(0.7);
@@ -9569,6 +9573,7 @@ function updateControllerKataHud() {
   const last = roomState.controllerKataLastTime || 0;
   const timing = `${elapsed.toFixed(2)}s${best > 0 ? ` | best ${best.toFixed(2)}s` : ''}${last > 0 ? ` | last ${last.toFixed(2)}s` : ''}`;
   const mantle = roomState.controllerKataMantleProof;
+  if (mantle) mantle.currentPosition = player.position.toArray();
   const mantleText = mantle ? ` | mantle ${mantle.phase} ${mantle.completions}/${mantle.starts}` : '';
   statusEl.textContent = `build ${BUILD} | controller kata | seed ${roomState.seed} | ${timing}${mantleText} | reach cyan exit`;
 }
@@ -9599,9 +9604,9 @@ function render() {
     if (!useControllerKataSlice()) {
       updateAttack(dt);
       updateEnemyEngagement(dt);
-      updateArms(dt);
       updateNookTts(dt);
     }
+    updateArms(dt);
     updateControllerKataHud();
     updateDiegeticLights(performance.now() / 1000);
     updatePad();
@@ -9609,10 +9614,8 @@ function render() {
     const renderStart = performance.now();
     renderer.clear();
     renderer.render(scene, camera);
-    if (!useControllerKataSlice()) {
-      renderer.clearDepth();
-      renderer.render(armsScene, armsCamera);
-    }
+    renderer.clearDepth();
+    renderer.render(armsScene, armsCamera);
     roomState.lastRenderMs = performance.now() - renderStart;
     roomState.lastFrameMs = performance.now() - frameStart;
     const mode = player.attack?.def?.name || (input.jumpCharging ? 'jump-charge' : (player.isRunning ? 'run' : (!player.grounded ? 'air' : (player.runCharge > 0 ? 'build' : 'walk'))));
@@ -9656,8 +9659,8 @@ async function init() {
     resize();
     window.addEventListener('resize', resize);
     placeActionPad();
+    loadArms();
     if (!useControllerKataSlice()) {
-      loadArms();
       loadOrcBerserkerEnemy();
       loadNookTtsManifest();
       setStatus(ATTACK_LAB ? 'Attack lab ready' : 'Limbo room ready');

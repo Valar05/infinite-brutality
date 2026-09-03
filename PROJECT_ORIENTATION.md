@@ -104,3 +104,15 @@ Before changing anything:
 - Prefer modification over replacement.
 - Prefer extension over refactor.
 - Prefer local fixes over global changes.
+
+## Product One Controller Grid
+
+- `controller-kata.html?seed=controller-proof` is the isolated playable controller surface; it loads the authoritative `src/main.js` controller path.
+- `src/product-one-controller.js` owns Product One input normalization, fixed-tick movement, queued jump commit, Rapier contact selection, and the no-CLIMB transition into constrained mantle motion. `src/player-climb.js` remains the shared owner of mantle planning and interpolation.
+- `src/controller-kata.js` consumes the pinned, data-only `src/generated/product-one-mantle-course.mjs` emitted by Boxcraft commit `b4ff8625a0981ed39eb6d25a6ba88642b974e9b4`, course hash `b4fbadc14e0b5be04285e02a21e361a5666d917b989bb99753b379f2cdfff969`.
+- Mantle eligibility is generic to actual walkable cuboids resolved through `src/physics-world.js`: a successful queued jump must still be rising when a real facing wall contact enters the player-relative feet-to-lip reach window, with support and body clearance. There is no authored-box height category or privileged mantle fixture.
+- `tools/qa_product_one_controller_simulator.mjs` mounts the exact page-owned arena records and proves the legacy low edge/stairs, Boxcraft step/low/high/impossible controls, and a qualifying seeded random cuboid through the shared controller. The global `.qa` case binds deterministic positive assertions and anti-vacuity controls.
+- Local syntax, contract, simulation, and HTTP checks are guardrails. Visible acceptance remains the user's play verdict; do not substitute a simulator or source marker for pixels.
+- `src/product-one-input-adapter.js` is the shipped input boundary used by both `src/main.js` and the robustness harness. The global QA engine derives the HTML/ESM dependency graph, requires runtime move/jump/step traces from that adapter, and generates partial-stick, approach-angle, jump-window, and irregular-frame samples from declarative ranges. The idealized controller simulator is diagnostic only; it cannot green a handoff by itself.
+- The Boxcraft high-mantle scenario is the proof's playable spawn so the required cuboid is discoverable without teleporting a test. Its normalized mantle timing window is contact through half of the source-owned 4m clear approach; a jump earlier than that can physically clear the box and is a separate, safe negative control.
+- Product One reuses the existing Infinite Brutality arms load/update/render path and mantle action for visible constrained motion. Machine QA is labeled guardrail-only with `visual_acceptance: false`; the user's play verdict remains acceptance.

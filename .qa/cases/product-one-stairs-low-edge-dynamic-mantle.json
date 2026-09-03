@@ -1,0 +1,352 @@
+{
+  "assertions": [
+    {
+      "op": "eq",
+      "path": "metrics.boxcraftCommit",
+      "value": "b4ff8625a0981ed39eb6d25a6ba88642b974e9b4"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.courseHash",
+      "value": "b4fbadc14e0b5be04285e02a21e361a5666d917b989bb99753b379f2cdfff969"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.capabilityProfile",
+      "value": {
+        "autostepHeight": 0.62,
+        "eyeHeight": 1.68,
+        "gravity": 14.4,
+        "id": "product-one",
+        "jumpSpeed": 7.1,
+        "mantleForward": 0.48,
+        "mantleMaxFeetToLip": 1,
+        "mantleMinFeetToLip": 0.2,
+        "radius": 0.38
+      }
+    },
+    {
+      "op": "eq",
+      "path": "metrics.arenaGeometryHash",
+      "value": "8c87484c"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.randomBoxCount",
+      "value": 28
+    },
+    {
+      "op": "eq",
+      "path": "metrics.randomMantleFixtureId",
+      "value": "cube-12"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.lowEdge.completed",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.lowEdge.grounded",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.lowEdge.mantleStarts",
+      "value": 0
+    },
+    {
+      "op": "eq",
+      "path": "metrics.stairs.completed",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.stairs.reachedTop",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.stairs.grounded",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.groundedStep.completed",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.groundedStep.mantleStarts",
+      "value": 0
+    },
+    {
+      "op": "eq",
+      "path": "metrics.groundedBoost.groundBoost",
+      "value": false
+    },
+    {
+      "op": "eq",
+      "path": "metrics.lowMantle.sequence",
+      "value": [
+        "ground",
+        "air",
+        "mantle",
+        "ground"
+      ]
+    },
+    {
+      "op": "eq",
+      "path": "metrics.lowMantle.realSharedJump",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.lowMantle.sharedPhysicsContact",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.highMantle.topY",
+      "value": 1.775
+    },
+    {
+      "op": "eq",
+      "path": "metrics.highMantle.sequence",
+      "value": [
+        "ground",
+        "air",
+        "mantle",
+        "ground"
+      ]
+    },
+    {
+      "op": "eq",
+      "path": "metrics.highMantle.realSharedJump",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.highMantle.sharedPhysicsContact",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.randomMantle.sequence",
+      "value": [
+        "ground",
+        "air",
+        "mantle",
+        "ground"
+      ]
+    },
+    {
+      "op": "eq",
+      "path": "metrics.randomMantle.contactSource",
+      "value": "cube-12"
+    },
+    {
+      "op": "eq",
+      "path": "metrics.randomMantle.completionVelocity",
+      "value": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "op": "eq",
+      "path": "metrics.impossible.rejected",
+      "value": true
+    },
+    {
+      "op": "eq",
+      "path": "metrics.impossible.completed",
+      "value": false
+    }
+  ],
+  "command": "product-one-controller",
+  "evidence_classification": "diagnostic",
+  "failure": {
+    "expected": {
+      "grounded_step": "Boxcraft grounded control autosteps without mantle",
+      "high_mantle": "top begins above eye height and becomes reachable during rising jump",
+      "impossible": "beyond ballistic apex plus reach never mantles",
+      "low_edge": "forward-only autosteps grounded without mantle",
+      "low_mantle": "real jump plus forward yields GROUND to AIR to MANTLE to GROUND",
+      "seeded_random": "a qualifying actual seeded random cuboid mantles through generic collider lookup",
+      "stairs": "forward-only reaches the top and returns grounded"
+    },
+    "negative_controls": [
+      {
+        "expected": "disable-autostep fault must be rejected",
+        "id": "disable-autostep"
+      },
+      {
+        "expected": "suppress-mantle fault must be rejected",
+        "id": "suppress-mantle"
+      },
+      {
+        "expected": "planner-only fault must be rejected",
+        "id": "planner-only"
+      },
+      {
+        "expected": "grounded-boost fault must be rejected",
+        "id": "grounded-boost"
+      },
+      {
+        "expected": "single-fixture-only fault must be rejected",
+        "id": "single-fixture-only"
+      },
+      {
+        "expected": "missing-course-box fault must be rejected",
+        "id": "missing-course-box"
+      }
+    ]
+  },
+  "failure_fingerprint": "090c14ff6509cdcb21afca95ebf0cc8f97079e88747f26919911de84deb75c9a",
+  "id": "product-one-stairs-low-edge-dynamic-mantle",
+  "negative_controls": [
+    {
+      "argv_append": [
+        "--negative-control",
+        "disable-autostep"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "disable-autostep rejected"
+        }
+      ],
+      "id": "disable-autostep"
+    },
+    {
+      "argv_append": [
+        "--negative-control",
+        "suppress-mantle"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "suppress-mantle rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.highMantle.completed",
+          "value": false
+        }
+      ],
+      "id": "suppress-mantle"
+    },
+    {
+      "argv_append": [
+        "--negative-control",
+        "planner-only"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "planner-only rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.highMantle.realSharedJump",
+          "value": false
+        },
+        {
+          "op": "eq",
+          "path": "metrics.highMantle.sharedPhysicsContact",
+          "value": false
+        }
+      ],
+      "id": "planner-only"
+    },
+    {
+      "argv_append": [
+        "--negative-control",
+        "grounded-boost"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "grounded-boost rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.groundedBoost.groundBoost",
+          "value": true
+        }
+      ],
+      "id": "grounded-boost"
+    },
+    {
+      "argv_append": [
+        "--negative-control",
+        "single-fixture-only"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "single-fixture-only rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.highMantle.completed",
+          "value": false
+        },
+        {
+          "op": "eq",
+          "path": "metrics.randomMantle.completed",
+          "value": false
+        }
+      ],
+      "id": "single-fixture-only"
+    },
+    {
+      "argv_append": [
+        "--negative-control",
+        "missing-course-box"
+      ],
+      "assertions": [
+        {
+          "op": "eq",
+          "path": "reason",
+          "value": "missing-course-box rejected"
+        },
+        {
+          "op": "eq",
+          "path": "metrics.highMantle.completed",
+          "value": false
+        },
+        {
+          "op": "contains",
+          "path": "failures",
+          "value": "playable course fixture withheld: mantle-course-high-mantle"
+        }
+      ],
+      "id": "missing-course-box"
+    }
+  ],
+  "quick": true,
+  "schema": "qa-case-v1",
+  "source_globs": [
+    "src/main.js",
+    "src/product-one-controller.js",
+    "src/physics-world.js",
+    "src/player-climb.js",
+    "src/controller-kata.js",
+    "src/generated/product-one-mantle-course.json",
+    "src/generated/product-one-mantle-course.mjs",
+    "src/generated/product-one-mantle-course.pin.json",
+    "tools/qa_product_one_controller_simulator.mjs",
+    "vendor/rapier3d/rapier.mjs",
+    "vendor/three/build/three.module.js"
+  ],
+  "status": "bound",
+  "title": "Diagnostic: idealized Product One geometry and constrained mantle invariants"
+}

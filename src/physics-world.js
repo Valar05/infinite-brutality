@@ -49,6 +49,7 @@ export function createPhysicsWorld(options = {}) {
   let playerBody = null;
   let playerCollider = null;
   let playerEyeOffset = 0.59;
+  const playerFootInset = Math.max(0, Number(options.playerFootInset ?? 0.15));
   let lastStepMs = 0;
   let lastMoveMs = 0;
   let lastContactCount = 0;
@@ -106,7 +107,7 @@ export function createPhysicsWorld(options = {}) {
   };
 
   const ensurePlayer = ({ eyePosition, eyeHeight, radius }) => {
-    const minY = eyePosition.y - eyeHeight + 0.15;
+    const minY = eyePosition.y - eyeHeight + playerFootInset;
     const maxY = eyePosition.y + 0.35;
     const bodyHeight = Math.max(radius * 2 + 0.2, maxY - minY);
     const capsuleHalfHeight = Math.max(0.12, (bodyHeight - radius * 2) * 0.5);
@@ -192,6 +193,24 @@ export function createPhysicsWorld(options = {}) {
       && Math.abs(localZ) <= record.size[2] * 0.5 - radius;
   };
 
+  const getWalkableCuboid = (source) => {
+    const exactSource = String(source || '');
+    if (!exactSource) return null;
+    const record = colliderRecords.find((entry) => entry.source === exactSource);
+    if (!record || record.type !== 'cuboid' || record.kind !== 'walkable' || !record.size || !record.position) return null;
+    const position = [...record.position];
+    const size = [...record.size];
+    return {
+      source: record.source,
+      kind: record.kind,
+      center: [...position],
+      position,
+      size,
+      topY: position[1] + size[1] * 0.5,
+      yaw: record.yaw || 0,
+    };
+  };
+
   const findCuboidTopSupport = ({ x, z, targetTopY, radius = 0.38, source = '', tolerance = 0.08 }) => {
     let best = null;
     for (const record of colliderRecords) {
@@ -205,7 +224,7 @@ export function createPhysicsWorld(options = {}) {
   };
 
   const isCapsuleClearAt = ({ x, z, eyeY, eyeHeight, radius = 0.38 }) => {
-    const minY = eyeY - eyeHeight + 0.15;
+    const minY = eyeY - eyeHeight + Math.max(playerFootInset, 0.001);
     const maxY = eyeY + 0.35;
     for (const record of colliderRecords) {
       if (record.type !== 'cuboid' || !record.size || !record.position) continue;
@@ -251,6 +270,7 @@ export function createPhysicsWorld(options = {}) {
     addTerrainMesh,
     addCuboid,
     movePlayer,
+    getWalkableCuboid,
     findCuboidTopSupport,
     isCapsuleClearAt,
     snapshot,

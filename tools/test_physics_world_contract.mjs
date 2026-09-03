@@ -24,7 +24,19 @@ physics.addCuboid({
   size: [12, 1, 12],
   position: [0, -0.5, 0],
   source: 'test-floor',
+  kind: 'walkable',
 });
+physics.addCuboid({ size: [2, 2, 2], position: [4, 1, 0], source: 'test-solid', kind: 'solid' });
+physics.addTerrainMesh({ meshData: { positions: [-1, 0, -1, 1, 0, -1, 0, 0, 1], indices: [0, 1, 2] }, source: 'test-terrain', kind: 'terrain' });
+const walkable = physics.getWalkableCuboid('test-floor');
+assert.deepEqual(walkable, { source: 'test-floor', kind: 'walkable', center: [0, -0.5, 0], position: [0, -0.5, 0], size: [12, 1, 12], topY: 0, yaw: 0 });
+walkable.center[0] = 999;
+walkable.size[0] = 999;
+assert.deepEqual(physics.getWalkableCuboid('test-floor').center, [0, -0.5, 0], 'walkable lookup must return a safe copy');
+assert.equal(physics.getWalkableCuboid('test-solid'), null, 'non-walkable cuboids must reject');
+assert.equal(physics.getWalkableCuboid('test-terrain'), null, 'terrain meshes must reject');
+assert.equal(physics.getWalkableCuboid('missing'), null, 'unknown sources must reject');
+
 const result = physics.movePlayer({
   eyePosition: { x: 0, y: 1.68, z: 0 },
   desiredDelta: { x: 0, y: -1.4, z: 0 },
@@ -38,7 +50,8 @@ const snapshot = physics.snapshot();
 assert.ok(snapshot.colliderCount >= 1, 'physics world must count registered static colliders');
 assert.ok(Array.isArray(snapshot.collisions), 'physics snapshot must expose recent player collision records');
 assert.equal(snapshot.ownerlessColliderCount, 0, 'named test collider should not be ownerless');
-assert.equal(snapshot.cuboidColliderCount, 1, 'test floor should be tracked as a cuboid collider');
+assert.equal(snapshot.cuboidColliderCount, 2, 'walkable and solid test cuboids should be tracked');
+assert.equal(snapshot.terrainMeshColliderCount, 1, 'terrain test collider should be tracked without becoming mantleable');
 physics.dispose();
 
 console.log(JSON.stringify({ ok: true, contract: 'physics-world-rapier', result }));
