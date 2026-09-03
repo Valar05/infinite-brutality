@@ -4,16 +4,18 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GENERATED_ROOM_BATCH } from './generated_room_batch.js';
 import { QUAKE_M1E1_SLICE } from './quake-m1e1-slice.js?v=0.8.197';
 import { buildCarvedVoxelFortressData } from './carved-voxel-fortress-slice.js?v=0.8.209';
-import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.212';
-import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.212';
+import { buildDistrictIntentPlan } from './district-intent-planner.js?v=0.8.213';
+import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.213';
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
-import { createMaterialResources } from './materials.js?v=0.8.212';
+import { createMaterialResources } from './materials.js?v=0.8.213';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createPlayerClimbApi } from './player-climb.js?v=0.8.200';
 import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.200';
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
+import { generateControllerArena } from './controller-kata.js?v=0.8.214';
+import { applyWorldGridOverlay } from './controller-grid-material.js?v=0.8.214';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
   DISTRICT_ARCHETYPES,
@@ -32,9 +34,10 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.212';
+const BUILD = '0.8.214';
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'carved_voxel_fortress';
+const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
+const CONTROLLER_KATA_BASE_SEED = URL_PARAMS.get('seed') || 'controller-proof';
 const ACTIVE_DISTRICT_ID = URL_PARAMS.get('district') || 'artillery_battery';
 const ISLAND_ART_ONLY = true;
 const PLAYABLE_SLICE_ROOM_COUNT = 3;
@@ -64,6 +67,7 @@ const fsButton = document.getElementById('fsButton');
 const healthBarFill = document.getElementById('healthBarFill');
 const healthValueEl = document.getElementById('healthValue');
 const damageFlashEl = document.getElementById('damageFlash');
+const healthHudEl = document.getElementById('healthHud');
 const attackDebugHud = document.getElementById('attackDebugHud');
 const attackDebugText = document.getElementById('attackDebugText');
 
@@ -1442,6 +1446,7 @@ function addRoomShell(parent, width, depth, mat = MAT.stone, options = {}) {
 }
 
 function islandRouteDisplayMaterial(mat) {
+  if (useControllerKataSlice()) return mat;
   if (!ISLAND_ART_ONLY) return mat;
   if (mat === MAT.bridge) return MAT.bridge;
   if (mat === MAT.exit) return MAT.bridge;
@@ -3555,6 +3560,10 @@ function activeRoomSpecs() {
   return roomState.sliceSpecs || playableRoomSpecs();
 }
 
+function useControllerKataSlice() {
+  return ACTIVE_SLICE === 'controller_kata';
+}
+
 function useQuakeM1E1Slice() {
   return ACTIVE_SLICE === 'quake_m1e1';
 }
@@ -5296,7 +5305,61 @@ function updateCurrentGauntletRoom() {
 }
 
 
+function applyControllerKataState(arena, movePlayer) {
+  roomState.plan = { levelIndex: roomState.levelIndex, seed: arena.numericSeed, sliceId: 'controller_kata', nodes: [] };
+  roomState.spec = { index: 0, connector: 'controller_kata', type: 'controller_kata', roomRole: 'controller_kata', landmark: 'cyan exit', routeSentence: [] };
+  roomState.seed = arena.numericSeed;
+  roomState.spawn.fromArray(arena.spawn);
+  roomState.exit.fromArray(arena.exit);
+  roomState.exitRadius = arena.exitRadius;
+  roomState.enemyPositions = [];
+  roomState.gauntletRooms = [];
+  roomState.sliceSpecs = [];
+  roomState.navGraph = null;
+  roomState.connectivityRepair = null;
+  roomState.levelBounds = { minX: -48, maxX: 48, minZ: -48, maxZ: 48 };
+  roomState.controllerKataStartedAt = performance.now();
+  if (enemy) enemy.visible = false;
+  if (movePlayer) {
+    player.position.copy(roomState.spawn);
+    player.visualPosition.copy(player.position);
+    player.velocity.set(0, 0, 0);
+    input.smoothMoveX = 0;
+    input.smoothMoveY = 0;
+    player.grounded = true;
+    player.runCharge = 0;
+    player.lastRunIntent = false;
+    player.attack = null;
+    player.attackTimer = 0;
+  }
+  setNodeIndex(0);
+  setStatus(`controller kata | seed ${arena.seedText} | reach cyan exit`);
+}
+
+function buildControllerKataSlice(movePlayer, rootGroup) {
+  const arena = generateControllerArena({ seed: `${CONTROLLER_KATA_BASE_SEED}:${roomState.levelIndex}` });
+  const floorMaterial = applyWorldGridOverlay(new THREE.MeshStandardMaterial({ color: 0x17252b, roughness: 0.92, metalness: 0.04 }), { gridScale: 1, gridThickness: 0.72, gridStrength: 0.32, edgeStrength: 0.08, gridColor: 0x63e7ff });
+  addWalkableBox(rootGroup, 'controller-kata-floor', arena.floor.size, arena.floor.center, floorMaterial, false, 0.02);
+  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x48636b, roughness: 0.82, metalness: 0.08 });
+  for (const cube of arena.cubes) addWalkableBox(rootGroup, cube.id, cube.size, cube.center, cubeMaterial, true, 0.04);
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 4, 12), new THREE.MeshBasicMaterial({ color: 0x63e7ff }));
+  beacon.name = 'controller-kata-exit';
+  beacon.position.set(arena.exit[0], 2, arena.exit[2]);
+  rootGroup.add(beacon);
+  applyControllerKataState(arena, movePlayer);
+  return arena;
+}
+
 function completeGeneratedGauntlet() {
+  if (useControllerKataSlice() && roomState.controllerKataStartedAt) {
+    const elapsed = Math.max(0, (performance.now() - roomState.controllerKataStartedAt) / 1000);
+    roomState.controllerKataLastTime = elapsed;
+    const key = 'infinite-brutality-controller-kata-best';
+    const prior = Number(localStorage.getItem(key) || 0);
+    const best = prior > 0 ? Math.min(prior, elapsed) : elapsed;
+    roomState.controllerKataBestTime = best;
+    localStorage.setItem(key, String(best));
+  }
   roomState.levelIndex += 1;
   roomState.nodeIndex = 0;
   setLevelIndex(roomState.levelIndex);
@@ -5318,6 +5381,10 @@ function buildRoom(movePlayer = true) {
   resetWalkableBounds();
   createActivePhysicsWorld();
   roomState.transitionLock = 0.7;
+  if (useControllerKataSlice()) {
+    buildControllerKataSlice(movePlayer, rootGroup);
+    return;
+  }
   if (useCarvedVoxelFortressSlice()) {
     const built = buildCarvedVoxelFortressSlice();
     const districtPlan = built.plan;
@@ -9391,6 +9458,15 @@ function updateArms(dt) {
   }
 }
 
+function updateControllerKataHud() {
+  if (!useControllerKataSlice() || !roomState.controllerKataStartedAt) return;
+  const elapsed = Math.max(0, (performance.now() - roomState.controllerKataStartedAt) / 1000);
+  const best = roomState.controllerKataBestTime || Number(localStorage.getItem('infinite-brutality-controller-kata-best') || 0);
+  const last = roomState.controllerKataLastTime || 0;
+  const timing = `${elapsed.toFixed(2)}s${best > 0 ? ` | best ${best.toFixed(2)}s` : ''}${last > 0 ? ` | last ${last.toFixed(2)}s` : ''}`;
+  statusEl.textContent = `build ${BUILD} | controller kata | seed ${roomState.seed} | ${timing} | reach cyan exit`;
+}
+
 function updatePad() {
 }
 
@@ -9414,18 +9490,23 @@ function render() {
     updateEnemyAttackSweepDebug(realDt);
     const dt = player.hitPause > 0 ? 0 : realDt * combatFx.timeScale;
     updatePlayer(dt);
-    updateAttack(dt);
-    updateEnemyEngagement(dt);
-    updateArms(dt);
-    updateNookTts(dt);
+    if (!useControllerKataSlice()) {
+      updateAttack(dt);
+      updateEnemyEngagement(dt);
+      updateArms(dt);
+      updateNookTts(dt);
+    }
+    updateControllerKataHud();
     updateDiegeticLights(performance.now() / 1000);
     updatePad();
     updateCollisionDebugOverlay();
     const renderStart = performance.now();
     renderer.clear();
     renderer.render(scene, camera);
-    renderer.clearDepth();
-    renderer.render(armsScene, armsCamera);
+    if (!useControllerKataSlice()) {
+      renderer.clearDepth();
+      renderer.render(armsScene, armsCamera);
+    }
     roomState.lastRenderMs = performance.now() - renderStart;
     roomState.lastFrameMs = performance.now() - frameStart;
     const mode = player.attack?.def?.name || (input.jumpCharging ? 'jump-charge' : (player.isRunning ? 'run' : (!player.grounded ? 'air' : (player.runCharge > 0 ? 'build' : 'walk'))));
@@ -9439,7 +9520,7 @@ function render() {
     maybePublishVisualQaFrame({ mode, node, enemyNav, navMode });
     const hurtText = ` | hurt ${Number(player.damageTaken || 0).toFixed(1)}`;
     refreshEnemyRouteDebug(enemyNav);
-    refreshPlayerHealthHud();
+    if (!useControllerKataSlice()) refreshPlayerHealthHud();
     refreshAttackDebugHud();
     if (DEBUG_UI) readoutEl.textContent = `L${roomState.levelIndex + 1}.${roomState.nodeIndex + 1} ${node ? node.connector : 'loading'}${districtText} | move ${input.smoothMoveX.toFixed(2)},${input.smoothMoveY.toFixed(2)} | ${mode} | enemy ${enemy.visible ? enemy.userData.health.toFixed(1) : 'down'}${hurtText}${navText}${ragText}${attackText} | ${input.gyro ? 'gyro' : 'touch'}`;
   } catch (err) {
@@ -9457,16 +9538,24 @@ async function init() {
     applyBootNavigationTarget();
     buildLights();
     buildEnemy();
+    if (useControllerKataSlice()) {
+      attackButton.hidden = true;
+      if (healthHudEl) healthHudEl.hidden = true;
+      if (damageFlashEl) damageFlashEl.hidden = true;
+      hintEl.textContent = 'Move with WASD or left touch. Look with mouse or right touch. Jump. Reach the cyan exit.';
+    }
     buildRoom();
     publishVisualQaBeacon('reset', visualQaBeaconFields());
     setupTouch();
     resize();
     window.addEventListener('resize', resize);
     placeActionPad();
-    loadArms();
-    loadOrcBerserkerEnemy();
-    loadNookTtsManifest();
-    setStatus(ATTACK_LAB ? 'Attack lab ready' : 'Limbo room ready');
+    if (!useControllerKataSlice()) {
+      loadArms();
+      loadOrcBerserkerEnemy();
+      loadNookTtsManifest();
+      setStatus(ATTACK_LAB ? 'Attack lab ready' : 'Limbo room ready');
+    }
     render();
   } catch (err) {
     console.error(err);

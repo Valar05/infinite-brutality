@@ -1,0 +1,42 @@
+name: Controller Grid Visual QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Exact hosted Product One controller-grid URL
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright package without browser download
+        run: npm install --no-save playwright
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Verify system Chrome
+        run: google-chrome --version
+      - name: Capture hosted controller-grid visual evidence
+        env:
+          PLAYWRIGHT_CHROME_CHANNEL: chrome
+          CONTROLLER_GRID_VISUAL_QA_URL: ${{ inputs.url }}
+        run: >
+          node tools/github_controller_grid_visual_capture.mjs
+          --url "$CONTROLLER_GRID_VISUAL_QA_URL"
+          --out-dir "generated/cloud-visual-evidence/controller-grid/github-actions-${{ github.run_id }}"
+          --job-id "github_actions_${{ github.run_id }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: controller-grid-visual-evidence-${{ github.run_id }}
+          path: generated/cloud-visual-evidence/controller-grid/github-actions-${{ github.run_id }}
+          if-no-files-found: error
