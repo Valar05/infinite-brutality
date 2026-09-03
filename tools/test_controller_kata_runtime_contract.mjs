@@ -45,7 +45,7 @@ for (const id of [
   assert.match(html, new RegExp(`id=["']${id}["']`), `controller shell must preserve main.js DOM id: ${id}`);
 }
 
-assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.215["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.216["']/, 'controller page must load the authoritative runtime');
 assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
@@ -65,6 +65,9 @@ assert.match(main, /generateControllerArena/);
 assert.match(main, /applyWorldGridOverlay/);
 assert.match(main, /new THREE\.GridHelper\(arena\.floor\.size\[0\], arena\.floor\.size\[0\] \/ arena\.grid\.step,/);
 assert.match(main, /grid\.name = 'controller-kata-grid-helper'/, 'controller proof must expose the visible GridHelper marker');
+assert.match(main, /grid\.position\.y = arena\.floor\.center\[1\] \+ arena\.floor\.size\[1\] \* 0\.5 \+ 0\.04 \+ 0\.01/);
+assert.match(main, /grid\.material\.depthWrite = false/);
+assert.match(main, /window\.__infiniteBrutalityControllerGrid = grid/);
 assert.match(main, /function useControllerKataSlice\(\)/);
 assert.match(main, /if \(useControllerKataSlice\(\)\) \{\s*buildControllerKataSlice\(movePlayer, rootGroup\);\s*return;/s);
 assert.match(main, /for \(const cube of arena\.cubes\) addWalkableBox\(rootGroup, cube\.id, cube\.size, cube\.center,/);
@@ -93,6 +96,9 @@ assert.match(cloudWorkflow, /actions\/upload-artifact@v4/);
 assert.equal((cloudCapture.match(/page\.goto\(/g) || []).length, 1, 'cloud capture may navigate only to the supplied hosted URL');
 assert.match(cloudCapture, /page\.goto\(args\.url/);
 assert.match(cloudCapture, /status\.includes\('controller kata'\)/);
+assert.match(cloudCapture, /controllerGrid: gridHelper/);
+assert.match(cloudCapture, /grid\.type !== 'GridHelper'/);
+assert.match(cloudCapture, /!grid\.visibleInScene/);
 assert.match(cloudCapture, /page\.keyboard\.down\('w'\)/);
 assert.match(cloudCapture, /page\.keyboard\.press\('Space'\)/);
 assert.match(cloudCapture, /initial-hosted\.png/);

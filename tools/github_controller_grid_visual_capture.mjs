@@ -55,10 +55,27 @@ async function inspectSurface(page) {
     const status = document.querySelector('#status')?.textContent?.trim() || '';
     const canvas = document.querySelector('canvas');
     const bounds = canvas?.getBoundingClientRect();
+    const gridHelper = window.__infiniteBrutalityControllerGrid;
+    let gridVisibleInScene = Boolean(gridHelper?.parent);
+    for (let node = gridHelper; node; node = node.parent) {
+      if (node.visible === false) gridVisibleInScene = false;
+    }
+    const gridMaterialVisible = Array.isArray(gridHelper?.material)
+      ? gridHelper.material.every((material) => material.visible !== false)
+      : gridHelper?.material?.visible !== false;
     return {
       url: location.href,
       title: document.title,
       status,
+      controllerGrid: gridHelper ? {
+        name: gridHelper.name,
+        type: gridHelper.type,
+        y: gridHelper.position.y,
+        renderOrder: gridHelper.renderOrder,
+        attached: Boolean(gridHelper.parent),
+        visibleInScene: gridVisibleInScene,
+        materialVisible: gridMaterialVisible,
+      } : null,
       canvas: canvas ? {
         width: canvas.width,
         height: canvas.height,
@@ -78,6 +95,10 @@ function requireReadySurface(surface, label) {
   const canvas = surface?.canvas;
   if (!canvas || canvas.width <= 0 || canvas.height <= 0 || canvas.clientWidth <= 0 || canvas.clientHeight <= 0) {
     throw new Error(`${label} canvas has zero size`);
+  }
+  const grid = surface?.controllerGrid;
+  if (!grid || grid.name !== 'controller-kata-grid-helper' || grid.type !== 'GridHelper' || !grid.attached || !grid.visibleInScene || !grid.materialVisible) {
+    throw new Error(`${label} controller GridHelper is not attached and visible in the scene`);
   }
 }
 
