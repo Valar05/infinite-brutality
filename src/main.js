@@ -34,7 +34,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.214';
+const BUILD = '0.8.215';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
 const CONTROLLER_KATA_BASE_SEED = URL_PARAMS.get('seed') || 'controller-proof';
@@ -5340,7 +5340,11 @@ function buildControllerKataSlice(movePlayer, rootGroup) {
   const arena = generateControllerArena({ seed: `${CONTROLLER_KATA_BASE_SEED}:${roomState.levelIndex}` });
   const floorMaterial = applyWorldGridOverlay(new THREE.MeshStandardMaterial({ color: 0x17252b, roughness: 0.92, metalness: 0.04 }), { gridScale: 1, gridThickness: 0.72, gridStrength: 0.32, edgeStrength: 0.08, gridColor: 0x63e7ff });
   addWalkableBox(rootGroup, 'controller-kata-floor', arena.floor.size, arena.floor.center, floorMaterial, false, 0.02);
-  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x48636b, roughness: 0.82, metalness: 0.08 });
+  const grid = new THREE.GridHelper(arena.floor.size[0], arena.floor.size[0] / arena.grid.step, 0x63e7ff, 0x315f68);
+  grid.name = 'controller-kata-grid-helper';
+  grid.position.y = 0.005;
+  rootGroup.add(grid);
+  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x7899a3, roughness: 0.76, metalness: 0.06 });
   for (const cube of arena.cubes) addWalkableBox(rootGroup, cube.id, cube.size, cube.center, cubeMaterial, true, 0.04);
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 4, 12), new THREE.MeshBasicMaterial({ color: 0x63e7ff }));
   beacon.name = 'controller-kata-exit';

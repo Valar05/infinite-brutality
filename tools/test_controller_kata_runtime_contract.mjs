@@ -45,7 +45,7 @@ for (const id of [
   assert.match(html, new RegExp(`id=["']${id}["']`), `controller shell must preserve main.js DOM id: ${id}`);
 }
 
-assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.214["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.215["']/, 'controller page must load the authoritative runtime');
 assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
@@ -63,6 +63,8 @@ assert.doesNotMatch(`${html}\n${main}\n${arena}`, new RegExp(forbiddenLegacySeed
 assert.match(main, /createPhysicsWorld, ensurePhysicsReady/);
 assert.match(main, /generateControllerArena/);
 assert.match(main, /applyWorldGridOverlay/);
+assert.match(main, /new THREE\.GridHelper\(arena\.floor\.size\[0\], arena\.floor\.size\[0\] \/ arena\.grid\.step,/);
+assert.match(main, /grid\.name = 'controller-kata-grid-helper'/, 'controller proof must expose the visible GridHelper marker');
 assert.match(main, /function useControllerKataSlice\(\)/);
 assert.match(main, /if \(useControllerKataSlice\(\)\) \{\s*buildControllerKataSlice\(movePlayer, rootGroup\);\s*return;/s);
 assert.match(main, /for \(const cube of arena\.cubes\) addWalkableBox\(rootGroup, cube\.id, cube\.size, cube\.center,/);
