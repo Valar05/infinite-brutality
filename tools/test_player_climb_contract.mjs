@@ -1,31 +1,72 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { advanceDirectMantle, createDirectMantlePlan, generateControllerArena } from '../src/controller-kata.js';
+import { createPhysicsWorld, ensurePhysicsReady } from '../src/physics-world.js';
 
 const mainSource = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-const climbSource = fs.readFileSync(new URL('../src/player-climb.js', import.meta.url), 'utf8');
+const arena = generateControllerArena({ seed: 'controller-proof:0' });
+const fixture = arena.directMantle;
 
-assert.match(mainSource, /const CLIMB_JUMP_REGRAB_LOCK_MS = 500;/, 'climb jump must suppress regrab for exactly 0.5s');
-assert.match(mainSource, /createPlayerClimbApi \} from '\.\/player-climb\.js\?v=0\.8\.200'/, 'runtime must import cache-busted climb module');
-assert.match(mainSource, /createPhysicsWorld, ensurePhysicsReady \} from '\.\/physics-world\.js\?v=0\.8\.200'/, 'runtime must import cache-busted physics module');
-assert.match(mainSource, /climbRegrabUntil: 0,/, 'player state must track climb regrab lockout');
-assert.match(mainSource, /player\.climbRegrabUntil = performance\.now\(\) \+ CLIMB_JUMP_REGRAB_LOCK_MS;/, 'jumping from climb must start regrab lockout');
-assert.match(mainSource, /player\.velocity\.set\(normal\.x \* CLIMB_DETACH_BACK, CLIMB_DETACH_UP, normal\.z \* CLIMB_DETACH_BACK\);/, 'jumping while climbing must detach with upward and backward impulse');
-assert.match(mainSource, /function findMantleTopSupport\(x, z, targetTopY\)/, 'mantle must be able to use nearby support, not only the climbed collider top');
-assert.match(mainSource, /findMantleTopSupport,/, 'climb API must receive mantle support probe');
-assert.match(mainSource, /if \(player\.mode === 'climb'\) \{\s+jump\(pointerId\);\s+\} else if \(player\.grounded\) \{/m, 'mobile jump button must call jump while climbing before the grounded-only charge path');
-assert.match(mainSource, /tryBeginClimb\(true, physicsMove\.collisions\)/, 'Rapier wall contacts must feed airborne auto-climb');
-assert.match(mainSource, /CLIMB_TERRAIN_LATERAL_SPAN: 3\.4/, 'freeform voxel climb must have a bounded lateral projection span');
+await ensurePhysicsReady();
+const physics = createPhysicsWorld({ gravity: { x: 0, y: -14.4, z: 0 }, autostepHeight: 0.62, autostepMinWidth: 0.646, snapToGround: 0.48 });
+physics.addCuboid({ size: arena.floor.size, position: arena.floor.center, source: 'controller-kata-floor', kind: 'walkable' });
+physics.addCuboid({ size: fixture.size, position: fixture.center, source: fixture.id, kind: 'walkable' });
 
-assert.match(climbSource, /if \(player\.climbRegrabUntil && performance\.now\(\) < player\.climbRegrabUntil\) return false;/, 'tryBeginClimb must respect regrab suppression');
-assert.match(climbSource, /function tryBeginClimb\(attachForward = true, wallContacts = \[\]\)/, 'tryBeginClimb must accept physics wall contacts');
-assert.match(climbSource, /contact\?\.isWall/, 'freeform climb must only attach to wall-class physics contacts');
-assert.match(climbSource, /kind: 'terrain'/, 'player climb state must support freeform terrain projection');
-assert.match(climbSource, /function enterTerrainClimb/, 'terrain wall contacts must enter a dedicated climb projection path');
-assert.match(climbSource, /findMantleTopSupport,/, 'climb module must accept a mantle support probe');
-assert.match(climbSource, /findMantleTopSupport\?\.\(candidate\.x, candidate\.z, targetTopY\)/, 'terrain mantle must probe visible terrain support near the current lip');
-assert.match(climbSource, /findMantleTopSupport\?\.\(candidate\.x, candidate\.z, climb\.topY\)/, 'surface mantle must probe support near the top');
-assert.match(climbSource, /findMantleTopSupport\?\.\(x, z, solid\.maxY\)/, 'solid mantle must probe nearby support when the wall top is too thin');
-assert.match(climbSource, /supportCandidates = \[/, 'solid mantle must test more than one exact edge point');
-assert.match(climbSource, /if \(!target\) target = \{ x: endX, z: endZ, topY: solid\.maxY \};/, 'solid mantle must not silently fail on thin wall tops');
+let eyePosition = { x: arena.spawn[0], y: 1.68, z: arena.spawn[2] };
+let contactMove = null;
+for (let frame = 0; frame < 120; frame += 1) {
+  const move = physics.movePlayer({
+    eyePosition,
+    desiredDelta: { x: 0, y: -0.24, z: 5.2 / 60 },
+    eyeHeight: 1.68,
+    radius: 0.38,
+  });
+  eyePosition = move.eyePosition;
+  if (move.collisions.some((collision) => collision.isWall && collision.source === fixture.id)) {
+    contactMove = move;
+    break;
+  }
+}
+assert.ok(contactMove, 'real Rapier forward motion must contact the bounded mantle fixture');
+const plan = createDirectMantlePlan({
+  fixture,
+  eyePosition: [eyePosition.x, eyePosition.y, eyePosition.z],
+  inputMoveY: 1,
+  collisions: contactMove.collisions,
+  eyeHeight: 1.68,
+  playerMode: contactMove.grounded ? 'ground' : 'air',
+  faceYaw: Math.PI,
+});
+assert.ok(plan, 'actual forward input plus the fixture wall contact must start a direct mantle');
+assert.equal(plan.kind, 'controller-direct');
+assert.equal(plan.contactSource, fixture.id);
+assert.ok(plan.activationDistance >= -0.08 && plan.activationDistance <= fixture.maxActivationDistance);
+assert.equal(plan.end[1], fixture.topY + 1.68);
+assert.notEqual(plan.kind, 'climb');
 
-console.log(JSON.stringify({ ok: true, contract: 'player-climb-mantle-jump' }));
+let frame = null;
+let steps = 0;
+while (!frame?.complete && steps < 60) {
+  frame = advanceDirectMantle({ ...plan, elapsed: frame?.elapsed || 0 }, 1 / 60);
+  steps += 1;
+}
+assert.ok(frame?.complete, 'direct mantle must complete within its bounded duration');
+assert.ok(steps <= Math.ceil(fixture.duration * 60) + 1);
+assert.deepEqual(frame.position, plan.end);
+assert.equal(createDirectMantlePlan({ fixture, eyePosition: plan.start, inputMoveY: 1, collisions: contactMove.collisions, playerMode: 'climb' }), null, 'Product One must reject CLIMB as a mantle precursor');
+assert.equal(createDirectMantlePlan({ fixture, eyePosition: plan.start, inputMoveY: 0, collisions: contactMove.collisions, playerMode: 'ground' }), null, 'mantle must require real forward input');
+assert.equal(createDirectMantlePlan({ fixture, eyePosition: plan.start, inputMoveY: 1, collisions: [], playerMode: 'ground' }), null, 'mantle must require the owned fixture contact');
+
+assert.match(mainSource, /tryBeginControllerKataDirectMantle/, 'authoritative runtime must integrate the direct mantle adapter');
+assert.match(mainSource, /if \(!useControllerKataSlice\(\) && tryBeginClimb/, 'Product One must bypass the general climb entry path');
+assert.match(mainSource, /controller kata entered forbidden CLIMB state/, 'Product One must fail closed if CLIMB is ever entered');
+physics.dispose();
+
+console.log(JSON.stringify({
+  ok: true,
+  contract: 'product-one-direct-mantle',
+  contactSource: plan.contactSource,
+  activationDistance: plan.activationDistance,
+  completionSteps: steps,
+  modes: ['ground', 'mantle', 'ground'],
+}));

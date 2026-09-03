@@ -14,7 +14,7 @@ import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
-import { generateControllerArena } from './controller-kata.js?v=0.8.214';
+import { advanceDirectMantle, createDirectMantlePlan, generateControllerArena } from './controller-kata.js?v=0.8.217';
 import { applyWorldGridOverlay } from './controller-grid-material.js?v=0.8.214';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
@@ -34,7 +34,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.216';
+const BUILD = '0.8.217';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
 const CONTROLLER_KATA_BASE_SEED = URL_PARAMS.get('seed') || 'controller-proof';
@@ -283,6 +283,7 @@ const roomState = {
   connectivityRepair: null,
   terrainLayer: null,
   physicsWorld: null,
+  controllerKataMantleProof: null,
   lastFrameMs: 0,
   lastRenderMs: 0,
 };
@@ -5305,6 +5306,59 @@ function updateCurrentGauntletRoom() {
 }
 
 
+function tryBeginControllerKataDirectMantle(physicsMove, moveY) {
+  const proof = roomState.controllerKataMantleProof;
+  if (!proof || player.mode === 'mantle') return false;
+  const plan = createDirectMantlePlan({
+    fixture: proof.fixture,
+    eyePosition: player.position.toArray(),
+    inputMoveY: moveY,
+    collisions: physicsMove?.collisions || [],
+    eyeHeight: PLAYER_EYE_HEIGHT,
+    playerMode: player.mode,
+    faceYaw: player.yaw,
+  });
+  if (!plan) return false;
+  player.mode = 'mantle';
+  player.climb = null;
+  player.mantle = plan;
+  player.velocity.set(0, 0, 0);
+  player.grounded = false;
+  proof.phase = 'started';
+  proof.starts += 1;
+  proof.startedAt = performance.now();
+  proof.contactSource = plan.contactSource;
+  proof.activationDistance = plan.activationDistance;
+  proof.startPosition = [...plan.start];
+  proof.modeHistory.push('mantle');
+  return true;
+}
+
+function updateControllerKataDirectMantle(dt) {
+  const proof = roomState.controllerKataMantleProof;
+  const mantle = player.mantle;
+  if (!proof || !mantle || mantle.kind !== 'controller-direct') {
+    throw new Error('controller kata direct mantle state is missing');
+  }
+  const frame = advanceDirectMantle(mantle, dt);
+  mantle.elapsed = frame.elapsed;
+  player.position.fromArray(frame.position);
+  player.velocity.set(0, 0, 0);
+  player.grounded = false;
+  player.yaw = mantle.faceYaw;
+  proof.phase = frame.complete ? 'completed' : 'mantling';
+  proof.progress = frame.progress;
+  if (!frame.complete) return;
+  player.position.fromArray(mantle.end);
+  player.mode = 'ground';
+  player.mantle = null;
+  player.grounded = true;
+  proof.completions += 1;
+  proof.completedAt = performance.now();
+  proof.endPosition = [...mantle.end];
+  proof.modeHistory.push('ground');
+}
+
 function applyControllerKataState(arena, movePlayer) {
   roomState.plan = { levelIndex: roomState.levelIndex, seed: arena.numericSeed, sliceId: 'controller_kata', nodes: [] };
   roomState.spec = { index: 0, connector: 'controller_kata', type: 'controller_kata', roomRole: 'controller_kata', landmark: 'cyan exit', routeSentence: [] };
@@ -5319,6 +5373,22 @@ function applyControllerKataState(arena, movePlayer) {
   roomState.connectivityRepair = null;
   roomState.levelBounds = { minX: -48, maxX: 48, minZ: -48, maxZ: 48 };
   roomState.controllerKataStartedAt = performance.now();
+  roomState.controllerKataMantleProof = {
+    fixture: { ...arena.directMantle, center: [...arena.directMantle.center], size: [...arena.directMantle.size], approach: [...arena.directMantle.approach] },
+    phase: 'ready',
+    starts: 0,
+    completions: 0,
+    climbEntries: 0,
+    progress: 0,
+    contactSource: '',
+    activationDistance: null,
+    startedAt: 0,
+    completedAt: 0,
+    startPosition: null,
+    endPosition: null,
+    modeHistory: ['ground'],
+  };
+  window.__infiniteBrutalityControllerMantle = roomState.controllerKataMantleProof;
   if (enemy) enemy.visible = false;
   if (movePlayer) {
     player.position.copy(roomState.spawn);
@@ -5327,13 +5397,16 @@ function applyControllerKataState(arena, movePlayer) {
     input.smoothMoveX = 0;
     input.smoothMoveY = 0;
     player.grounded = true;
+    player.mode = 'ground';
+    player.climb = null;
+    player.mantle = null;
     player.runCharge = 0;
     player.lastRunIntent = false;
     player.attack = null;
     player.attackTimer = 0;
   }
   setNodeIndex(0);
-  setStatus(`controller kata | seed ${arena.seedText} | reach cyan exit`);
+  setStatus(`controller kata | seed ${arena.seedText} | mantle ready | reach cyan exit`);
 }
 
 function buildControllerKataSlice(movePlayer, rootGroup) {
@@ -5347,6 +5420,8 @@ function buildControllerKataSlice(movePlayer, rootGroup) {
   grid.renderOrder = 2;
   rootGroup.add(grid);
   window.__infiniteBrutalityControllerGrid = grid;
+  const mantleMaterial = new THREE.MeshStandardMaterial({ color: 0xd6a642, roughness: 0.72, metalness: 0.05 });
+  addWalkableBox(rootGroup, arena.directMantle.id, arena.directMantle.size, arena.directMantle.center, mantleMaterial, true, 0.04);
   const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x7899a3, roughness: 0.76, metalness: 0.06 });
   for (const cube of arena.cubes) addWalkableBox(rootGroup, cube.id, cube.size, cube.center, cubeMaterial, true, 0.04);
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 4, 12), new THREE.MeshBasicMaterial({ color: 0x63e7ff }));
@@ -9248,13 +9323,18 @@ function updatePlayer(dt) {
   if (desired.lengthSq() > 1) desired.normalize();
   const stickMagnitude = Math.hypot(moveX, moveY);
 
+  if (useControllerKataSlice() && player.mode === 'climb') {
+    if (roomState.controllerKataMantleProof) roomState.controllerKataMantleProof.climbEntries += 1;
+    throw new Error('controller kata entered forbidden CLIMB state');
+  }
   if (player.mode === 'climb') {
     updatePlayerClimb(dt, moveX, moveY);
     finalizePlayerFrame(dt, now, stickMagnitude);
     return;
   }
   if (player.mode === 'mantle') {
-    updatePlayerMantle(dt);
+    if (useControllerKataSlice()) updateControllerKataDirectMantle(dt);
+    else updatePlayerMantle(dt);
     finalizePlayerFrame(dt, now, stickMagnitude);
     return;
   }
@@ -9349,6 +9429,10 @@ function updatePlayer(dt) {
       if (physicsMove.grounded && player.velocity.y <= 0) player.velocity.y = 0;
       else player.velocity.y = physicsMove.movement.y / dt;
     }
+    if (useControllerKataSlice() && tryBeginControllerKataDirectMantle(physicsMove, moveY)) {
+      finalizePlayerFrame(dt, now, stickMagnitude);
+      return;
+    }
     if (physicsMove.grounded) {
       if (!player.grounded && player.velocity.y < -1.2) playThud(0.7);
       player.grounded = true;
@@ -9357,7 +9441,7 @@ function updatePlayer(dt) {
     } else {
       player.grounded = false;
       player.mode = 'air';
-      if (tryBeginClimb(true, physicsMove.collisions)) {
+      if (!useControllerKataSlice() && tryBeginClimb(true, physicsMove.collisions)) {
         finalizePlayerFrame(dt, now, stickMagnitude);
         return;
       }
@@ -9403,7 +9487,7 @@ function updatePlayer(dt) {
   } else {
     player.grounded = false;
     player.mode = 'air';
-    if (tryBeginClimb(true)) {
+    if (!useControllerKataSlice() && tryBeginClimb(true)) {
       finalizePlayerFrame(dt, now, stickMagnitude);
       return;
     }
@@ -9471,7 +9555,9 @@ function updateControllerKataHud() {
   const best = roomState.controllerKataBestTime || Number(localStorage.getItem('infinite-brutality-controller-kata-best') || 0);
   const last = roomState.controllerKataLastTime || 0;
   const timing = `${elapsed.toFixed(2)}s${best > 0 ? ` | best ${best.toFixed(2)}s` : ''}${last > 0 ? ` | last ${last.toFixed(2)}s` : ''}`;
-  statusEl.textContent = `build ${BUILD} | controller kata | seed ${roomState.seed} | ${timing} | reach cyan exit`;
+  const mantle = roomState.controllerKataMantleProof;
+  const mantleText = mantle ? ` | mantle ${mantle.phase} ${mantle.completions}/${mantle.starts}` : '';
+  statusEl.textContent = `build ${BUILD} | controller kata | seed ${roomState.seed} | ${timing}${mantleText} | reach cyan exit`;
 }
 
 function updatePad() {

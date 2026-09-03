@@ -45,7 +45,7 @@ for (const id of [
   assert.match(html, new RegExp(`id=["']${id}["']`), `controller shell must preserve main.js DOM id: ${id}`);
 }
 
-assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.216["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.217["']/, 'controller page must load the authoritative runtime');
 assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
@@ -62,6 +62,12 @@ assert.doesNotMatch(`${html}\n${main}\n${arena}`, new RegExp(forbiddenLegacySeed
 
 assert.match(main, /createPhysicsWorld, ensurePhysicsReady/);
 assert.match(main, /generateControllerArena/);
+assert.match(arena, /export function createDirectMantlePlan/);
+assert.match(arena, /export function advanceDirectMantle/);
+assert.match(main, /tryBeginControllerKataDirectMantle\(physicsMove, moveY\)/);
+assert.match(main, /if \(!useControllerKataSlice\(\) && tryBeginClimb/);
+assert.match(main, /controller kata entered forbidden CLIMB state/);
+assert.match(main, /arena\.directMantle\.id/);
 assert.match(main, /applyWorldGridOverlay/);
 assert.match(main, /new THREE\.GridHelper\(arena\.floor\.size\[0\], arena\.floor\.size\[0\] \/ arena\.grid\.step,/);
 assert.match(main, /grid\.name = 'controller-kata-grid-helper'/, 'controller proof must expose the visible GridHelper marker');
@@ -100,6 +106,11 @@ assert.match(cloudCapture, /controllerGrid: gridHelper/);
 assert.match(cloudCapture, /grid\.type !== 'GridHelper'/);
 assert.match(cloudCapture, /!grid\.visibleInScene/);
 assert.match(cloudCapture, /page\.keyboard\.down\('w'\)/);
+assert.match(cloudCapture, /window\.__infiniteBrutalityControllerMantle/);
+assert.match(cloudCapture, /proof\?\.starts >= 1/);
+assert.match(cloudCapture, /proof\?\.completions >= 1/);
+assert.match(cloudCapture, /mantleStartSurface/);
+assert.match(cloudCapture, /entered forbidden CLIMB state/);
 assert.match(cloudCapture, /page\.keyboard\.press\('Space'\)/);
 assert.match(cloudCapture, /initial-hosted\.png/);
 assert.match(cloudCapture, /after-keyboard-input\.png/);

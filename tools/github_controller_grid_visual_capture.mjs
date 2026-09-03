@@ -63,10 +63,26 @@ async function inspectSurface(page) {
     const gridMaterialVisible = Array.isArray(gridHelper?.material)
       ? gridHelper.material.every((material) => material.visible !== false)
       : gridHelper?.material?.visible !== false;
+    const mantleProof = window.__infiniteBrutalityControllerMantle;
     return {
       url: location.href,
       title: document.title,
       status,
+      controllerMantle: mantleProof ? {
+        fixtureId: mantleProof.fixture?.id || '',
+        phase: mantleProof.phase,
+        starts: mantleProof.starts,
+        completions: mantleProof.completions,
+        climbEntries: mantleProof.climbEntries,
+        progress: mantleProof.progress,
+        contactSource: mantleProof.contactSource,
+        activationDistance: mantleProof.activationDistance,
+        startedAt: mantleProof.startedAt,
+        completedAt: mantleProof.completedAt,
+        startPosition: mantleProof.startPosition,
+        endPosition: mantleProof.endPosition,
+        modeHistory: [...(mantleProof.modeHistory || [])],
+      } : null,
       controllerGrid: gridHelper ? {
         name: gridHelper.name,
         type: gridHelper.type,
@@ -100,6 +116,13 @@ function requireReadySurface(surface, label) {
   if (!grid || grid.name !== 'controller-kata-grid-helper' || grid.type !== 'GridHelper' || !grid.attached || !grid.visibleInScene || !grid.materialVisible) {
     throw new Error(`${label} controller GridHelper is not attached and visible in the scene`);
   }
+  const mantle = surface?.controllerMantle;
+  if (!mantle || mantle.fixtureId !== 'controller-kata-direct-mantle') {
+    throw new Error(`${label} direct mantle proof instrumentation is missing`);
+  }
+  if (mantle.climbEntries !== 0 || mantle.modeHistory.includes('climb')) {
+    throw new Error(`${label} entered forbidden CLIMB state`);
+  }
 }
 
 const args = parseArgs(process.argv);
@@ -115,8 +138,10 @@ let browser = null;
 let page = null;
 let fatalError = '';
 let initialSurface = null;
+let mantleStartSurface = null;
 let finalSurface = null;
 let initialScreenshot = null;
+let mantleStartScreenshot = null;
 let inputScreenshot = null;
 let inputHeld = false;
 
@@ -146,21 +171,37 @@ try {
 
   await page.keyboard.down('w');
   inputHeld = true;
-  await page.waitForTimeout(850);
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(650);
+  await page.waitForFunction(() => {
+    const proof = window.__infiniteBrutalityControllerMantle;
+    return proof?.starts >= 1 && (proof.phase === 'started' || proof.phase === 'mantling');
+  }, null, { polling: 'raf', timeout: args.timeoutMs });
+  mantleStartSurface = await inspectSurface(page);
+  requireReadySurface(mantleStartSurface, 'mantle-start');
+  if (mantleStartSurface.controllerMantle.starts < 1) throw new Error('direct mantle start was not observed');
+  const mantleStartPath = path.join(outDir, 'mantle-start.png');
+  const mantleStartBytes = await page.screenshot({ path: mantleStartPath, fullPage: false });
+  mantleStartScreenshot = { file: path.basename(mantleStartPath), sha256: sha256(mantleStartBytes) };
+
+  await page.waitForFunction(() => {
+    const proof = window.__infiniteBrutalityControllerMantle;
+    return proof?.completions >= 1 && proof.phase === 'completed';
+  }, null, { polling: 'raf', timeout: args.timeoutMs });
   await page.keyboard.up('w');
   inputHeld = false;
+  await page.keyboard.press('Space');
   await page.waitForTimeout(350);
 
   finalSurface = await inspectSurface(page);
   requireReadySurface(finalSurface, 'after-input');
+  if (finalSurface.controllerMantle.completions < 1 || finalSurface.controllerMantle.phase !== 'completed') {
+    throw new Error('direct mantle completion was not observed');
+  }
   const inputPath = path.join(outDir, 'after-keyboard-input.png');
   const inputBytes = await page.screenshot({ path: inputPath, fullPage: false });
   inputScreenshot = { file: path.basename(inputPath), sha256: sha256(inputBytes) };
 
-  if (initialScreenshot.sha256 === inputScreenshot.sha256) {
-    throw new Error('initial and after-input screenshots are byte-identical');
+  if (initialScreenshot.sha256 === mantleStartScreenshot.sha256 || initialScreenshot.sha256 === inputScreenshot.sha256) {
+    throw new Error('direct mantle evidence screenshots are byte-identical');
   }
 } catch (error) {
   fatalError = String(error?.stack || error?.message || error).slice(0, 4000);
@@ -189,16 +230,18 @@ const manifest = {
   finalUrl: page?.url() || '',
   statuses: {
     initial: initialSurface?.status || '',
+    mantleStart: mantleStartSurface?.status || '',
     afterKeyboardInput: finalSurface?.status || '',
   },
   screenshots: {
     initial: initialScreenshot,
+    mantleStart: mantleStartScreenshot,
     afterKeyboardInput: inputScreenshot,
   },
   inputExercise: {
     forwardKey: 'w',
     jumpKey: 'Space',
-    forwardHoldMs: 1500,
+    forwardUntilMantleCompletion: true,
   },
   surface: {
     runtime: 'github-actions-playwright',
@@ -206,6 +249,7 @@ const manifest = {
     channel: launchOptions.channel,
     viewport: { width: 1366, height: 900 },
     initial: initialSurface,
+    mantleStart: mantleStartSurface,
     afterKeyboardInput: finalSurface,
   },
   consoleEvents,

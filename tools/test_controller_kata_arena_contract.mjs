@@ -26,6 +26,17 @@ assert.deepEqual(first.floor, { center: [0, -0.25, 0], size: [96, 0.5, 96] });
 assert.deepEqual(first.spawn, [0, 1.65, -38]);
 assert.deepEqual(first.exit, [0, 0, 38]);
 assert.equal(first.cubes.length, 28);
+assert.deepEqual(first.directMantle, {
+  id: 'controller-kata-direct-mantle',
+  center: [0, 0.6, -34],
+  size: [6, 1.2, 2.4],
+  approach: [0, 0, 1],
+  minForwardInput: 0.55,
+  maxActivationDistance: 0.82,
+  duration: 0.34,
+  topY: 1.2,
+});
+assert.ok(pointToBoxDistanceXZ(first.spawn, first.directMantle.center, first.directMantle.size) < first.grid.safeRouteClearance, 'direct mantle must be guaranteed near spawn');
 
 const occupied = new Set();
 const widths = new Set();
@@ -51,6 +62,9 @@ for (const [index, cube] of first.cubes.entries()) {
   assert.ok(Math.abs(z) + sz * 0.5 < first.floor.size[2] * 0.5);
   assert.ok(pointToBoxDistanceXZ(first.spawn, cube.center, cube.size) >= first.grid.safeRouteClearance);
   assert.ok(pointToBoxDistanceXZ(first.exit, cube.center, cube.size) >= first.grid.safeRouteClearance);
+  const separatedFromMantleX = Math.abs(cube.center[0] - first.directMantle.center[0]) > (cube.size[0] + first.directMantle.size[0]) * 0.5;
+  const separatedFromMantleZ = Math.abs(cube.center[2] - first.directMantle.center[2]) > (cube.size[2] + first.directMantle.size[2]) * 0.5;
+  assert.ok(separatedFromMantleX || separatedFromMantleZ, `${cube.id} overlaps direct mantle fixture`);
   const key = `${x},${z}`;
   assert.ok(!occupied.has(key));
   occupied.add(key);
