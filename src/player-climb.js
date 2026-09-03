@@ -1,4 +1,106 @@
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.js';
+
+function finiteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function vectorFrom(value) {
+  if (value?.isVector3) return value.clone();
+  if (Array.isArray(value)) return new THREE.Vector3(finiteNumber(value[0]), finiteNumber(value[1]), finiteNumber(value[2]));
+  return new THREE.Vector3(finiteNumber(value?.x), finiteNumber(value?.y), finiteNumber(value?.z));
+}
+
+export function advanceConstrainedMantle(plan, dt) {
+  if (!plan?.start || !plan?.end || !(finiteNumber(plan.duration) > 0)) {
+    throw new TypeError('constrained mantle plan is required');
+  }
+  const elapsed = Math.min(plan.duration, finiteNumber(plan.elapsed) + Math.max(0, finiteNumber(dt)));
+  const progress = Math.max(0, Math.min(1, elapsed / plan.duration));
+  const eased = progress * progress * (3 - 2 * progress);
+  const lift = Math.sin(Math.PI * eased) * 0.18;
+  const position = vectorFrom(plan.start).lerp(vectorFrom(plan.end), eased);
+  position.y += lift;
+  return {
+    elapsed,
+    progress,
+    position: position.toArray(),
+    velocity: [0, 0, 0],
+    grounded: progress >= 1,
+    complete: progress >= 1,
+  };
+}
+
+export function createBoundedContactMantlePlan(options = {}) {
+  const fixture = options.fixture;
+  const position = vectorFrom(options.eyePosition);
+  const collisions = Array.isArray(options.collisions) ? options.collisions : [];
+  const inputMoveY = finiteNumber(options.inputMoveY);
+  const eyeHeight = finiteNumber(options.eyeHeight, 1.68);
+  const radius = finiteNumber(options.radius, 0.38);
+  const mantleForward = finiteNumber(options.mantleForward, 0.48);
+  const velocityY = finiteNumber(options.velocityY);
+  const playerMode = String(options.playerMode || 'ground');
+  if (!fixture || options.grounded || playerMode !== 'air' || velocityY <= 0.05) return null;
+  if (inputMoveY < finiteNumber(fixture.minForwardInput, 0.55)) return null;
+
+  const contact = collisions.find((entry) => entry?.isWall && entry.source === fixture.id && entry.normal && entry.point);
+  if (!contact) return null;
+  const normal = vectorFrom(contact.normal);
+  normal.y = 0;
+  if (normal.lengthSq() < 0.35 * 0.35) return null;
+  normal.normalize();
+  const inward = normal.clone().multiplyScalar(-1);
+  const facing = vectorFrom(options.facing);
+  facing.y = 0;
+  if (facing.lengthSq() < 0.0001) return null;
+  facing.normalize();
+  const faceDot = facing.dot(inward);
+  if (faceDot < finiteNumber(fixture.minFacingDot, 0.72)) return null;
+
+  const feetY = position.y - eyeHeight;
+  const feetToLip = finiteNumber(fixture.topY) - feetY;
+  if (feetToLip < finiteNumber(fixture.minFeetToLip, 0.2) || feetToLip > finiteNumber(fixture.maxFeetToLip, 1.0)) return null;
+
+  const contactPoint = vectorFrom(contact.point);
+  const inset = radius + mantleForward;
+  const halfX = finiteNumber(fixture.size?.[0]) * 0.5;
+  const halfZ = finiteNumber(fixture.size?.[2]) * 0.5;
+  const minX = finiteNumber(fixture.center?.[0]) - halfX + radius;
+  const maxX = finiteNumber(fixture.center?.[0]) + halfX - radius;
+  const minZ = finiteNumber(fixture.center?.[2]) - halfZ + radius;
+  const maxZ = finiteNumber(fixture.center?.[2]) + halfZ - radius;
+  const targetX = Math.max(minX, Math.min(maxX, contactPoint.x + inward.x * inset));
+  const targetZ = Math.max(minZ, Math.min(maxZ, contactPoint.z + inward.z * inset));
+  const findSupport = options.findMantleTopSupport;
+  const support = typeof findSupport === 'function' ? findSupport(targetX, targetZ, fixture.topY) : null;
+  if (!support || Math.abs(finiteNumber(support.topY) - finiteNumber(fixture.topY)) > 0.08) return null;
+  const end = new THREE.Vector3(targetX, finiteNumber(support.topY) + eyeHeight, targetZ);
+  if (typeof options.isBodyClear !== 'function' || !options.isBodyClear(targetX, targetZ, end.y)) return null;
+
+  const horizontalDisplacement = Math.hypot(end.x - position.x, end.z - position.z);
+  const verticalDisplacement = end.y - position.y;
+  if (verticalDisplacement < 0 || verticalDisplacement > finiteNumber(fixture.maxVerticalDisplacement, 1.02)) return null;
+  if (horizontalDisplacement > finiteNumber(fixture.maxHorizontalDisplacement, 1.45)) return null;
+
+  return {
+    kind: 'controller-direct',
+    source: fixture.id,
+    start: position,
+    end,
+    elapsed: 0,
+    duration: finiteNumber(fixture.duration, 0.34),
+    faceYaw: finiteNumber(options.faceYaw),
+    contactSource: contact.source,
+    contactNormal: normal.toArray(),
+    contactPoint: { x: contactPoint.x, y: contactPoint.y, z: contactPoint.z },
+    faceDot,
+    feetToLip,
+    supportSource: String(support.source || fixture.id),
+    verticalDisplacement,
+    horizontalDisplacement,
+  };
+}
 
 export function createPlayerClimbApi(deps) {
   const {
@@ -416,23 +518,21 @@ function updatePlayerMantle(dt) {
   const mantle = player.mantle;
   if (!mantle) {
     player.mode = 'ground';
-    return;
+    return null;
   }
-  mantle.elapsed = Math.min(mantle.duration, mantle.elapsed + dt);
-  const t = clamp(mantle.elapsed / mantle.duration, 0, 1);
-  const eased = t * t * (3 - 2 * t);
-  const lift = Math.sin(Math.PI * eased) * 0.18;
-  player.position.lerpVectors(mantle.start, mantle.end, eased);
-  player.position.y += lift;
+  const frame = advanceConstrainedMantle(mantle, dt);
+  mantle.elapsed = frame.elapsed;
+  player.position.fromArray(frame.position);
   player.velocity.set(0, 0, 0);
   player.grounded = false;
   player.yaw = mantle.faceYaw;
-  if (t >= 1) {
+  if (frame.complete) {
     player.position.copy(mantle.end);
     player.mode = 'ground';
     player.mantle = null;
     player.grounded = true;
   }
+  return frame;
 }
 
   return { tryBeginClimb, startMantleFromClimb, updatePlayerClimb, updatePlayerMantle };

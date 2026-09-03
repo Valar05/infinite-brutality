@@ -9,12 +9,12 @@ import { buildDistrictAssemblyPlan } from './district-assembly-emitter.js?v=0.8.
 import { createDistrictGeometryApi } from './district-geometry.js?v=0.8.196';
 import { createMaterialResources } from './materials.js?v=0.8.213';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
-import { createPlayerClimbApi } from './player-climb.js?v=0.8.200';
-import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.200';
+import { createBoundedContactMantlePlan, createPlayerClimbApi } from './player-climb.js?v=0.8.218';
+import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.218';
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
-import { advanceDirectMantle, createDirectMantlePlan, generateControllerArena } from './controller-kata.js?v=0.8.217';
+import { generateControllerArena } from './controller-kata.js?v=0.8.218';
 import { applyWorldGridOverlay } from './controller-grid-material.js?v=0.8.214';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
 import {
@@ -34,7 +34,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.217';
+const BUILD = '0.8.218';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
 const CONTROLLER_KATA_BASE_SEED = URL_PARAMS.get('seed') || 'controller-proof';
@@ -5309,14 +5309,24 @@ function updateCurrentGauntletRoom() {
 function tryBeginControllerKataDirectMantle(physicsMove, moveY) {
   const proof = roomState.controllerKataMantleProof;
   if (!proof || player.mode === 'mantle') return false;
-  const plan = createDirectMantlePlan({
+  const collisions = physicsMove?.collisions || [];
+  const fixtureContact = collisions.find((entry) => entry?.isWall && entry.source === proof.fixture.id);
+  if (fixtureContact && (player.grounded || physicsMove?.grounded)) proof.phase = 'approach-ready';
+  const plan = createBoundedContactMantlePlan({
     fixture: proof.fixture,
-    eyePosition: player.position.toArray(),
+    eyePosition: player.position,
     inputMoveY: moveY,
-    collisions: physicsMove?.collisions || [],
+    collisions,
     eyeHeight: PLAYER_EYE_HEIGHT,
+    radius: PLAYER_SOLID_RADIUS,
+    mantleForward: CLIMB_MANTLE_FORWARD,
     playerMode: player.mode,
+    grounded: player.grounded || !!physicsMove?.grounded,
+    velocityY: player.velocity.y,
+    facing: cameraForwardYaw(player.yaw),
     faceYaw: player.yaw,
+    findMantleTopSupport: (x, z, targetTopY) => roomState.physicsWorld?.findCuboidTopSupport({ x, z, targetTopY, radius: PLAYER_SOLID_RADIUS, source: proof.fixture.id }),
+    isBodyClear: (x, z, eyeY) => !!roomState.physicsWorld?.isCapsuleClearAt({ x, z, eyeY, eyeHeight: PLAYER_EYE_HEIGHT, radius: PLAYER_SOLID_RADIUS }),
   });
   if (!plan) return false;
   player.mode = 'mantle';
@@ -5328,8 +5338,14 @@ function tryBeginControllerKataDirectMantle(physicsMove, moveY) {
   proof.starts += 1;
   proof.startedAt = performance.now();
   proof.contactSource = plan.contactSource;
-  proof.activationDistance = plan.activationDistance;
-  proof.startPosition = [...plan.start];
+  proof.contactNormal = [...plan.contactNormal];
+  proof.faceDot = plan.faceDot;
+  proof.feetToLip = plan.feetToLip;
+  proof.supportSource = plan.supportSource;
+  proof.verticalDisplacement = plan.verticalDisplacement;
+  proof.horizontalDisplacement = plan.horizontalDisplacement;
+  proof.startPosition = plan.start.toArray();
+  proof.targetPosition = plan.end.toArray();
   proof.modeHistory.push('mantle');
   return true;
 }
@@ -5340,22 +5356,13 @@ function updateControllerKataDirectMantle(dt) {
   if (!proof || !mantle || mantle.kind !== 'controller-direct') {
     throw new Error('controller kata direct mantle state is missing');
   }
-  const frame = advanceDirectMantle(mantle, dt);
-  mantle.elapsed = frame.elapsed;
-  player.position.fromArray(frame.position);
-  player.velocity.set(0, 0, 0);
-  player.grounded = false;
-  player.yaw = mantle.faceYaw;
-  proof.phase = frame.complete ? 'completed' : 'mantling';
-  proof.progress = frame.progress;
-  if (!frame.complete) return;
-  player.position.fromArray(mantle.end);
-  player.mode = 'ground';
-  player.mantle = null;
-  player.grounded = true;
+  const frame = updatePlayerMantle(dt);
+  proof.phase = frame?.complete ? 'completed' : 'mantling';
+  proof.progress = frame?.progress || 0;
+  if (!frame?.complete) return;
   proof.completions += 1;
   proof.completedAt = performance.now();
-  proof.endPosition = [...mantle.end];
+  proof.endPosition = mantle.end.toArray();
   proof.modeHistory.push('ground');
 }
 
@@ -5381,7 +5388,13 @@ function applyControllerKataState(arena, movePlayer) {
     climbEntries: 0,
     progress: 0,
     contactSource: '',
-    activationDistance: null,
+    contactNormal: null,
+    faceDot: null,
+    feetToLip: null,
+    supportSource: '',
+    verticalDisplacement: null,
+    horizontalDisplacement: null,
+    targetPosition: null,
     startedAt: 0,
     completedAt: 0,
     startPosition: null,

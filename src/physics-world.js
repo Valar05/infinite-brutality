@@ -180,6 +180,43 @@ export function createPhysicsWorld(options = {}) {
     };
   };
 
+
+  const cuboidContainsXZ = (record, x, z, radius = 0) => {
+    if (record?.type !== 'cuboid' || !record.size || !record.position) return false;
+    const yaw = -(record.yaw || 0);
+    const dx = x - record.position[0];
+    const dz = z - record.position[2];
+    const localX = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+    const localZ = dx * Math.sin(yaw) + dz * Math.cos(yaw);
+    return Math.abs(localX) <= record.size[0] * 0.5 - radius
+      && Math.abs(localZ) <= record.size[2] * 0.5 - radius;
+  };
+
+  const findCuboidTopSupport = ({ x, z, targetTopY, radius = 0.38, source = '', tolerance = 0.08 }) => {
+    let best = null;
+    for (const record of colliderRecords) {
+      if (record.type !== 'cuboid' || (source && record.source !== source)) continue;
+      if (!cuboidContainsXZ(record, x, z, radius)) continue;
+      const topY = record.position[1] + record.size[1] * 0.5;
+      if (Math.abs(topY - targetTopY) > tolerance) continue;
+      if (!best || topY > best.topY) best = { topY, source: record.source, kind: record.kind };
+    }
+    return best;
+  };
+
+  const isCapsuleClearAt = ({ x, z, eyeY, eyeHeight, radius = 0.38 }) => {
+    const minY = eyeY - eyeHeight + 0.15;
+    const maxY = eyeY + 0.35;
+    for (const record of colliderRecords) {
+      if (record.type !== 'cuboid' || !record.size || !record.position) continue;
+      const recordMinY = record.position[1] - record.size[1] * 0.5;
+      const recordMaxY = record.position[1] + record.size[1] * 0.5;
+      if (maxY < recordMinY || minY > recordMaxY) continue;
+      if (cuboidContainsXZ(record, x, z, -radius)) return false;
+    }
+    return true;
+  };
+
   const snapshot = () => {
     const ownerless = colliderRecords.filter((record) => record.ownerless);
     return {
@@ -214,6 +251,8 @@ export function createPhysicsWorld(options = {}) {
     addTerrainMesh,
     addCuboid,
     movePlayer,
+    findCuboidTopSupport,
+    isCapsuleClearAt,
     snapshot,
     dispose,
   };

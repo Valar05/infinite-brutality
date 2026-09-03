@@ -6,6 +6,7 @@ const html = file('../controller-kata.html');
 const index = file('../index.html');
 const main = file('../src/main.js');
 const arena = file('../src/controller-kata.js');
+const climb = file('../src/player-climb.js');
 const gridMaterial = file('../src/controller-grid-material.js');
 const physics = file('../src/physics-world.js');
 const license = file('../vendor/three/LICENSE');
@@ -45,7 +46,7 @@ for (const id of [
   assert.match(html, new RegExp(`id=["']${id}["']`), `controller shell must preserve main.js DOM id: ${id}`);
 }
 
-assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.217["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.218["']/, 'controller page must load the authoritative runtime');
 assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
@@ -60,10 +61,12 @@ assert.match(main, /CONTROLLER_KATA_BASE_SEED = URL_PARAMS\.get\('seed'\) \|\| '
 assert.match(arena, /DEFAULT_ARENA_SEED = 'controller-proof'/);
 assert.doesNotMatch(`${html}\n${main}\n${arena}`, new RegExp(forbiddenLegacySeed, 'i'));
 
-assert.match(main, /createPhysicsWorld, ensurePhysicsReady/);
+assert.match(main, /createPhysicsWorld, ensurePhysicsReady \} from '\.\/physics-world\.js\?v=0\.8\.218'/);
 assert.match(main, /generateControllerArena/);
-assert.match(arena, /export function createDirectMantlePlan/);
-assert.match(arena, /export function advanceDirectMantle/);
+assert.doesNotMatch(arena, /createDirectMantlePlan|advanceDirectMantle/, 'arena module must not reinvent mantle mechanics');
+assert.match(climb, /export function createBoundedContactMantlePlan/);
+assert.match(climb, /export function advanceConstrainedMantle/);
+assert.match(main, /createBoundedContactMantlePlan/);
 assert.match(main, /tryBeginControllerKataDirectMantle\(physicsMove, moveY\)/);
 assert.match(main, /if \(!useControllerKataSlice\(\) && tryBeginClimb/);
 assert.match(main, /controller kata entered forbidden CLIMB state/);
@@ -81,6 +84,10 @@ assert.match(main, /function addWalkableBox[\s\S]*?addBeveledBox\(parent, name, 
 assert.match(gridMaterial, /export function applyWorldGridOverlay/);
 assert.match(physics, /world\.timestep = 1 \/ 60/);
 assert.match(physics, /controller\.computeColliderMovement/);
+assert.match(physics, /const findCuboidTopSupport/);
+assert.match(physics, /const isCapsuleClearAt/);
+assert.match(main, /physicsWorld\?\.findCuboidTopSupport/);
+assert.match(main, /physicsWorld\?\.isCapsuleClearAt/);
 
 assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*updateAttack\(dt\);/s);
 assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*renderer\.clearDepth\(\);\s*renderer\.render\(armsScene, armsCamera\);/s);
@@ -107,8 +114,17 @@ assert.match(cloudCapture, /grid\.type !== 'GridHelper'/);
 assert.match(cloudCapture, /!grid\.visibleInScene/);
 assert.match(cloudCapture, /page\.keyboard\.down\('w'\)/);
 assert.match(cloudCapture, /window\.__infiniteBrutalityControllerMantle/);
+assert.match(cloudCapture, /proof\?\.starts === 0 && proof\.phase === 'approach-ready'/);
 assert.match(cloudCapture, /proof\?\.starts >= 1/);
 assert.match(cloudCapture, /proof\?\.completions >= 1/);
+assert.ok(
+  cloudCapture.indexOf("proof?.starts === 0 && proof.phase === 'approach-ready'")
+    < cloudCapture.indexOf("page.keyboard.press('Space')")
+  && cloudCapture.indexOf("page.keyboard.press('Space')")
+    < cloudCapture.indexOf("proof?.starts >= 1"),
+  'cloud replay must reach grounded contact, then jump, then observe mantle start',
+);
+assert.match(cloudCapture, /completed mantle violated constrained contact\/support bounds/);
 assert.match(cloudCapture, /mantleStartSurface/);
 assert.match(cloudCapture, /entered forbidden CLIMB state/);
 assert.match(cloudCapture, /page\.keyboard\.press\('Space'\)/);

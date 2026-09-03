@@ -32,7 +32,11 @@ assert.deepEqual(first.directMantle, {
   size: [6, 1.2, 2.4],
   approach: [0, 0, 1],
   minForwardInput: 0.55,
-  maxActivationDistance: 0.82,
+  minFacingDot: 0.72,
+  minFeetToLip: 0.2,
+  maxFeetToLip: 1.0,
+  maxVerticalDisplacement: 1.02,
+  maxHorizontalDisplacement: 1.45,
   duration: 0.34,
   topY: 1.2,
 });

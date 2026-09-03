@@ -76,7 +76,20 @@ async function inspectSurface(page) {
         climbEntries: mantleProof.climbEntries,
         progress: mantleProof.progress,
         contactSource: mantleProof.contactSource,
-        activationDistance: mantleProof.activationDistance,
+        contactNormal: mantleProof.contactNormal,
+        faceDot: mantleProof.faceDot,
+        feetToLip: mantleProof.feetToLip,
+        supportSource: mantleProof.supportSource,
+        verticalDisplacement: mantleProof.verticalDisplacement,
+        horizontalDisplacement: mantleProof.horizontalDisplacement,
+        targetPosition: mantleProof.targetPosition,
+        bounds: {
+          minFacingDot: mantleProof.fixture?.minFacingDot,
+          minFeetToLip: mantleProof.fixture?.minFeetToLip,
+          maxFeetToLip: mantleProof.fixture?.maxFeetToLip,
+          maxVerticalDisplacement: mantleProof.fixture?.maxVerticalDisplacement,
+          maxHorizontalDisplacement: mantleProof.fixture?.maxHorizontalDisplacement,
+        },
         startedAt: mantleProof.startedAt,
         completedAt: mantleProof.completedAt,
         startPosition: mantleProof.startPosition,
@@ -138,6 +151,7 @@ let browser = null;
 let page = null;
 let fatalError = '';
 let initialSurface = null;
+let approachSurface = null;
 let mantleStartSurface = null;
 let finalSurface = null;
 let initialScreenshot = null;
@@ -173,6 +187,15 @@ try {
   inputHeld = true;
   await page.waitForFunction(() => {
     const proof = window.__infiniteBrutalityControllerMantle;
+    return proof?.starts === 0 && proof.phase === 'approach-ready';
+  }, null, { polling: 'raf', timeout: args.timeoutMs });
+  approachSurface = await inspectSurface(page);
+  requireReadySurface(approachSurface, 'approach-ready');
+  if (approachSurface.controllerMantle.starts !== 0) throw new Error('grounded approach incorrectly started a mantle');
+  await page.keyboard.press('Space');
+
+  await page.waitForFunction(() => {
+    const proof = window.__infiniteBrutalityControllerMantle;
     return proof?.starts >= 1 && (proof.phase === 'started' || proof.phase === 'mantling');
   }, null, { polling: 'raf', timeout: args.timeoutMs });
   mantleStartSurface = await inspectSurface(page);
@@ -188,13 +211,21 @@ try {
   }, null, { polling: 'raf', timeout: args.timeoutMs });
   await page.keyboard.up('w');
   inputHeld = false;
-  await page.keyboard.press('Space');
   await page.waitForTimeout(350);
 
   finalSurface = await inspectSurface(page);
   requireReadySurface(finalSurface, 'after-input');
   if (finalSurface.controllerMantle.completions < 1 || finalSurface.controllerMantle.phase !== 'completed') {
     throw new Error('direct mantle completion was not observed');
+  }
+  const completedMantle = finalSurface.controllerMantle;
+  if (completedMantle.supportSource !== completedMantle.fixtureId
+      || completedMantle.faceDot < completedMantle.bounds.minFacingDot
+      || completedMantle.feetToLip < completedMantle.bounds.minFeetToLip
+      || completedMantle.feetToLip > completedMantle.bounds.maxFeetToLip
+      || completedMantle.verticalDisplacement > completedMantle.bounds.maxVerticalDisplacement
+      || completedMantle.horizontalDisplacement > completedMantle.bounds.maxHorizontalDisplacement) {
+    throw new Error('completed mantle violated constrained contact/support bounds');
   }
   const inputPath = path.join(outDir, 'after-keyboard-input.png');
   const inputBytes = await page.screenshot({ path: inputPath, fullPage: false });
@@ -241,6 +272,7 @@ const manifest = {
   inputExercise: {
     forwardKey: 'w',
     jumpKey: 'Space',
+    groundedApproachBeforeJump: true,
     forwardUntilMantleCompletion: true,
   },
   surface: {
@@ -249,6 +281,7 @@ const manifest = {
     channel: launchOptions.channel,
     viewport: { width: 1366, height: 900 },
     initial: initialSurface,
+    approachReady: approachSurface,
     mantleStart: mantleStartSurface,
     afterKeyboardInput: finalSurface,
   },
