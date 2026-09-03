@@ -46,6 +46,7 @@ for (const id of [
 }
 
 assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.214["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
 assert.match(html, /"three"\s*:\s*"\.\/vendor\/three\/build\/three\.module\.js"/);
