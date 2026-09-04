@@ -2,7 +2,7 @@ import { CONTROLLER_KATA_FIXED_DT as FIXED_DT, CONTROLLER_KATA_PROFILE as P } fr
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
 const vec = (value = {}) => ({ x: Number(value.x) || 0, y: Number(value.y) || 0, z: Number(value.z) || 0 });
-const lengthXZ = (value) => Math.hypot(value.x, value.z);
+const lengthXZ = (value) => Math.sqrt(value.x * value.x + value.z * value.z);
 const normalizedXZ = (value) => {
   const length = lengthXZ(value);
   return length > 1e-9 ? { x: value.x / length, y: 0, z: value.z / length } : { x: 0, y: 0, z: 0 };
@@ -11,7 +11,7 @@ const forwardForYaw = (yaw) => ({ x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) });
 const rightForYaw = (yaw) => ({ x: Math.cos(yaw), y: 0, z: -Math.sin(yaw) });
 const copyState = (state) => ({
   position: vec(state.position), velocity: vec(state.velocity), yaw: state.yaw, pitch: state.pitch,
-  grounded: state.grounded, mode: state.mode, runCharge: state.runCharge, isRunning: state.isRunning,
+  grounded: state.grounded, mode: state.mode, runCharge: state.runCharge, isRunning: state.isRunning, lastRunIntent: state.lastRunIntent,
 });
 
 export function createControllerKataCore(options = {}) {
@@ -21,14 +21,14 @@ export function createControllerKataCore(options = {}) {
   const fixedTick = typeof options.onFixedTick === 'function' ? options.onFixedTick : () => {};
   const state = {
     position: vec(options.spawn), velocity: vec(), yaw: Math.PI, pitch: 0, grounded: true, mode: 'ground',
-    runCharge: 0, isRunning: false, mantle: null, tick: 0,
+    runCharge: 0, isRunning: false, lastRunIntent: false, mantle: null, tick: 0,
   };
   const input = { moveX: 0, moveY: 0, smoothX: 0, smoothY: 0, jump: false, lookX: 0, lookY: 0 };
   let accumulator = 0;
 
   function reset(spawn) {
     Object.assign(state, { position: vec(spawn), velocity: vec(), yaw: Math.PI, pitch: 0, grounded: true,
-      mode: 'ground', runCharge: 0, isRunning: false, mantle: null, tick: 0 });
+      mode: 'ground', runCharge: 0, isRunning: false, lastRunIntent: false, mantle: null, tick: 0 });
     Object.assign(input, { moveX: 0, moveY: 0, smoothX: 0, smoothY: 0, jump: false, lookX: 0, lookY: 0 });
     accumulator = 0;
   }
@@ -101,8 +101,7 @@ export function createControllerKataCore(options = {}) {
     const before = copyState(state);
     state.yaw -= input.lookX;
     state.pitch = clamp(state.pitch - input.lookY, -1.15, 1.1);
-    input.lookX = 0;
-    input.lookY = 0;
+    input.lookX = 0; input.lookY = 0;
     let outcome = 'move';
     if (state.mode === 'mantle') {
       outcome = advanceMantle();
@@ -113,81 +112,74 @@ export function createControllerKataCore(options = {}) {
     const blend = 1 - Math.exp(-smoothRate * FIXED_DT);
     input.smoothX += (input.moveX - input.smoothX) * blend;
     input.smoothY += (input.moveY - input.smoothY) * blend;
+    if (Math.abs(input.moveX) < 0.001 && Math.abs(input.smoothX) < 0.015) input.smoothX = 0;
+    if (Math.abs(input.moveY) < 0.001 && Math.abs(input.smoothY) < 0.015) input.smoothY = 0;
     const rawLength = Math.hypot(input.smoothX, input.smoothY);
     const moveX = rawLength > 1 ? input.smoothX / rawLength : input.smoothX;
     const moveY = rawLength > 1 ? input.smoothY / rawLength : input.smoothY;
-    const forward = forwardForYaw(state.yaw);
-    const right = rightForYaw(state.yaw);
+    const forward = forwardForYaw(state.yaw), right = rightForYaw(state.yaw);
     let desired = { x: forward.x * moveY + right.x * moveX, y: 0, z: forward.z * moveY + right.z * moveX };
     if (lengthXZ(desired) > 1) desired = normalizedXZ(desired);
     const magnitude = Math.hypot(moveX, moveY);
+    if (input.jump) {
+      input.jump = false;
+      if (state.grounded && state.mode !== 'mantle') {
+        const horizontalSpeed = lengthXZ(state.velocity);
+        const moveDirection = horizontalSpeed > 0.05 ? normalizedXZ(state.velocity) : (lengthXZ(desired) > 0.0001 ? normalizedXZ(desired) : forward);
+        const running = Boolean(state.isRunning);
+        const verticalBoost = running ? P.jumpSpeed + 0.5 + 0.75 + Math.min(0.4, horizontalSpeed * 0.07) : P.jumpSpeed;
+        const directionalBoost = running ? 4.45 + Math.min(1.6, horizontalSpeed * 0.28) + 0.75 : 0;
+        state.velocity.x += moveDirection.x * directionalBoost; state.velocity.z += moveDirection.z * directionalBoost;
+        state.velocity.y = Math.max(state.velocity.y, verticalBoost); state.grounded = false; state.mode = 'air';
+        emit({ type: 'jump-commit', velocityY: state.velocity.y, running });
+      } else emit({ type: 'jump-rejected', grounded: Boolean(state.grounded), mode: state.mode });
+    }
     const building = state.grounded && moveY > 0.56 && Math.abs(moveX) <= Math.max(0.001, moveY) && magnitude > 0.55;
-    state.runCharge = building ? Math.min(1, state.runCharge + FIXED_DT)
-      : Math.max(0, state.runCharge - FIXED_DT * (state.grounded ? 2.2 : 0.15));
+    state.runCharge = building ? Math.min(1, state.runCharge + FIXED_DT) : Math.max(0, state.runCharge - FIXED_DT * (state.grounded ? 2.2 : 0.15));
     state.isRunning = state.grounded && state.runCharge >= 1;
+    if (state.isRunning) state.lastRunIntent = true; else if (state.grounded && magnitude < 0.18) state.lastRunIntent = false;
     const wishSpeed = state.grounded ? 5.2 + 3.6 * state.runCharge : 6.2;
     if (state.grounded) {
       const speed = lengthXZ(state.velocity);
-      if (speed > 0.001) {
-        const next = Math.max(0, speed - speed * 13.5 * FIXED_DT);
-        state.velocity.x *= next / speed;
-        state.velocity.z *= next / speed;
-      }
+      if (speed > 0.001) { const next = Math.max(0, speed - speed * 13.5 * FIXED_DT); state.velocity.x *= next / speed; state.velocity.z *= next / speed; }
     }
     const direction = normalizedXZ(desired);
-    if (state.grounded && lengthXZ(direction) > 0.0001) {
-      const along = state.velocity.x * direction.x + state.velocity.z * direction.z;
-      const add = wishSpeed - along;
-      if (add > 0) {
-        const amount = Math.min(28 * wishSpeed * FIXED_DT, add);
-        state.velocity.x += direction.x * amount;
-        state.velocity.z += direction.z * amount;
+    if (!state.grounded) {
+      const horizontalSpeed = lengthXZ(state.velocity);
+      if (lengthXZ(direction) > 0.0001) {
+        const add = wishSpeed - (state.velocity.x * direction.x + state.velocity.z * direction.z);
+        if (add > 0) { const amount = Math.min(14 * Math.max(0.35, magnitude) * FIXED_DT, add); state.velocity.x += direction.x * amount; state.velocity.z += direction.z * amount; }
+        else if (add < 0) { const amount = Math.min(-add, 19.5 * FIXED_DT); state.velocity.x += direction.x * amount; state.velocity.z += direction.z * amount; }
       }
-    } else if (!state.grounded && lengthXZ(direction) > 0.0001) {
-      const along = state.velocity.x * direction.x + state.velocity.z * direction.z;
-      const add = wishSpeed - along;
-      const amount = add > 0 ? Math.min(14 * Math.max(0.35, magnitude) * FIXED_DT, add)
-        : -Math.min(-add, 19.5 * FIXED_DT);
-      state.velocity.x += direction.x * amount;
-      state.velocity.z += direction.z * amount;
+      if (horizontalSpeed > 8.8) {
+        const overspeed = horizontalSpeed - 8.8, drag = Math.min(overspeed, 3.4 * FIXED_DT + overspeed * 0.12 * FIXED_DT);
+        const scale = (horizontalSpeed - drag) / horizontalSpeed; state.velocity.x *= scale; state.velocity.z *= scale;
+      }
+    } else if (lengthXZ(direction) > 0.0001) {
+      const add = wishSpeed - (state.velocity.x * direction.x + state.velocity.z * direction.z);
+      if (add > 0) { const amount = Math.min(28 * wishSpeed * FIXED_DT, add); state.velocity.x += direction.x * amount; state.velocity.z += direction.z * amount; }
     }
-    if (input.jump && state.grounded) {
-      state.velocity.y = P.jumpSpeed;
-      state.grounded = false;
-      state.mode = 'air';
-      emit({ type: 'jump-commit' });
-    }
-    input.jump = false;
     state.velocity.y -= P.gravity * FIXED_DT;
     const movementStart = vec(state.position);
     const desiredDelta = { x: state.velocity.x * FIXED_DT, y: state.velocity.y * FIXED_DT, z: state.velocity.z * FIXED_DT };
     const move = world.movePlayer({ eyePosition: state.position, desiredDelta, eyeHeight: P.eyeHeight, radius: P.radius });
-    state.position = vec(move.eyePosition);
-    state.velocity.x = move.movement.x / FIXED_DT;
-    state.velocity.z = move.movement.z / FIXED_DT;
+    state.position = vec(move.eyePosition); state.velocity.x = move.movement.x / FIXED_DT; state.velocity.z = move.movement.z / FIXED_DT;
     state.velocity.y = move.grounded && state.velocity.y <= 0 ? 0 : move.movement.y / FIXED_DT;
     const mantle = planMantle(move, movementStart, desiredDelta);
     if (mantle) {
-      state.mantle = mantle;
-      state.mode = 'mantle';
-      state.grounded = false;
-      state.velocity = vec();
-      outcome = 'mantle-start';
+      state.mantle = mantle; state.mode = 'mantle'; state.grounded = false; state.velocity = vec(); outcome = 'mantle-start';
       emit({ type: 'mantle-start', plan: { source: mantle.source, contactSource: mantle.contactSource, feetToLip: mantle.feetToLip } });
-    } else {
-      state.grounded = Boolean(move.grounded);
-      state.mode = state.grounded ? 'ground' : 'air';
-    }
+    } else { state.grounded = Boolean(move.grounded); state.mode = state.grounded ? 'ground' : 'air'; }
     fixedTick({ tick: state.tick, input: { moveX, moveY }, before, after: copyState(state), outcome });
   }
 
   return Object.freeze({
     state,
-    setMove(value = {}) { input.moveX = clamp(value.moveX, -1, 1); input.moveY = clamp(value.moveY, -1, 1); },
+    setMove(value = {}) { let x = clamp(value.moveX, -1, 1), y = clamp(value.moveY, -1, 1); const length = Math.hypot(x, y); if (length > 1) { x /= length; y /= length; } input.moveX = x; input.moveY = y; },
     addLook(dx, dy) { input.lookX += Number(dx) || 0; input.lookY += Number(dy) || 0; },
     jump() { input.jump = true; },
     update(dt) {
-      accumulator = Math.min(0.1, accumulator + Math.max(0, Number(dt) || 0));
+      accumulator += clamp(Number(dt) || 0, 0, 0.25);
       let steps = 0;
       while (accumulator + 1e-12 >= FIXED_DT) { step(); accumulator -= FIXED_DT; steps += 1; }
       return { steps, state: copyState(state), input: { moveX: input.smoothX, moveY: input.smoothY } };

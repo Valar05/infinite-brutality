@@ -1,13 +1,13 @@
 import { CONTROLLER_KATA_PROFILE as P } from './controller-kata-profile.js?build=b2eca19f7ffe30707c9b9d98ac2dfe5f5750d06f4c07740d4a7b712f77d8bc25';
 import { generateControllerArena } from './controller-kata.js?build=1da2817e618a8b2d47e103639777ef8b0d5bed98b6ae6f03a8c4f35e5eb892a1';
-import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?build=7360e97b129a7063b51aa398deddd5f9b5b272ba9c1ac613aa6c606c99d0fdde';
-import { createControllerKataCore } from './controller-kata-core.js?build=c6f4ab285004448f593e26fd3c67055ff1d3ee3174b3e2e39229c3729ae4bfe0';
-import { createNoodleSvgTerminal } from './noodle-svg-terminal.js?build=f6296355e14b9e23f2a0436f6a922e1ecee5360f20561dea6c2fd18c3d38db3b';
+import { createControllerKataWorld } from './controller-kata-world.js?build=7c9fee29dd1cca146ce413ec002859fdab89f89fbd8b8d1a1fd1c27322931354';
+import { createControllerKataCore } from './controller-kata-core.js?build=f567e9110b18d256fcfb34c8fabbea221456c66d81c02450ef093ea46c09b794';
+import { createNoodleSvgTerminal } from './noodle-svg-terminal.js?build=2da96dd4398f8cf898d184f7cc2177ebd1a58570d55b00e117fe0b5d72b0ba29';
 import { createTouchLookOwner } from './touch-look-owner.js?build=aaa2525307225fc34d9298ddccbc2de5b7b2ff9fe945b488f490df58ed5ee751';
 import { createPlaytestOverwatchTelemetry } from './playtest-overwatch-telemetry.js?build=d89295693b529a85c381357d545b1b4c9983debc2343472dc5382f66c21bf228';
-import { CONTROLLER_KATA_BUILD_MANIFEST } from './controller-kata-svg-build-manifest.js?build=09a516130fd33fcafe17026ed67f8be1353413a5da0e46bb5790bdfe050970a6';
+import { CONTROLLER_KATA_BUILD_MANIFEST } from './controller-kata-svg-build-manifest.js?build=2f3973bc7f64db17223fde075502b16fa905b22c25cb2cfbe5872719b143827f';
 
-const BUILD = 'controller-kata-noodle-svg-v1';
+const BUILD = 'controller-kata-noodle-svg-v2';
 const doc = document;
 const win = window;
 const svg = doc.getElementById('game');
@@ -57,6 +57,7 @@ function frameRecord(value) {
 
 function beginPlaytest(source) {
   if (playtest.started || !core) return;
+  startedAt = performance.now();
   if (playtest.start({ slice: 'controller_kata', build: BUILD, trigger: source })) {
     playtest.milestone('course-ready', { seed: arena.seedText });
     playtest.tapeStart({ seed: arena.seedText, courseHash: arena.boxcraftCourse.courseHash, initial: frameRecord(core.state) });
@@ -65,8 +66,7 @@ function beginPlaytest(source) {
 
 function mountArena() {
   if (world) world.dispose();
-  world = createPhysicsWorld({ gravity: { x: 0, y: -P.gravity, z: 0 }, characterOffset: 0.035,
-    playerFootInset: 0, autostepHeight: P.autostepHeight, autostepMinWidth: 0.646, snapToGround: 0.48 });
+  world = createControllerKataWorld({ autostepHeight: P.autostepHeight, snapToGround: 0.48 });
   arena = generateControllerArena({ seed: runIndex ? seed + ':' + runIndex : seed });
   const worldCuboids = arena.traversal.fixtures.concat(arena.cubes);
   world.addCuboid({ size: arena.floor.size, position: arena.floor.center, source: 'controller-kata-floor', kind: 'floor' });
@@ -99,7 +99,6 @@ function mountArena() {
       });
     },
   });
-  startedAt = performance.now();
 }
 
 function moveStick(event) {
@@ -257,8 +256,7 @@ function render(now) {
   }
 }
 
-async function boot() {
-  await ensurePhysicsReady();
+function boot() {
   terminal = createNoodleSvgTerminal({ svg });
   mountArena();
   setupInput();
@@ -270,4 +268,4 @@ async function boot() {
   });
   win.requestAnimationFrame(render);
 }
-boot().catch((error) => reportCrash('boot', error));
+try { boot(); } catch (error) { reportCrash('boot', error); }

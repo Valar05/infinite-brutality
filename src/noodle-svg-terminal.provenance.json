@@ -1,6 +1,10 @@
 {
+  "approved_deviations": [
+    "Sutherland-Hodgman near-plane polygon clipping replaces whole-face rejection"
+  ],
   "authority": {
     "archive_sha256": "3a3888479d8048025c9cbfbd554aacb8df013664c44c4f27d554ea61a42f9d6b",
+    "baseline_controller_commit": "128f67fca0a3a4dbd602bcf30f6c7dc2ed7131a7",
     "noodle3d_html_sha256": "9862656c631d2c2b2f1035774cef51060b38ff83f0977d35eecd5d89b262d749",
     "source": "Helm Center document 1Wi5s1Vp8JvQIivmjvdAMIXI7Vn6A0OMeLYZjN5zaZNo"
   },
@@ -10,12 +14,14 @@
     "perspective projection",
     "near-plane line clipping",
     "backface culling",
-    "painter depth ordering"
+    "painter depth ordering",
+    "Noodle camera-space handedness"
   ],
   "excluded": [
     "Noodle accessibility controls",
     "Noodle input behavior",
     "Noodle game state"
   ],
-  "schema": "noodle-svg-terminal-provenance-v1"
+  "schema": "noodle-svg-terminal-provenance-v1",
+  "upstream_contract": "Plain controller state and cuboid records; SVG remains replaceable terminal opinion."
 }

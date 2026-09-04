@@ -1,0 +1,365 @@
+{
+  "schema": "controller-kata-baseline-tapes-v1",
+  "authority": {
+    "commit": "128f67fca0a3a4dbd602bcf30f6c7dc2ed7131a7",
+    "controller": "src/product-one-controller.js"
+  },
+  "fixedDt": 0.016666666666666666,
+  "tapes": [
+    {
+      "name": "forward-release",
+      "frames": [
+        {
+          "label": "forward",
+          "tick": 1,
+          "position": [
+            -4.953015943218184e-18,
+            1.68,
+            0.04044444444444444
+          ],
+          "velocity": [
+            -2.9718095659309104e-16,
+            0,
+            2.4266666666666667
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "forward",
+          "tick": 10,
+          "position": [
+            -1.0208247502092622e-16,
+            1.68,
+            0.8335666666666668
+          ],
+          "velocity": [
+            -6.882515011208126e-16,
+            0,
+            5.620000000000001
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.11666666666666665,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "forward",
+          "tick": 30,
+          "position": [
+            -3.572172248432915e-16,
+            1.68,
+            2.9169
+          ],
+          "velocity": [
+            -8.352091170184948e-16,
+            0,
+            6.82
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.44999999999999996,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "forward",
+          "tick": 60,
+          "position": [
+            -8.317678595128911e-16,
+            1.68,
+            6.7919
+          ],
+          "velocity": [
+            -1.055645540865019e-15,
+            0,
+            8.620000000000005
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.9500000000000013,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "release",
+          "tick": 61,
+          "position": [
+            -8.494844165405562e-16,
+            1.68,
+            6.936566666666667
+          ],
+          "velocity": [
+            -1.0629934216599033e-15,
+            0,
+            8.680000000000005
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.966666666666668,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "release",
+          "tick": 70,
+          "position": [
+            -1.000336409259527e-15,
+            1.68,
+            8.16836666666667
+          ],
+          "velocity": [
+            -9.410186004648271e-16,
+            0,
+            7.684000000000006
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.6900000000000017,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "release",
+          "tick": 90,
+          "position": [
+            -1.1605160409557244e-15,
+            1.68,
+            9.47633261903531
+          ],
+          "velocity": [
+            -3.810779160156618e-17,
+            0,
+            0.31117373293343265
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "release",
+          "tick": 120,
+          "position": [
+            -1.1627101330481969e-15,
+            1.68,
+            9.494248740597854
+          ],
+          "velocity": [
+            -1.0838094644166007e-19,
+            0,
+            0.0008849975888322987
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0,
+          "isRunning": false,
+          "lastRunIntent": false
+        }
+      ]
+    },
+    {
+      "name": "right-strafe",
+      "frames": [
+        {
+          "label": "right",
+          "tick": 1,
+          "position": [
+            -0.04044444444444444,
+            1.68,
+            -4.953015943218184e-18
+          ],
+          "velocity": [
+            -2.4266666666666667,
+            0,
+            -2.9718095659309104e-16
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "right",
+          "tick": 10,
+          "position": [
+            -0.8055666666666668,
+            1.68,
+            -9.865346398331362e-17
+          ],
+          "velocity": [
+            -5.200000000000001,
+            0,
+            -6.368163355566237e-16
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "right",
+          "tick": 30,
+          "position": [
+            -2.5389000000000017,
+            1.68,
+            -3.109255758355214e-16
+          ],
+          "velocity": [
+            -5.2,
+            0,
+            -6.368163355566235e-16
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0,
+          "isRunning": false,
+          "lastRunIntent": false
+        }
+      ]
+    },
+    {
+      "name": "running-jump",
+      "frames": [
+        {
+          "label": "run",
+          "tick": 60,
+          "position": [
+            -8.317678595128911e-16,
+            1.68,
+            6.7919
+          ],
+          "velocity": [
+            -1.055645540865019e-15,
+            0,
+            8.620000000000005
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.9500000000000013,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "run",
+          "tick": 61,
+          "position": [
+            -8.494844165405562e-16,
+            1.68,
+            6.936566666666667
+          ],
+          "velocity": [
+            -1.0629934216599033e-15,
+            0,
+            8.680000000000005
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": true,
+          "mode": "ground",
+          "runCharge": 0.966666666666668,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "jump",
+          "tick": 62,
+          "position": [
+            -8.678643239177593e-16,
+            1.7943333333333333,
+            7.086650000000001
+          ],
+          "velocity": [
+            -1.1027944426321923e-15,
+            6.859999999999999,
+            9.005000000000004
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": false,
+          "mode": "air",
+          "runCharge": 0.9641666666666681,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "air",
+          "tick": 63,
+          "position": [
+            -0.00026221603023512106,
+            1.9046666666666667,
+            7.241157998496282
+          ],
+          "velocity": [
+            -0.01573296181405519,
+            6.619999999999999,
+            9.270479909776896
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": false,
+          "mode": "air",
+          "runCharge": 0.9616666666666681,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "air",
+          "tick": 72,
+          "position": [
+            -0.042112355157167936,
+            2.7176666666666653,
+            8.826089048389147
+          ],
+          "velocity": [
+            -0.5687933394890413,
+            4.459999999999997,
+            11.581357503202453
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": false,
+          "mode": "air",
+          "runCharge": 0.9391666666666686,
+          "isRunning": false,
+          "lastRunIntent": false
+        },
+        {
+          "label": "air",
+          "tick": 92,
+          "position": [
+            -0.5566186583485047,
+            3.3643333333333274,
+            13.536384642341527
+          ],
+          "velocity": [
+            -2.452213382281907,
+            -0.34000000000000385,
+            16.392931771555126
+          ],
+          "yaw": 3.141592653589793,
+          "grounded": false,
+          "mode": "air",
+          "runCharge": 0.8891666666666697,
+          "isRunning": false,
+          "lastRunIntent": false
+        }
+      ]
+    }
+  ]
+}

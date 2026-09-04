@@ -10,9 +10,8 @@ export function projectNoodleFrame(frame, viewport = {}) {
   const focal = Number(viewport.focal) || Math.min(width, height) * 1.05;
   const near = Number(viewport.near) || 0.12;
   const camera = frame.camera;
-  const viewYaw = camera.yaw - Math.PI;
-  const cy = Math.cos(viewYaw);
-  const sy = Math.sin(viewYaw);
+  const cy = Math.cos(camera.yaw);
+  const sy = Math.sin(camera.yaw);
   const cp = Math.cos(camera.pitch);
   const sp = Math.sin(camera.pitch);
   const toCamera = (point) => {
@@ -20,7 +19,7 @@ export function projectNoodleFrame(frame, viewport = {}) {
     const dy = point.y - camera.y;
     const dz = point.z - camera.z;
     const x = dx * cy - dz * sy;
-    const flatZ = dx * sy + dz * cy;
+    const flatZ = -dx * sy - dz * cy;
     return { x, y: dy * cp - flatZ * sp, z: dy * sp + flatZ * cp };
   };
   const project = (point) => ({ x: width / 2 + focal * point.x / point.z, y: height / 2 - focal * point.y / point.z, z: point.z });
@@ -38,9 +37,22 @@ export function projectNoodleFrame(frame, viewport = {}) {
     }
     return [project(a), project(b)];
   };
+  const clipPolygon = (points) => {
+    const output = [];
+    for (let index = 0; index < points.length; index += 1) {
+      const current = points[index], previous = points[(index + points.length - 1) % points.length];
+      const currentInside = current.z >= near, previousInside = previous.z >= near;
+      if (currentInside !== previousInside) {
+        const t = (near - previous.z) / (current.z - previous.z);
+        output.push({ x: previous.x + (current.x - previous.x) * t, y: previous.y + (current.y - previous.y) * t, z: near });
+      }
+      if (currentInside) output.push(current);
+    }
+    return output;
+  };
   const polygon = (points, fill, kind, id) => {
-    const cameraPoints = points.map(toCamera);
-    if (cameraPoints.some((point) => point.z < near)) return null;
+    const cameraPoints = clipPolygon(points.map(toCamera));
+    if (cameraPoints.length < 3) return null;
     const screen = cameraPoints.map(project);
     let area = 0;
     for (let index = 0; index < screen.length; index += 1) {
