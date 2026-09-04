@@ -1,5 +1,5 @@
 import mantleCourse from './generated/product-one-mantle-course.mjs?v=231b619c8dac766a3989640ae4b11a03e4aaeb3830110702171044c0077f57f6';
-import { CONTROLLER_KATA_PROFILE as PRODUCT_ONE_CAPABILITY_PROFILE } from './controller-kata-profile.js?build=38dc52ca54554f86b69a0daeb6de28729168e7b2934ff850b40994499662b759';
+import { CONTROLLER_KATA_PROFILE as PRODUCT_ONE_CAPABILITY_PROFILE } from './controller-kata-profile.js?build=b2eca19f7ffe30707c9b9d98ac2dfe5f5750d06f4c07740d4a7b712f77d8bc25';
 
 const DEFAULT_ARENA_SEED = 'controller-proof';
 const BOX_COUNT = 28;

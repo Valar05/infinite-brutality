@@ -1,11 +1,11 @@
-import { CONTROLLER_KATA_PROFILE as P } from './controller-kata-profile.js?build=38dc52ca54554f86b69a0daeb6de28729168e7b2934ff850b40994499662b759';
-import { generateControllerArena } from './controller-kata.js?build=e54114481acc5212d748b851ed599d1cd677ecffe8323c022b340cb3fd5e3cd2';
+import { CONTROLLER_KATA_PROFILE as P } from './controller-kata-profile.js?build=b2eca19f7ffe30707c9b9d98ac2dfe5f5750d06f4c07740d4a7b712f77d8bc25';
+import { generateControllerArena } from './controller-kata.js?build=1da2817e618a8b2d47e103639777ef8b0d5bed98b6ae6f03a8c4f35e5eb892a1';
 import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?build=7360e97b129a7063b51aa398deddd5f9b5b272ba9c1ac613aa6c606c99d0fdde';
-import { createControllerKataCore } from './controller-kata-core.js?build=75ec2e28b0b9d1dbdf5629e0584b4d8763b8a1f026cf6e4787cc139bcf2a6c7b';
+import { createControllerKataCore } from './controller-kata-core.js?build=c6f4ab285004448f593e26fd3c67055ff1d3ee3174b3e2e39229c3729ae4bfe0';
 import { createNoodleSvgTerminal } from './noodle-svg-terminal.js?build=f6296355e14b9e23f2a0436f6a922e1ecee5360f20561dea6c2fd18c3d38db3b';
 import { createTouchLookOwner } from './touch-look-owner.js?build=aaa2525307225fc34d9298ddccbc2de5b7b2ff9fe945b488f490df58ed5ee751';
 import { createPlaytestOverwatchTelemetry } from './playtest-overwatch-telemetry.js?build=d89295693b529a85c381357d545b1b4c9983debc2343472dc5382f66c21bf228';
-import { CONTROLLER_KATA_BUILD_MANIFEST } from './controller-kata-svg-build-manifest.js?build=3f88cc78e25ceac5bc7fc1767fa4422fc404f786719cf0070250584d97d32ab4';
+import { CONTROLLER_KATA_BUILD_MANIFEST } from './controller-kata-svg-build-manifest.js?build=09a516130fd33fcafe17026ed67f8be1353413a5da0e46bb5790bdfe050970a6';
 
 const BUILD = 'controller-kata-noodle-svg-v1';
 const doc = document;

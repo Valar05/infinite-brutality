@@ -1,10 +1,10 @@
 {
   "build": {
-    "graph_sha256": "98daa1dcc30b8bafb9287be6695224f897d7c5d42d735b18ed2c969faa94fc25",
+    "graph_sha256": "9e064e87a446ec3d73e9bd079897bc320c186715d9e6e5d5e179e5c0f272f4c6",
     "hash_source": "controller-kata.html",
     "id": "controller-kata-build",
-    "marker": "controller-kata-runtime.js?build=ac74ca4d14973890e35bd8da53752ecd436e3d33e02846aaa1e9990626728368",
-    "sha256": "e5292c9fe5187f741a5121bf42ca53e8a6e944fb5b486c02bf3fe336d9800a3d"
+    "marker": "controller-kata-runtime.js?build=dad321978041af7a0415c8a86269c5ee4fc28451dcf29bd61933c93d53e991fa",
+    "sha256": "12e1e3230cdecd5da687d63cc52857254410926da0bfe2a60c42abf028db6f04"
   },
   "challenge": {
     "hash_source": "tools/test_playtest_overwatch_telemetry_contract.mjs",
@@ -25,7 +25,7 @@
     "expected_package": "com.android.chrome",
     "origin": "http://127.0.0.1:8798",
     "return_package": "com.termux",
-    "url_template": "http://127.0.0.1:8798/infinite-brutality/controller-kata.html?slice=controller_kata&seed=controller-proof&ow_session={session}&ow_token={token}&ow_collector={collector_port}&ow_build=e5292c9fe5187f741a5121bf42ca53e8a6e944fb5b486c02bf3fe336d9800a3d&ow_seed=controller-proof&ow_graph=98daa1dcc30b8bafb9287be6695224f897d7c5d42d735b18ed2c969faa94fc25"
+    "url_template": "http://127.0.0.1:8798/infinite-brutality/controller-kata.html?slice=controller_kata&seed=controller-proof&ow_session={session}&ow_token={token}&ow_collector={collector_port}&ow_build=12e1e3230cdecd5da687d63cc52857254410926da0bfe2a60c42abf028db6f04&ow_seed=controller-proof&ow_graph=9e064e87a446ec3d73e9bd079897bc320c186715d9e6e5d5e179e5c0f272f4c6"
   },
   "plan_hash": "dc568497be7f525663e41ffe86f8fcf6b0b8adf697e7d459e1ebbfbce233d1a1",
   "project": {

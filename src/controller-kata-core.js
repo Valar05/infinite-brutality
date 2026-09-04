@@ -1,4 +1,4 @@
-import { CONTROLLER_KATA_PROFILE as P } from './controller-kata-profile.js';
+import { CONTROLLER_KATA_FIXED_DT as FIXED_DT, CONTROLLER_KATA_PROFILE as P } from './controller-kata-profile.js';
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
 const vec = (value = {}) => ({ x: Number(value.x) || 0, y: Number(value.y) || 0, z: Number(value.z) || 0 });
@@ -77,7 +77,7 @@ export function createControllerKataCore(options = {}) {
 
   function advanceMantle() {
     const mantle = state.mantle;
-    mantle.elapsed = Math.min(mantle.duration, mantle.elapsed + P.fixedDt);
+    mantle.elapsed = Math.min(mantle.duration, mantle.elapsed + FIXED_DT);
     const progress = mantle.elapsed / mantle.duration;
     const eased = progress * progress * (3 - 2 * progress);
     const lift = Math.sin(Math.PI * eased) * 0.18;
@@ -110,7 +110,7 @@ export function createControllerKataCore(options = {}) {
       return;
     }
     const smoothRate = state.grounded ? 13.5 : 9.5;
-    const blend = 1 - Math.exp(-smoothRate * P.fixedDt);
+    const blend = 1 - Math.exp(-smoothRate * FIXED_DT);
     input.smoothX += (input.moveX - input.smoothX) * blend;
     input.smoothY += (input.moveY - input.smoothY) * blend;
     const rawLength = Math.hypot(input.smoothX, input.smoothY);
@@ -122,14 +122,14 @@ export function createControllerKataCore(options = {}) {
     if (lengthXZ(desired) > 1) desired = normalizedXZ(desired);
     const magnitude = Math.hypot(moveX, moveY);
     const building = state.grounded && moveY > 0.56 && Math.abs(moveX) <= Math.max(0.001, moveY) && magnitude > 0.55;
-    state.runCharge = building ? Math.min(1, state.runCharge + P.fixedDt)
-      : Math.max(0, state.runCharge - P.fixedDt * (state.grounded ? 2.2 : 0.15));
+    state.runCharge = building ? Math.min(1, state.runCharge + FIXED_DT)
+      : Math.max(0, state.runCharge - FIXED_DT * (state.grounded ? 2.2 : 0.15));
     state.isRunning = state.grounded && state.runCharge >= 1;
     const wishSpeed = state.grounded ? 5.2 + 3.6 * state.runCharge : 6.2;
     if (state.grounded) {
       const speed = lengthXZ(state.velocity);
       if (speed > 0.001) {
-        const next = Math.max(0, speed - speed * 13.5 * P.fixedDt);
+        const next = Math.max(0, speed - speed * 13.5 * FIXED_DT);
         state.velocity.x *= next / speed;
         state.velocity.z *= next / speed;
       }
@@ -139,15 +139,15 @@ export function createControllerKataCore(options = {}) {
       const along = state.velocity.x * direction.x + state.velocity.z * direction.z;
       const add = wishSpeed - along;
       if (add > 0) {
-        const amount = Math.min(28 * wishSpeed * P.fixedDt, add);
+        const amount = Math.min(28 * wishSpeed * FIXED_DT, add);
         state.velocity.x += direction.x * amount;
         state.velocity.z += direction.z * amount;
       }
     } else if (!state.grounded && lengthXZ(direction) > 0.0001) {
       const along = state.velocity.x * direction.x + state.velocity.z * direction.z;
       const add = wishSpeed - along;
-      const amount = add > 0 ? Math.min(14 * Math.max(0.35, magnitude) * P.fixedDt, add)
-        : -Math.min(-add, 19.5 * P.fixedDt);
+      const amount = add > 0 ? Math.min(14 * Math.max(0.35, magnitude) * FIXED_DT, add)
+        : -Math.min(-add, 19.5 * FIXED_DT);
       state.velocity.x += direction.x * amount;
       state.velocity.z += direction.z * amount;
     }
@@ -158,14 +158,14 @@ export function createControllerKataCore(options = {}) {
       emit({ type: 'jump-commit' });
     }
     input.jump = false;
-    state.velocity.y -= P.gravity * P.fixedDt;
+    state.velocity.y -= P.gravity * FIXED_DT;
     const movementStart = vec(state.position);
-    const desiredDelta = { x: state.velocity.x * P.fixedDt, y: state.velocity.y * P.fixedDt, z: state.velocity.z * P.fixedDt };
+    const desiredDelta = { x: state.velocity.x * FIXED_DT, y: state.velocity.y * FIXED_DT, z: state.velocity.z * FIXED_DT };
     const move = world.movePlayer({ eyePosition: state.position, desiredDelta, eyeHeight: P.eyeHeight, radius: P.radius });
     state.position = vec(move.eyePosition);
-    state.velocity.x = move.movement.x / P.fixedDt;
-    state.velocity.z = move.movement.z / P.fixedDt;
-    state.velocity.y = move.grounded && state.velocity.y <= 0 ? 0 : move.movement.y / P.fixedDt;
+    state.velocity.x = move.movement.x / FIXED_DT;
+    state.velocity.z = move.movement.z / FIXED_DT;
+    state.velocity.y = move.grounded && state.velocity.y <= 0 ? 0 : move.movement.y / FIXED_DT;
     const mantle = planMantle(move, movementStart, desiredDelta);
     if (mantle) {
       state.mantle = mantle;
@@ -189,7 +189,7 @@ export function createControllerKataCore(options = {}) {
     update(dt) {
       accumulator = Math.min(0.1, accumulator + Math.max(0, Number(dt) || 0));
       let steps = 0;
-      while (accumulator + 1e-12 >= P.fixedDt) { step(); accumulator -= P.fixedDt; steps += 1; }
+      while (accumulator + 1e-12 >= FIXED_DT) { step(); accumulator -= FIXED_DT; steps += 1; }
       return { steps, state: copyState(state), input: { moveX: input.smoothX, moveY: input.smoothY } };
     },
     reset,
