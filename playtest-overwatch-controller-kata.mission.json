@@ -1,0 +1,64 @@
+{
+  "build": {
+    "graph_sha256": "0cfbc85fd7df223dc104be1f0b9bfd95e6ab5504265fb305954a2ec3bca757ff",
+    "hash_source": "controller-kata.html",
+    "id": "controller-kata-build",
+    "marker": "main.js?v=0cfabf3204b4ff25c2d672212fb92132c6a60047bb9faa7df5df2295242fbdaf",
+    "sha256": null
+  },
+  "challenge": {
+    "hash_source": "tools/test_playtest_overwatch_telemetry_contract.mjs",
+    "id": "controller-kata-overwatch",
+    "sha256": null
+  },
+  "compatibility": {
+    "hash_source": "src/playtest-overwatch-telemetry.js",
+    "id": "overwatch-browser-adapter",
+    "sha256": null
+  },
+  "course": {
+    "hash_source": "src/generated/product-one-mantle-course.mjs",
+    "id": "boxcraft-mantle-course",
+    "sha256": null
+  },
+  "launch": {
+    "expected_package": "com.android.chrome",
+    "origin": "http://127.0.0.1:8798",
+    "return_package": "com.termux",
+    "url_template": "http://127.0.0.1:8798/infinite-brutality/controller-kata.html?slice=controller_kata&seed=controller-proof&ow_session={session}&ow_token={token}&ow_collector={collector_port}&ow_build=467b35b91de322d371ebc09c921bdb90e1574f17b26b346246a46268a9228e0d&ow_seed=controller-proof&ow_graph=0cfbc85fd7df223dc104be1f0b9bfd95e6ab5504265fb305954a2ec3bca757ff"
+  },
+  "plan_hash": "dc568497be7f525663e41ffe86f8fcf6b0b8adf697e7d459e1ebbfbce233d1a1",
+  "project": {
+    "id": "infinite-brutality",
+    "root": "/storage/emulated/0/Documents/GodotProjects/infinite-brutality"
+  },
+  "ruleset": {
+    "hash_source": "src/product-one-controller.js",
+    "id": "accessible-contact-mantle",
+    "sha256": null
+  },
+  "schema": "playtest-overwatch-mission-v1",
+  "task": {
+    "derivation": "One clean first-play route over the compact deterministic course; initial pressure par is 25 seconds.",
+    "milestones": [
+      "course-ready",
+      "first-mantle",
+      "cyan-exit"
+    ],
+    "text": "Move through the random-box controller grid and reach the cyan exit."
+  },
+  "telemetry": {
+    "collector_host": "127.0.0.1",
+    "collector_port": 49152,
+    "output": "xdg-local-state",
+    "seed": "controller-proof",
+    "touchscreen_name": "synaptics_tcm_touch"
+  },
+  "timing": {
+    "hard_stop_seconds": 25,
+    "par_seconds": 25,
+    "permitted_attempts": 1,
+    "prepare_ttl_seconds": 120,
+    "recovery_seconds": 0
+  }
+}

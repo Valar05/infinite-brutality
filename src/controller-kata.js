@@ -1,5 +1,5 @@
-import mantleCourse from './generated/product-one-mantle-course.mjs?v=0.8.222';
-import { PRODUCT_ONE_CAPABILITY_PROFILE } from './product-one-controller.js?v=0.8.222';
+import mantleCourse from './generated/product-one-mantle-course.mjs?v=231b619c8dac766a3989640ae4b11a03e4aaeb3830110702171044c0077f57f6';
+import { PRODUCT_ONE_CAPABILITY_PROFILE } from './product-one-controller.js?v=783755caa3ce10b1c62dccf7d7a020d6f03608573854f52e3e432ee5d86c00be';
 
 const DEFAULT_ARENA_SEED = 'controller-proof';
 const BOX_COUNT = 28;
@@ -8,8 +8,11 @@ const GRID_MAX = 40;
 const GRID_STEP = 4;
 const BOX_MIN_WIDTH = 1.35;
 const BOX_MAX_WIDTH = 3.2;
-const BOX_MIN_HEIGHT = 0.8;
-const BOX_MAX_HEIGHT = 5;
+const BOX_HEIGHT_TIERS = Object.freeze([
+  Object.freeze({ id: 'step', minimum: 0.18, maximum: 0.6 }),
+  Object.freeze({ id: 'reachable-mantle', minimum: 0.68, maximum: 1.62 }),
+  Object.freeze({ id: 'too-high', minimum: 1.78, maximum: 5 }),
+]);
 const BOX_MIN_DEPTH = 1.35;
 const BOX_MAX_DEPTH = 3.2;
 const SAFE_ROUTE_CLEARANCE = 6;
@@ -155,7 +158,8 @@ export function generateControllerArena(options = {}) {
     const key = `${x},${z}`;
     if (occupied.has(key)) continue;
     const width = randomDimension(BOX_MIN_WIDTH, BOX_MAX_WIDTH);
-    const height = randomDimension(BOX_MIN_HEIGHT, BOX_MAX_HEIGHT);
+    const tier = BOX_HEIGHT_TIERS[cubes.length % BOX_HEIGHT_TIERS.length];
+    const height = randomDimension(tier.minimum, tier.maximum);
     const depth = randomDimension(BOX_MIN_DEPTH, BOX_MAX_DEPTH);
     const center = [x, height * 0.5, z];
     const size = [width, height, depth];
@@ -164,7 +168,7 @@ export function generateControllerArena(options = {}) {
     if (overlapsBounds(center, size, TRAVERSAL_LANE_BOUNDS)) continue;
     if (reservedCourseBounds.some((bounds) => overlapsBounds(center, size, bounds))) continue;
     occupied.add(key);
-    cubes.push({ id: `cube-${cubes.length}`, cell: [x, z], center, size, role: 'seeded-random', walkableTop: true });
+    cubes.push({ id: `cube-${cubes.length}`, cell: [x, z], center, size, role: `seeded-random-${tier.id}`, tier: tier.id, walkableTop: true });
   }
 
   if (cubes.length !== BOX_COUNT) throw new Error(`controller arena generation exhausted after ${attempts} attempts`);
@@ -172,7 +176,8 @@ export function generateControllerArena(options = {}) {
   const courseFixtures = mantleCourse.fixtures.map(copyFixture);
   const fixtures = [...LEGACY_AUTOSTEP_FIXTURES.map(copyFixture), ...courseFixtures];
   const courseScenarios = Object.fromEntries(mantleCourse.scenarios.map((scenario) => [scenario.fixtureId, copyCourseScenario(scenario)]));
-  const geometryHash = hashArenaSeed(JSON.stringify(fixtures.map(({ id, role, center, size }) => ({ id, role, center, size })))).toString(16).padStart(8, '0');
+  const geometryHash = hashArenaSeed(JSON.stringify([...fixtures, ...cubes].map(({ id, role, tier, center, size }) => ({ id, role, tier: tier || '', center, size })))).toString(16).padStart(8, '0');
+  const tierCounts = Object.fromEntries(BOX_HEIGHT_TIERS.map((tier) => [tier.id, cubes.filter((cube) => cube.tier === tier.id).length]));
   return {
     seedText,
     numericSeed,
@@ -197,5 +202,6 @@ export function generateControllerArena(options = {}) {
       scenarios: { ...copyLegacyScenarios(), ...courseScenarios },
     },
     cubes,
+    tierCounts,
   };
 }

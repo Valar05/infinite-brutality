@@ -34,11 +34,12 @@ function vectorRecord(value) {
 
 export function createPhysicsWorld(options = {}) {
   const gravity = options.gravity || { x: 0, y: -14.4, z: 0 };
+  const autostepHeight = Number(options.autostepHeight ?? 0.62);
   const world = new World(gravity);
   world.timestep = 1 / 60;
   const controller = world.createCharacterController(options.characterOffset ?? 0.035);
   controller.setSlideEnabled(true);
-  controller.enableAutostep(options.autostepHeight ?? 0.62, options.autostepMinWidth ?? 0.36, false);
+  controller.enableAutostep(autostepHeight, options.autostepMinWidth ?? 0.36, false);
   controller.enableSnapToGround(options.snapToGround ?? 0.42);
   controller.setMaxSlopeClimbAngle(options.maxSlopeClimbAngle ?? Math.PI * 0.34);
   controller.setMinSlopeSlideAngle(options.minSlopeSlideAngle ?? Math.PI * 0.44);
@@ -193,6 +194,61 @@ export function createPhysicsWorld(options = {}) {
       && Math.abs(localZ) <= record.size[2] * 0.5 - radius;
   };
 
+  const findWalkableCuboidContact = ({ eyePosition, desiredDelta, eyeHeight = 1.68, radius = 0.38 }) => {
+    const dx = Number(desiredDelta?.x) || 0;
+    const dz = Number(desiredDelta?.z) || 0;
+    if (Math.hypot(dx, dz) < 1e-5) return null;
+    const feetY = (Number(eyePosition?.y) || 0) - eyeHeight;
+    let best = null;
+    for (const record of colliderRecords) {
+      if (record.type !== 'cuboid' || record.kind !== 'walkable' || !record.source || !record.size || !record.position) continue;
+      const topY = record.position[1] + record.size[1] * 0.5;
+      const bottomY = record.position[1] - record.size[1] * 0.5;
+      if (topY <= feetY + autostepHeight + 1e-6 || topY > (Number(eyePosition?.y) || 0) + 1e-6 || bottomY > (Number(eyePosition?.y) || 0)) continue;
+      const yaw = -(record.yaw || 0);
+      const cosine = Math.cos(yaw);
+      const sine = Math.sin(yaw);
+      const startX = ((Number(eyePosition?.x) || 0) - record.position[0]) * cosine - ((Number(eyePosition?.z) || 0) - record.position[2]) * sine;
+      const startZ = ((Number(eyePosition?.x) || 0) - record.position[0]) * sine + ((Number(eyePosition?.z) || 0) - record.position[2]) * cosine;
+      const localDx = dx * cosine - dz * sine;
+      const localDz = dx * sine + dz * cosine;
+      const halfX = record.size[0] * 0.5 + radius;
+      const halfZ = record.size[2] * 0.5 + radius;
+      let enter = Number.NEGATIVE_INFINITY;
+      let exit = 1;
+      let localNormalX = 0;
+      let localNormalZ = 0;
+      for (const axis of [{ start: startX, delta: localDx, half: halfX, x: 1, z: 0 }, { start: startZ, delta: localDz, half: halfZ, x: 0, z: 1 }]) {
+        if (Math.abs(axis.delta) < 1e-9) {
+          if (Math.abs(axis.start) > axis.half + 1e-6) { enter = 2; break; }
+          continue;
+        }
+        const t1 = (-axis.half - axis.start) / axis.delta;
+        const t2 = (axis.half - axis.start) / axis.delta;
+        const near = Math.min(t1, t2);
+        const far = Math.max(t1, t2);
+        if (near > enter) {
+          enter = near;
+          const sign = t1 < t2 ? -1 : 1;
+          localNormalX = axis.x * sign;
+          localNormalZ = axis.z * sign;
+        }
+        exit = Math.min(exit, far);
+      }
+      if (enter < -1e-6 || enter > exit + 1e-6 || enter > 1 + 1e-6) continue;
+      const worldYaw = record.yaw || 0;
+      const normal = { x: localNormalX * Math.cos(worldYaw) - localNormalZ * Math.sin(worldYaw), y: 0,
+        z: localNormalX * Math.sin(worldYaw) + localNormalZ * Math.cos(worldYaw) };
+      const hitX = (Number(eyePosition?.x) || 0) + dx * Math.max(0, enter);
+      const hitZ = (Number(eyePosition?.z) || 0) + dz * Math.max(0, enter);
+      const contact = { source: record.source, kind: record.kind, normal,
+        point: { x: hitX - normal.x * radius, y: Math.min(topY, Number(eyePosition?.y) || 0), z: hitZ - normal.z * radius },
+        toi: Math.max(0, enter), isWall: true, isGround: false, recovered: true };
+      if (!best || contact.toi < best.toi - 1e-9 || (Math.abs(contact.toi - best.toi) <= 1e-9 && contact.source < best.source)) best = contact;
+    }
+    return best;
+  };
+
   const getWalkableCuboid = (source) => {
     const exactSource = String(source || '');
     if (!exactSource) return null;
@@ -271,6 +327,7 @@ export function createPhysicsWorld(options = {}) {
     addCuboid,
     movePlayer,
     getWalkableCuboid,
+    findWalkableCuboidContact,
     findCuboidTopSupport,
     isCapsuleClearAt,
     snapshot,

@@ -1,5 +1,41 @@
 {
   "commands": {
+    "playtest-derived-regressions": {
+      "adapter": {
+        "kind": "final-json"
+      },
+      "argv": [
+        "node",
+        "--no-warnings",
+        "tools/test_playtest_derived_regressions.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "parameters": {},
+      "robustness_domains": {},
+      "seeds": [],
+      "timeout_seconds": 30
+    },
+    "playtest-overwatch-telemetry": {
+      "adapter": {
+        "kind": "exit-code"
+      },
+      "argv": [
+        "node",
+        "--no-warnings",
+        "tools/test_playtest_overwatch_telemetry_contract.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "parameters": {},
+      "robustness_domains": {},
+      "seeds": [],
+      "timeout_seconds": 30
+    },
     "product-one-controller": {
       "adapter": {
         "kind": "final-json"

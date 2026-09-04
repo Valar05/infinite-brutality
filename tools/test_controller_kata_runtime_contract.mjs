@@ -33,6 +33,7 @@ for (const id of [
   'game',
   'status',
   'hint',
+  'endTestButton',
   'errorCopyButton',
   'leftStick',
   'actionPad',
@@ -51,7 +52,7 @@ for (const id of [
   assert.match(html, new RegExp(`id=["']${id}["']`), `controller shell must preserve main.js DOM id: ${id}`);
 }
 
-assert.match(html, /src=["']\.\/src\/main\.js\?v=0\.8\.222["']/, 'controller page must load the authoritative runtime');
+assert.match(html, /src=["']\.\/src\/main\.js\?v=0cfabf3204b4ff25c2d672212fb92132c6a60047bb9faa7df5df2295242fbdaf["']/, 'controller page must load the authoritative runtime');
 assert.match(html, /rel=["']icon["'] href=["']\.\/assets\/textures\/ib-vector-hazard-20260609\.svg["']/, 'controller page must use a hosted repository favicon');
 assert.doesNotMatch(html, /controller-kata-runtime\.js/, 'duplicated standalone movement runtime must not be active');
 assert.doesNotMatch(html, /controller-kata\.css/, 'controller page must reuse the authoritative shell stylesheet');
@@ -66,12 +67,14 @@ assert.match(main, /CONTROLLER_KATA_BASE_SEED = URL_PARAMS\.get\('seed'\) \|\| '
 assert.match(arena, /DEFAULT_ARENA_SEED = 'controller-proof'/);
 assert.doesNotMatch(`${html}\n${main}\n${arena}`, new RegExp(forbiddenLegacySeed, 'i'));
 
-assert.match(main, /createPhysicsWorld, ensurePhysicsReady \} from '\.\/physics-world\.js\?v=0\.8\.222'/);
+assert.match(main, /createPhysicsWorld, ensurePhysicsReady \} from '\.\/physics-world\.js\?v=[0-9a-f]{64}'/);
 assert.match(main, /generateControllerArena/);
 assert.doesNotMatch(arena, /createDirectMantlePlan|advanceDirectMantle/, 'arena module must not reinvent mantle mechanics');
 assert.match(climb, /export function createBoundedContactMantlePlan/);
 assert.match(climb, /export function advanceConstrainedMantle/);
 assert.match(main, /createProductOneController, PRODUCT_ONE_CAPABILITY_PROFILE, PRODUCT_ONE_PHYSICS_OPTIONS/);
+assert.match(main, /playtestOverwatch\.tapeFrame/);
+assert.match(main, /playtestOverwatch\.end/);
 assert.match(main, /productOneController\.input\.pressJump/);
 assert.match(main, /productOneController\.input\.setMove/);
 assert.match(main, /productOneController\.input\.update\(dt\)/);
@@ -132,10 +135,11 @@ assert.match(productOne, /physicsWorld\.findCuboidTopSupport/);
 assert.match(productOne, /physicsWorld\.isCapsuleClearAt/);
 
 assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*updateAttack\(dt\);/s);
-assert.match(main, /updateArms\(dt\);/);
-assert.match(main, /renderer\.clearDepth\(\);\s*renderer\.render\(armsScene, armsCamera\);/s);
+assert.match(main, /if \(!useControllerKataSlice\(\)\) updateArms\(dt\);/, 'controller grid must not update arms');
+assert.match(main, /if \(!useControllerKataSlice\(\)\) \{\s*renderer\.clearDepth\(\);\s*renderer\.render\(armsScene, armsCamera\);\s*\}/s, 'controller grid must not render arms');
 assert.match(main, /if \(useControllerKataSlice\(\)\) \{\s*attackButton\.hidden = true;/s);
-assert.match(main, /loadArms\(\);\s*if \(!useControllerKataSlice\(\)\) \{\s*loadOrcBerserkerEnemy\(\);/s);
+assert.match(main, /if \(!useControllerKataSlice\(\)\) loadArms\(\);/, 'controller grid must not load arm assets');
+assert.match(main, /useControllerKataSlice\(\) \? new THREE\.Group\(\) : buildFallbackArms\(\)/, 'controller grid must not construct fallback hands');
 assert.doesNotMatch(main, /input\.lookPointer = event\.pointerId;\s*input\.lastLookX[\s\S]{0,120}if \(button === attackButton\)/, 'action buttons must not steal look pointer ownership');
 assert.match(arena, /PLAYABLE_MANTLE_SCENARIO[\s\S]*scenario-high-mantle/);
 
