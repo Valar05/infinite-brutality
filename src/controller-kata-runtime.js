@@ -271,4 +271,3 @@ async function boot() {
   win.requestAnimationFrame(render);
 }
 boot().catch((error) => reportCrash('boot', error));
- 
