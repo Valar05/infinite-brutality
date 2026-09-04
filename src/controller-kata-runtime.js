@@ -1,72 +1,274 @@
-import * as THREE from 'three';
-import { generateControllerArena } from './controller-kata.js';
-import { applyWorldGridOverlay } from './controller-grid-material.js';
-import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js';
+import { CONTROLLER_KATA_PROFILE as P } from './controller-kata-profile.js?build=38dc52ca54554f86b69a0daeb6de28729168e7b2934ff850b40994499662b759';
+import { generateControllerArena } from './controller-kata.js?build=e54114481acc5212d748b851ed599d1cd677ecffe8323c022b340cb3fd5e3cd2';
+import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?build=7360e97b129a7063b51aa398deddd5f9b5b272ba9c1ac613aa6c606c99d0fdde';
+import { createControllerKataCore } from './controller-kata-core.js?build=75ec2e28b0b9d1dbdf5629e0584b4d8763b8a1f026cf6e4787cc139bcf2a6c7b';
+import { createNoodleSvgTerminal } from './noodle-svg-terminal.js?build=f6296355e14b9e23f2a0436f6a922e1ecee5360f20561dea6c2fd18c3d38db3b';
+import { createTouchLookOwner } from './touch-look-owner.js?build=aaa2525307225fc34d9298ddccbc2de5b7b2ff9fe945b488f490df58ed5ee751';
+import { createPlaytestOverwatchTelemetry } from './playtest-overwatch-telemetry.js?build=d89295693b529a85c381357d545b1b4c9983debc2343472dc5382f66c21bf228';
+import { CONTROLLER_KATA_BUILD_MANIFEST } from './controller-kata-svg-build-manifest.js?build=3f88cc78e25ceac5bc7fc1767fa4422fc404f786719cf0070250584d97d32ab4';
 
-const C={eye:1.68,radius:.38,jumpCharge:.18,jump:7.1,jumpExtra:.95,runJump:4.45,runJumpY:.5,jumpHold:11.75,groundAccel:28,friction:13.5,walk:5.2,run:8.8,air:6.2,airMax:8.8,airTurn:14,airBrake:19.5,airDrag:3.4,runBuild:1,stick:1.28,smoothGround:13.5,smoothAir:9.5,gravity:14.4,dt:1/60};
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const forward=y=>new THREE.Vector3(-Math.sin(y),0,-Math.cos(y));
-const right=y=>new THREE.Vector3(Math.cos(y),0,-Math.sin(y));
+const BUILD = 'controller-kata-noodle-svg-v1';
+const doc = document;
+const win = window;
+const svg = doc.getElementById('game');
+const status = doc.getElementById('status');
+const hint = doc.getElementById('hint');
+const stick = doc.getElementById('leftStick');
+const knob = stick.querySelector('div');
+const jumpButton = doc.getElementById('jumpButton');
+const endButton = doc.getElementById('endTestButton');
+const fullscreenButton = doc.getElementById('fsButton');
+const params = new URLSearchParams(win.location.search);
+const seed = params.get('seed') || 'controller-proof';
+const playtest = createPlaytestOverwatchTelemetry({
+  search: win.location.search,
+  origin: win.location.origin,
+  runtimeBuildGraph: CONTROLLER_KATA_BUILD_MANIFEST,
+});
+let world = null;
+let core = null;
+let terminal = null;
+let arena = null;
+let cuboids = [];
+let runIndex = 0;
+let startedAt = performance.now();
+let lookOwner = null;
+let stickPointer = null;
+let previous = performance.now();
+let active = true;
 
-export async function createControllerKataRuntime(o={}){
- const d=o.document||document,w=o.window||window,canvas=o.canvas||d.getElementById('kata');
- const status=d.getElementById('status'),hint=d.getElementById('hint'),stick=d.getElementById('stick'),knob=stick.querySelector('i'),jumpButton=d.getElementById('jump'),gyroButton=d.getElementById('gyro');
- const baseSeed=new URLSearchParams(w.location.search).get('seed')||'vlad';
- await ensurePhysicsReady();
- const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'}); renderer.setPixelRatio(Math.min(1,w.devicePixelRatio||1)); renderer.outputColorSpace=THREE.SRGBColorSpace;
- const scene=new THREE.Scene(); scene.background=new THREE.Color(0x071014); scene.fog=new THREE.Fog(0x071014,42,112);
- const camera=new THREE.PerspectiveCamera(74,1,.05,130); camera.rotation.order='YXZ';
- scene.add(new THREE.HemisphereLight(0xc8f8ff,0x122126,1.8)); const sun=new THREE.DirectionalLight(0xe7fdff,1.8); sun.position.set(-12,24,-8); scene.add(sun);
- let physics=createPhysicsWorld(),group=null,arena,runIndex=0,startedAt=performance.now(),best=Number(w.localStorage.getItem('controller-kata-best')||0);
- const player={position:new THREE.Vector3(),velocity:new THREE.Vector3(),yaw:Math.PI,pitch:0,grounded:true,runCharge:0,isRunning:false,lastRunIntent:false};
- const input={moveX:0,moveY:0,smoothMoveX:0,smoothMoveY:0,stickPointer:null,lookPointer:null,lastLookX:0,lastLookY:0,gyro:false,gyroYaw:0,gyroPitch:0,gyroBaseGamma:null,gyroBaseBeta:null,jumpPointer:null,jumpHoldStart:0,jumpCharging:false};
-
- function buildArena(){
-  if(group){scene.remove(group);group.traverse(x=>{x.geometry?.dispose();if(x.material){(Array.isArray(x.material)?x.material:[x.material]).forEach(m=>m.dispose())}});physics.dispose();physics=createPhysicsWorld()}
-  group=new THREE.Group();scene.add(group);arena=generateControllerArena({seed:runIndex?`${baseSeed}:${runIndex}`:baseSeed});
-  const fm=applyWorldGridOverlay(new THREE.MeshStandardMaterial({color:0x10262d,roughness:.92}),{gridColor:0x9cefff,gridScale:1,gridThickness:.58,gridStrength:.3,edgeStrength:.12});
-  const floor=new THREE.Mesh(new THREE.BoxGeometry(...arena.floor.size),fm);floor.position.fromArray(arena.floor.center);group.add(floor);physics.addCuboid({size:arena.floor.size,position:arena.floor.center,source:'floor',kind:'floor'});
-  const boxes=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x607078,roughness:.88}),arena.cubes.length),m=new THREE.Matrix4();
-  arena.cubes.forEach((cube,i)=>{m.compose(new THREE.Vector3().fromArray(cube.center),new THREE.Quaternion(),new THREE.Vector3().fromArray(cube.size));boxes.setMatrixAt(i,m);physics.addCuboid({size:cube.size,position:cube.center,source:cube.id,kind:'cube'})});boxes.instanceMatrix.needsUpdate=true;group.add(boxes);
-  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,6,8),new THREE.MeshBasicMaterial({color:0x49efff}));beam.position.set(arena.exit[0],3,arena.exit[2]);group.add(beam);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(arena.exitRadius-.12,arena.exitRadius,32),new THREE.MeshBasicMaterial({color:0x49efff,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.set(arena.exit[0],.012,arena.exit[2]);group.add(ring);
-  player.position.fromArray(arena.spawn);player.velocity.set(0,0,0);player.yaw=Math.PI;player.pitch=0;player.grounded=true;player.runCharge=0;player.isRunning=false;input.smoothMoveX=0;input.smoothMoveY=0;startedAt=performance.now();
- }
- function commitJump(force=0,charge=0,keep=false){
-  if(!player.grounded)return;const f=forward(player.yaw).normalize(),r=right(player.yaw).normalize(),blend=new THREE.Vector3().addScaledVector(f,input.moveY).addScaledVector(r,input.moveX);if(blend.lengthSq()>1)blend.normalize();
-  const horizontal=new THREE.Vector3(player.velocity.x,0,player.velocity.z),speed=horizontal.length(),dir=speed>.05?horizontal.multiplyScalar(1/speed):(blend.lengthSq()>.0001?blend.normalize():f);
-  const ratio=clamp(charge/C.jumpCharge,0,1),chargeBoost=(1-Math.pow(1-ratio,4))*C.jumpExtra;
-  player.velocity.y=Math.max(player.velocity.y,player.isRunning?C.jump+C.runJumpY+force+Math.min(.4,speed*.07):C.jump+chargeBoost+force);
-  if(player.isRunning){const boost=C.runJump+Math.min(1.6,speed*.28)+force;player.velocity.x+=dir.x*boost;player.velocity.z+=dir.z*boost}player.grounded=false;
-  if(!keep){input.jumpCharging=false;input.jumpHoldStart=0;input.jumpPointer=null}
- }
- function jump(id=null){if(!player.grounded)return;if(player.isRunning){commitJump(.75);return}input.jumpPointer=id;input.jumpCharging=true;input.jumpHoldStart=performance.now();commitJump(0,0,true)}
- function step(dt){
-  const now=performance.now(),rate=player.grounded?C.smoothGround:C.smoothAir,blend=1-Math.exp(-rate*dt);input.smoothMoveX+=(input.moveX-input.smoothMoveX)*blend;input.smoothMoveY+=(input.moveY-input.smoothMoveY)*blend;
-  if(Math.abs(input.moveX)<.001&&Math.abs(input.smoothMoveX)<.015)input.smoothMoveX=0;if(Math.abs(input.moveY)<.001&&Math.abs(input.smoothMoveY)<.015)input.smoothMoveY=0;
-  const x=input.smoothMoveX,y=input.smoothMoveY,desired=new THREE.Vector3().addScaledVector(forward(player.yaw),y).addScaledVector(right(player.yaw),x);if(desired.lengthSq()>1)desired.normalize();const magnitude=Math.hypot(x,y),building=player.grounded&&y>.56&&Math.abs(x)<=Math.max(.001,y)&&magnitude>.55;
-  if(building)player.runCharge=Math.min(C.runBuild,player.runCharge+dt);else if(player.grounded)player.runCharge=Math.max(0,player.runCharge-dt*2.2);else player.runCharge=Math.max(0,player.runCharge-dt*.15);player.isRunning=player.grounded&&player.runCharge>=C.runBuild;if(player.isRunning)player.lastRunIntent=true;else if(player.grounded&&magnitude<.18)player.lastRunIntent=false;
-  const wishSpeed=player.grounded?C.walk+(C.run-C.walk)*clamp(player.runCharge/C.runBuild,0,1):C.air;
-  if(player.grounded){const speed=Math.hypot(player.velocity.x,player.velocity.z);if(speed>.001){const next=Math.max(0,speed-speed*C.friction*dt);player.velocity.x*=next/speed;player.velocity.z*=next/speed}}
-  const dir=desired.lengthSq()>.0001?desired.normalize():desired;
-  if(!player.grounded){const h=new THREE.Vector3(player.velocity.x,0,player.velocity.z),speed=h.length();if(dir.lengthSq()>.0001){const add=wishSpeed-h.dot(dir);if(add>0)h.addScaledVector(dir,Math.min(C.airTurn*Math.max(.35,magnitude)*dt,add));else if(add<0)h.addScaledVector(dir,Math.min(-add,C.airBrake*dt))}if(speed>C.airMax){const over=speed-C.airMax,drag=Math.min(over,C.airDrag*dt+over*.12*dt);h.multiplyScalar((speed-drag)/speed)}player.velocity.x=h.x;player.velocity.z=h.z}
-  else if(dir.lengthSq()>.0001){const add=wishSpeed-player.velocity.dot(dir);if(add>0)player.velocity.addScaledVector(dir,Math.min(C.groundAccel*wishSpeed*dt,add))}
-  if(!player.grounded&&input.jumpCharging&&input.jumpHoldStart&&player.velocity.y>0){const held=clamp((now-input.jumpHoldStart)/1000,0,C.jumpCharge);player.velocity.y+=C.jumpHold*(1-held/C.jumpCharge)*dt}
-  player.velocity.y-=C.gravity*dt;const move=physics.movePlayer({eyePosition:player.position,desiredDelta:{x:player.velocity.x*dt,y:player.velocity.y*dt,z:player.velocity.z*dt},eyeHeight:C.eye,radius:C.radius});player.position.set(move.eyePosition.x,move.eyePosition.y,move.eyePosition.z);player.velocity.x=move.movement.x/dt;player.velocity.z=move.movement.z/dt;player.velocity.y=move.grounded&&player.velocity.y<=0?0:move.movement.y/dt;const wasGrounded=player.grounded;player.grounded=move.grounded;
-  if(!wasGrounded&&player.grounded&&player.isRunning&&input.jumpCharging&&input.jumpHoldStart&&player.lastRunIntent&&now-input.jumpHoldStart>35)commitJump(.15);player.position.x=clamp(player.position.x,-48,48);player.position.z=clamp(player.position.z,-48,48);
-  if(player.position.y<-10){player.position.fromArray(arena.spawn);player.velocity.set(0,0,0)}
-  if(player.grounded&&Math.hypot(player.position.x-arena.exit[0],player.position.z-arena.exit[2])<arena.exitRadius){const elapsed=(performance.now()-startedAt)/1000;if(!best||elapsed<best){best=elapsed;w.localStorage.setItem('controller-kata-best',String(best))}runIndex++;buildArena()}
-  camera.position.copy(player.position);camera.rotation.y=player.yaw+input.gyroYaw;camera.rotation.x=player.pitch+input.gyroPitch;
- }
- function moveStick(e){const rect=stick.getBoundingClientRect(),dx=e.clientX-(rect.left+rect.width/2),dy=e.clientY-(rect.top+rect.height/2),max=rect.width*.36,len=Math.min(max,Math.hypot(dx,dy)),a=Math.atan2(dy,dx),x=Math.cos(a)*len,y=Math.sin(a)*len;knob.style.transform=`translate(${x}px,${y}px)`;input.moveX=Math.sign(x)*Math.pow(Math.abs(x/max),C.stick);input.moveY=Math.sign(-y)*Math.pow(Math.abs(y/max),C.stick)}
- function endPointer(e){if(e.pointerId===input.stickPointer){input.stickPointer=null;input.moveX=0;input.moveY=0;knob.style.transform='translate(0,0)';stick.classList.remove('active')}if(e.pointerId===input.lookPointer)input.lookPointer=null;if(e.pointerId===input.jumpPointer){input.jumpPointer=null;input.jumpCharging=false;input.jumpHoldStart=0}}
- canvas.addEventListener('pointerdown',e=>{hint.hidden=true;if(e.clientX<w.innerWidth*.44){input.stickPointer=e.pointerId;stick.style.left=`${clamp(e.clientX-63,6,w.innerWidth*.44-126)}px`;stick.style.top=`${clamp(e.clientY-63,6,w.innerHeight-132)}px`;stick.classList.add('active');moveStick(e)}else{input.lookPointer=e.pointerId;input.lastLookX=e.clientX;input.lastLookY=e.clientY}e.preventDefault()});
- w.addEventListener('pointermove',e=>{if(e.pointerId===input.stickPointer)moveStick(e);if(e.pointerId===input.lookPointer){player.yaw-=(e.clientX-input.lastLookX)*.0065;player.pitch=clamp(player.pitch-(e.clientY-input.lastLookY)*.0053,-1.15,1.1);input.lastLookX=e.clientX;input.lastLookY=e.clientY}if(e.pointerId===input.stickPointer||e.pointerId===input.lookPointer)e.preventDefault()},{passive:false});w.addEventListener('pointerup',endPointer);w.addEventListener('pointercancel',endPointer);jumpButton.addEventListener('pointerdown',e=>{jump(e.pointerId);e.preventDefault()});
- const keys={KeyW:['moveY',1],KeyS:['moveY',-1],KeyA:['moveX',-1],KeyD:['moveX',1]};w.addEventListener('keydown',e=>{if(keys[e.code])input[keys[e.code][0]]=keys[e.code][1];if(e.code==='Space'&&!e.repeat){jump();e.preventDefault()}});w.addEventListener('keyup',e=>{const k=keys[e.code];if(k&&input[k[0]]===k[1])input[k[0]]=0;if(e.code==='Space'){input.jumpCharging=false;input.jumpHoldStart=0}});
- gyroButton?.addEventListener('click',async()=>{if(!input.gyro&&typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'&&await DeviceOrientationEvent.requestPermission()!=='granted')return;input.gyro=!input.gyro;input.gyroBaseGamma=null;input.gyroBaseBeta=null;input.gyroYaw=0;input.gyroPitch=0;gyroButton.classList.toggle('active',input.gyro)});
- w.addEventListener('deviceorientation',e=>{if(!input.gyro)return;const g=Number(e.gamma||0),b=Number(e.beta||0);if(input.gyroBaseGamma===null){input.gyroBaseGamma=g;input.gyroBaseBeta=b}input.gyroYaw=clamp(THREE.MathUtils.degToRad(g-input.gyroBaseGamma)*.72,-.42,.42);input.gyroPitch=clamp(THREE.MathUtils.degToRad(b-input.gyroBaseBeta)*.44,-.28,.28)});
- function resize(){const x=Math.max(1,w.innerWidth),y=Math.max(1,w.innerHeight);renderer.setSize(x,y,false);camera.aspect=x/y;camera.updateProjectionMatrix()}w.addEventListener('resize',resize);resize();buildArena();
- let previous=performance.now(),accumulator=0;function frame(now){accumulator=Math.min(.1,accumulator+(now-previous)/1000);previous=now;while(accumulator>=C.dt){step(C.dt);accumulator-=C.dt}const elapsed=(now-startedAt)/1000,speed=Math.hypot(player.velocity.x,player.velocity.z),motion=player.grounded?(player.isRunning?'RUN':'GROUND'):'AIR';status.value=`K03  ${motion}  ${speed.toFixed(1)}m/s  60Hz  seed ${arena.seedText}  cubes ${arena.cubes.length}  ${elapsed.toFixed(1)}s${best?`  best ${best.toFixed(1)}s`:''}`;renderer.render(scene,camera);w.requestAnimationFrame(frame)}w.requestAnimationFrame(frame);
- return{renderer,scene,camera,get physics(){return physics},player,input};
+function reportCrash(phase, error) {
+  playtest.crash(phase, { message: String(error && (error.message || error) || 'unknown').slice(0, 1024) });
+  status.textContent = 'boot error';
+  hint.textContent = String(error && (error.message || error) || 'unknown');
 }
-createControllerKataRuntime().catch(error=>{console.error(error);const el=document.getElementById('status');if(el)el.value=`boot error: ${error.message||error}`});
+win.addEventListener('error', (event) => reportCrash('window-error', event.error || event.message));
+win.addEventListener('unhandledrejection', (event) => reportCrash('unhandled-rejection', event.reason));
+
+function frameRecord(value) {
+  return {
+    position: [value.position.x, value.position.y, value.position.z],
+    velocity: [value.velocity.x, value.velocity.y, value.velocity.z],
+    yaw: value.yaw,
+    mode: value.mode,
+    grounded: Boolean(value.grounded),
+  };
+}
+
+function beginPlaytest(source) {
+  if (playtest.started || !core) return;
+  if (playtest.start({ slice: 'controller_kata', build: BUILD, trigger: source })) {
+    playtest.milestone('course-ready', { seed: arena.seedText });
+    playtest.tapeStart({ seed: arena.seedText, courseHash: arena.boxcraftCourse.courseHash, initial: frameRecord(core.state) });
+  }
+}
+
+function mountArena() {
+  if (world) world.dispose();
+  world = createPhysicsWorld({ gravity: { x: 0, y: -P.gravity, z: 0 }, characterOffset: 0.035,
+    playerFootInset: 0, autostepHeight: P.autostepHeight, autostepMinWidth: 0.646, snapToGround: 0.48 });
+  arena = generateControllerArena({ seed: runIndex ? seed + ':' + runIndex : seed });
+  const worldCuboids = arena.traversal.fixtures.concat(arena.cubes);
+  world.addCuboid({ size: arena.floor.size, position: arena.floor.center, source: 'controller-kata-floor', kind: 'floor' });
+  for (const record of worldCuboids) {
+    world.addCuboid({ size: record.size, position: record.center, source: record.id, kind: 'walkable' });
+  }
+  cuboids = worldCuboids.map((record) => ({
+    id: record.id,
+    center: record.center.slice(),
+    size: record.size.slice(),
+    kind: String(record.id).indexOf('mantle-course-') === 0 ? 'course' : 'box',
+  }));
+  cuboids.push({ id: 'cyan-exit', center: [arena.exit[0], 2.5, arena.exit[2]], size: [0.28, 5, 0.28], kind: 'exit' });
+  core = createControllerKataCore({
+    world,
+    spawn: { x: arena.spawn[0], y: arena.spawn[1], z: arena.spawn[2] },
+    onEvent(event) {
+      if (event.type === 'mantle-start') playtest.milestone('first-mantle', { contactSource: event.plan.contactSource });
+    },
+    onFixedTick(tick) {
+      playtest.tapeFrame({
+        schema: 'product-one-fixed-tick-v1',
+        tick: tick.tick,
+        input: tick.input,
+        yaw: tick.before.yaw,
+        jumpQueued: false,
+        before: tick.before,
+        after: tick.after,
+        outcome: tick.outcome,
+      });
+    },
+  });
+  startedAt = performance.now();
+}
+
+function moveStick(event) {
+  const rect = stick.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dx = event.clientX - centerX;
+  const dy = event.clientY - centerY;
+  const maximum = rect.width * 0.36;
+  const length = Math.min(maximum, Math.hypot(dx, dy));
+  const angle = Math.atan2(dy, dx);
+  const x = Math.cos(angle) * length;
+  const y = Math.sin(angle) * length;
+  knob.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+  core.setMove({ moveX: Math.sign(x) * Math.pow(Math.abs(x / maximum), 1.28),
+    moveY: Math.sign(-y) * Math.pow(Math.abs(y / maximum), 1.28) });
+  beginPlaytest('first-movement');
+}
+
+function beginStick(event) {
+  if (stickPointer !== null) return false;
+  stickPointer = event.pointerId;
+  const size = stick.getBoundingClientRect().width || 132;
+  stick.style.left = Math.max(8, Math.min(win.innerWidth * 0.44 - size, event.clientX - size / 2)) + 'px';
+  stick.style.top = Math.max(44, Math.min(win.innerHeight - size - 8, event.clientY - size / 2)) + 'px';
+  stick.classList.add('active');
+  try { svg.setPointerCapture(event.pointerId); } catch {}
+  moveStick(event);
+  return true;
+}
+
+function endStick(event) {
+  if (event.pointerId !== stickPointer) return false;
+  stickPointer = null;
+  core.setMove({ moveX: 0, moveY: 0 });
+  knob.style.transform = 'translate(0,0)';
+  stick.classList.remove('active');
+  return true;
+}
+
+function setupInput() {
+  lookOwner = createTouchLookOwner({
+    capturePointer: (pointerId) => { try { svg.setPointerCapture(pointerId); } catch {} },
+    releasePointer: (pointerId) => { if (svg.hasPointerCapture(pointerId)) svg.releasePointerCapture(pointerId); },
+    onDelta: (delta) => core.addLook(delta.dx * 0.0065, delta.dy * 0.0053),
+    onTrace: (trace) => playtest.pointerEvent(Object.assign({}, trace, { targetZone: 'right-look' })),
+  });
+  svg.addEventListener('pointerdown', (event) => {
+    hint.hidden = true;
+    if (event.clientX < win.innerWidth * 0.44) beginStick(event);
+    else lookOwner.begin(event);
+    event.preventDefault();
+  });
+  win.addEventListener('pointermove', (event) => {
+    if (event.pointerId === stickPointer) {
+      moveStick(event);
+      event.preventDefault();
+      return;
+    }
+    if (lookOwner.move(event)) event.preventDefault();
+  }, { passive: false });
+  const end = (event) => {
+    if (endStick(event)) return;
+    lookOwner.end(event, event.type === 'pointercancel' ? 'cancel' : 'up');
+  };
+  win.addEventListener('pointerup', end);
+  win.addEventListener('pointercancel', end);
+  svg.addEventListener('lostpointercapture', (event) => {
+    if (event.pointerId === stickPointer) endStick(event);
+    else lookOwner.lost(event);
+  });
+  jumpButton.addEventListener('pointerdown', (event) => {
+    core.jump();
+    beginPlaytest('jump');
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  const keys = { KeyW: ['moveY', 1], KeyS: ['moveY', -1], KeyA: ['moveX', -1], KeyD: ['moveX', 1] };
+  const keyboard = { moveX: 0, moveY: 0 };
+  win.addEventListener('keydown', (event) => {
+    const binding = keys[event.code];
+    if (binding) {
+      keyboard[binding[0]] = binding[1];
+      core.setMove(keyboard);
+      beginPlaytest('keyboard-movement');
+      event.preventDefault();
+    }
+    if (event.code === 'Space' && !event.repeat) {
+      core.jump();
+      beginPlaytest('keyboard-jump');
+      event.preventDefault();
+    }
+  });
+  win.addEventListener('keyup', (event) => {
+    const binding = keys[event.code];
+    if (binding && keyboard[binding[0]] === binding[1]) {
+      keyboard[binding[0]] = 0;
+      core.setMove(keyboard);
+    }
+  });
+  win.addEventListener('blur', () => {
+    if (core) core.setMove({ moveX: 0, moveY: 0 });
+    stickPointer = null;
+    lookOwner.reset('blur');
+  });
+}
+
+async function finishTest() {
+  if (endButton.disabled) return;
+  endButton.disabled = true;
+  endButton.textContent = 'Finalizing...';
+  core.setMove({ moveX: 0, moveY: 0 });
+  lookOwner.reset('end-test');
+  playtest.end({ reason: 'end-test-button', final: frameRecord(core.state) });
+  await playtest.flush();
+  endButton.textContent = 'Done';
+  if (win.history.length > 1) win.history.back();
+}
+endButton.hidden = false;
+endButton.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  finishTest();
+});
+fullscreenButton.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  doc.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+});
+
+function render(now) {
+  if (!active) return;
+  try {
+    const dt = Math.min(0.1, Math.max(0, (now - previous) / 1000));
+    previous = now;
+    const result = core.update(dt);
+    const state = result.state;
+    terminal.render({
+      camera: { x: state.position.x, y: state.position.y, z: state.position.z, yaw: state.yaw, pitch: state.pitch },
+      cuboids,
+      gridStep: arena.grid.step,
+      gridHalf: 48,
+    });
+    const elapsed = Math.max(0, (now - startedAt) / 1000);
+    status.textContent = 'controller kata svg | ' + state.mode + ' | ' + elapsed.toFixed(1) + 's | ' + arena.seedText;
+    if (state.grounded && Math.hypot(state.position.x - arena.exit[0], state.position.z - arena.exit[2]) < arena.exitRadius) {
+      playtest.milestone('cyan-exit');
+      playtest.success({ result: 'cyan-exit' });
+      runIndex += 1;
+      mountArena();
+    }
+    win.requestAnimationFrame(render);
+  } catch (error) {
+    active = false;
+    reportCrash('render', error);
+  }
+}
+
+async function boot() {
+  await ensurePhysicsReady();
+  terminal = createNoodleSvgTerminal({ svg });
+  mountArena();
+  setupInput();
+  win.__infiniteBrutalityControllerKata = Object.freeze({
+    build: BUILD,
+    graphSha256: CONTROLLER_KATA_BUILD_MANIFEST.graphSha256,
+    getState: () => frameRecord(core.state),
+    getArena: () => ({ seed: arena.seedText, exit: arena.exit.slice(), geometryHash: arena.traversal.geometryHash }),
+  });
+  win.requestAnimationFrame(render);
+}
+boot().catch((error) => reportCrash('boot', error));
+ 

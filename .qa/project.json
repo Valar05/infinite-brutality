@@ -1,5 +1,23 @@
 {
   "commands": {
+    "controller-kata-engine-terminal": {
+      "adapter": {
+        "kind": "exit-code"
+      },
+      "argv": [
+        "node",
+        "--no-warnings",
+        "tools/test_controller_kata_runtime_contract.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "parameters": {},
+      "robustness_domains": {},
+      "seeds": [],
+      "timeout_seconds": 30
+    },
     "playtest-derived-regressions": {
       "adapter": {
         "kind": "final-json"
@@ -124,8 +142,6 @@
     "docs/**",
     "generated/boxcraft_blocks/**",
     "ib",
-    "src/controller-kata-runtime.js",
-    "src/controller-kata.css",
     "tools/boxcraft-judgment-mcp/**",
     "tools/ib.mjs",
     "tools/start_local_server.sh",

@@ -1,53 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-build="controller-kata-noodle-svg-v1">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" href="./assets/textures/ib-vector-hazard-20260609.svg" type="image/svg+xml">
-  <title>Product One Controller Grid</title>
-  <link rel="stylesheet" href="./src/styles.css?v=b870b29e64f47b5f355187aa30f7260fb19fd67e03965fb531f9eaf4d331e096">
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "./vendor/three/build/three.module.js",
-      "three/addons/": "./vendor/three/examples/jsm/"
-    }
-  }
-  </script>
+  <title>Product One Noodle Controller Grid</title>
+  <link rel="stylesheet" href="./src/controller-kata.css?build=3c8ac5a7e26be8591cbd2484fe8a305e79780c1f82abebfbe6725dd904582ced">
 </head>
 <body>
   <div id="app">
-    <canvas id="game" aria-label="Product One controller grid"></canvas>
-    <div id="topHud">
-      <strong>Product One Controller Grid</strong>
-      <div id="topControls">
-        <button id="fsButton" class="top-button" type="button" title="Fullscreen">⛶</button>
-        <button id="gyroButton" class="top-button" type="button" title="Gyro">Gyro</button>
-        <button id="endTestButton" class="top-button" type="button" title="End test" hidden>End Test</button>
-        <button id="errorCopyButton" class="top-button error-copy-button" type="button" title="Copy last error" hidden>Copy Error</button>
-        <div id="status">booting...</div>
-      </div>
-    </div>
-    <div id="hint">Move with WASD or left touch. Look with mouse or right touch. Jump. Reach the cyan exit.</div>
-    <div id="healthHud" aria-label="Player health">
-      <div class="health-header">
-        <span class="health-label">Vital</span>
-        <span id="healthValue">10 / 10</span>
-      </div>
-      <div id="healthBar">
-        <div id="healthBarFill"></div>
-      </div>
-    </div>
-    <div id="damageFlash"></div>
-    <div id="attackDebugHud" hidden><pre id="attackDebugText"></pre></div>
-    <div id="readout"></div>
-    <div id="leftStick" class="stick"><div></div></div>
-    <div id="actionPad">
-      <button id="jumpButton" type="button">Jump</button>
-      <button id="attackButton" type="button">Strike</button>
-    </div>
+    <svg id="game" aria-label="Product One controller grid" preserveAspectRatio="none">
+      <rect width="100%" height="100%" fill="#071014"></rect>
+      <g data-noodle-scene></g>
+      <path id="reticle" d="M390 225h20M400 215v20"></path>
+    </svg>
+    <div id="topHud"><strong>Product One · Noodle SVG</strong><div id="topControls">
+      <button id="fsButton" class="top-button" type="button">Expand</button>
+      <button id="gyroButton" class="top-button" type="button" hidden>Gyro</button>
+      <button id="endTestButton" class="top-button" type="button">End Test</button>
+      <span id="status">booting...</span>
+    </div></div>
+    <div id="hint">Left side moves. Right side looks. Jump. Reach the cyan exit.</div>
+    <div id="leftStick"><div></div></div>
+    <div id="actionPad"><button id="jumpButton" type="button">Jump</button><button id="attackButton" type="button" hidden>Strike</button></div>
   </div>
-  <script type="module" src="./src/main.js?v=0cfabf3204b4ff25c2d672212fb92132c6a60047bb9faa7df5df2295242fbdaf"></script>
+  <script type="module" src="./src/controller-kata-runtime.js?build=ac74ca4d14973890e35bd8da53752ecd436e3d33e02846aaa1e9990626728368"></script>
 </body>
 </html>
