@@ -1,0 +1,34 @@
+{
+  "schema": "qa-project-v1",
+  "id": "infinite-brutality-fleshpunk",
+  "runtime_globs": [
+    "tools/fleshpunk-lineart-training/**",
+    "tools/boxcraft-judgment-mcp/**",
+    "data/fleshpunk_*.json",
+    "assets/training/fleshpunk/**",
+    "generated/fleshpunk_lineart/**"
+  ],
+  "ignore_globs": [
+    ".git/**",
+    ".qa/**"
+  ],
+  "risk_preflight_required": false,
+  "commands": {
+    "fleshpunk-training-contract": {
+      "argv": [
+        "node",
+        "tools/fleshpunk-lineart-training/test_campaign.mjs"
+      ],
+      "adapter": {
+        "kind": "exit-code"
+      },
+      "timeout_seconds": 30,
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "seeds": [],
+      "parameters": {}
+    }
+  }
+}

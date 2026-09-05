@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_tendon_bridge_winch-canary
+seed: 314159
+target_id: fp_tendon_bridge_winch
+view: TRIPTYCH
+room_roles: winch_gallery, strongpoint_gallery
+host_surface: reinforced cliff shelf
+support_chain: rock_anchor > bone_plinth > drum_bearings > tendon_drum > bridge_anchor
+pipes: fp_tendon_bridge_winch_pressure_feed_pipe
+valves: fp_tendon_bridge_winch_ratchet_release_valve
+tendons: fp_tendon_bridge_winch_bridge_traction_tendons
+connective_tissue: fp_tendon_bridge_winch_bearing_cuffs
+interaction: crank, release, or sabotage bridge tension
+collider: solid plinth and guarded operator footprint
+service_route: visible maintenance access from the traversable route
+silhouette: large tendon drum and valve wheel above the bridge anchor
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

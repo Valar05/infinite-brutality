@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_peristaltic_lift-canary
+seed: 314159
+target_id: fp_peristaltic_lift
+view: TRIPTYCH
+room_roles: tower_core, undercroft_pass
+host_surface: carved lift shaft
+support_chain: shaft_socket > rib_platform > tendon_suspension > guide_rails > upper_termination
+pipes: fp_peristaltic_lift_lift_pressure_risers
+valves: fp_peristaltic_lift_floor_stop_valves
+tendons: fp_peristaltic_lift_suspension_tendons
+connective_tissue: fp_peristaltic_lift_rib_platform_ligaments
+interaction: call, ride, stop, or overload the lift
+collider: solid platform, guide rails, clearance envelope
+service_route: visible maintenance access from the traversable route
+silhouette: rib cage platform suspended inside a pumping shaft
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

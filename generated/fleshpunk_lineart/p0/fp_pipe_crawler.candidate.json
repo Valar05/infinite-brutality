@@ -1,0 +1,43 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_pipe_crawler",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_pipe_crawler_breathing_manifold",
+    "fp_pipe_crawler_segment_vent_valves",
+    "fp_pipe_crawler_hook_retraction_tendons",
+    "fp_pipe_crawler_segment_membranes"
+  ],
+  "componentGraphHash": "21a25b24147b21abc0e3549dfbe73472456bdc42172d0813ce62c3e3bba08695",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "pipe wall or ceiling service rack",
+  "supportChain": [
+    "grip_hooks",
+    "segment_sockets",
+    "spine",
+    "head_mount"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "segmented crawler wrapped around a pipe run",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}

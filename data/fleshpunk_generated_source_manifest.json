@@ -1,0 +1,58 @@
+{
+  "schema": "FLESHPUNK GENERATED SOURCE MANIFEST 1",
+  "assets": [
+    {
+      "id": "fp_pressure_valve_gate_source_v2",
+      "path": "assets/training/fleshpunk/source/fp_pressure_valve_gate_source_v2.png",
+      "sha256": "17a682eefdcaa6656fd4f43d336d294dfc5642d9fe4ef646b6ec204844ecd15c",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "class": "generated_raster_source",
+      "generator": "OpenAI built-in image generation",
+      "generated_at": "2026-09-04",
+      "target_use": "trace-cleaned P0 lineart training reference; not runtime art",
+      "review": {
+        "structural_appeal": "PROCEED_AS_SOURCE",
+        "lineart_cleanliness": "REVISE",
+        "reason": "fine surface detail must be thresholded and simplified before training"
+      },
+      "constraints": [
+        "no text",
+        "black ink on white",
+        "assembled plus exploded plus orthographic",
+        "pipes valves tendons connective tissue"
+      ],
+      "visual_acceptance": false
+    },
+    {
+      "id": "fp_pressure_valve_gate_line_v3",
+      "path": "assets/training/fleshpunk/source/fp_pressure_valve_gate_line_v3.png",
+      "sha256": "f3a1022019157ae819e74df5665392da7d31a249d690b02937f358572791c727",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "class": "generated_lineart_source",
+      "generator": "OpenAI built-in image generation",
+      "generated_at": "2026-09-04",
+      "target_use": "P0 continuation-training supplement; not runtime art",
+      "review": {
+        "structural_appeal": "PROCEED_AS_SOURCE",
+        "lineart_cleanliness": "PROCEED_AFTER_BINARY_PROJECTION",
+        "reason": "assembled and true exploded gate preserve pipes, valve, tendon actuators, connective tissue cuffs, service fasteners, and orthographic flow views"
+      },
+      "binary_projection": {
+        "path": "assets/training/fleshpunk/lineart-v1/selected/fp_pressure_valve_gate_line_v3.png",
+        "sha256": "97dcc31529ffa0f3fc6add61f90b85f97bd3229d31f72a00d269c996920f8416",
+        "threshold": 220,
+        "white_ratio": 0.8887106577555338,
+        "dark_ratio": 0.11128934224446614,
+        "mid_ratio": 0.0
+      },
+      "visual_acceptance": false,
+      "final_acceptance": "USER_ONLY"
+    }
+  ]
+}

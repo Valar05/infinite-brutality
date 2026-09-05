@@ -1,0 +1,1561 @@
+{
+  "schema": "FLESHPUNK ASSET CATALOG 1",
+  "family": "fleshpunk_maze",
+  "proof_district": "lift_court_hybrid",
+  "lineart_contract": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "anatomy_law": {
+    "pipe": "transports blood, air, pressure, waste, ammunition, or coolant",
+    "valve": "visibly controls route, pressure, danger, or machine state",
+    "tendon": "transmits force between actuator, joint, winch, or limb",
+    "connective_tissue": "anchors, seals, absorbs movement, or exposes a severable attachment"
+  },
+  "assets": [
+    {
+      "id": "fp_pressure_valve_gate",
+      "wave": "P0",
+      "class": "machine",
+      "runtime_role": "controllable maze chokepoint",
+      "room_roles": [
+        "gate_step",
+        "kill_court"
+      ],
+      "host_surface": "carved gate throat",
+      "support_chain": [
+        "host_socket",
+        "bone_iron_frame",
+        "hinge_load_path",
+        "gate_leaf",
+        "wall_tie_in"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "twin pressure uprights framing a tendon-bound gate",
+      "interaction": "rotate valve to open, close, or vent the gate",
+      "collider": "solid gate leaf plus walkable threshold",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_pressure_valve_gate_blood_pressure_pipes",
+          "system": "pipe",
+          "function": "carry actuation pressure"
+        },
+        {
+          "id": "fp_pressure_valve_gate_wheel_shutoff_valve",
+          "system": "valve",
+          "function": "controls gate state"
+        },
+        {
+          "id": "fp_pressure_valve_gate_paired_gate_tendons",
+          "system": "tendon",
+          "function": "pull the gate leaf"
+        },
+        {
+          "id": "fp_pressure_valve_gate_hinge_seal",
+          "system": "connective_tissue",
+          "function": "anchors and seals moving interfaces"
+        }
+      ]
+    },
+    {
+      "id": "fp_tendon_bridge_winch",
+      "wave": "P0",
+      "class": "machine",
+      "runtime_role": "bridge deployment and tension control",
+      "room_roles": [
+        "winch_gallery",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "reinforced cliff shelf",
+      "support_chain": [
+        "rock_anchor",
+        "bone_plinth",
+        "drum_bearings",
+        "tendon_drum",
+        "bridge_anchor"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "large tendon drum and valve wheel above the bridge anchor",
+      "interaction": "crank, release, or sabotage bridge tension",
+      "collider": "solid plinth and guarded operator footprint",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_tendon_bridge_winch_pressure_feed_pipe",
+          "system": "pipe",
+          "function": "feeds the tension bladder"
+        },
+        {
+          "id": "fp_tendon_bridge_winch_ratchet_release_valve",
+          "system": "valve",
+          "function": "controls stored pressure"
+        },
+        {
+          "id": "fp_tendon_bridge_winch_bridge_traction_tendons",
+          "system": "tendon",
+          "function": "transmit force to bridge"
+        },
+        {
+          "id": "fp_tendon_bridge_winch_bearing_cuffs",
+          "system": "connective_tissue",
+          "function": "bind living and iron bearings"
+        }
+      ]
+    },
+    {
+      "id": "fp_peristaltic_lift",
+      "wave": "P0",
+      "class": "machine",
+      "runtime_role": "vertical traversal and crushing hazard",
+      "room_roles": [
+        "tower_core",
+        "undercroft_pass"
+      ],
+      "host_surface": "carved lift shaft",
+      "support_chain": [
+        "shaft_socket",
+        "rib_platform",
+        "tendon_suspension",
+        "guide_rails",
+        "upper_termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "rib cage platform suspended inside a pumping shaft",
+      "interaction": "call, ride, stop, or overload the lift",
+      "collider": "solid platform, guide rails, clearance envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_peristaltic_lift_lift_pressure_risers",
+          "system": "pipe",
+          "function": "feed lift bladders"
+        },
+        {
+          "id": "fp_peristaltic_lift_floor_stop_valves",
+          "system": "valve",
+          "function": "select and lock elevation"
+        },
+        {
+          "id": "fp_peristaltic_lift_suspension_tendons",
+          "system": "tendon",
+          "function": "carry platform load"
+        },
+        {
+          "id": "fp_peristaltic_lift_rib_platform_ligaments",
+          "system": "connective_tissue",
+          "function": "join platform ribs to tendons"
+        }
+      ]
+    },
+    {
+      "id": "fp_severable_pressure_conduit",
+      "wave": "P0",
+      "class": "machine",
+      "runtime_role": "route switch, rupture hazard, and repair target",
+      "room_roles": [
+        "undercroft_pass",
+        "gate_step"
+      ],
+      "host_surface": "wall or floor service chase",
+      "support_chain": [
+        "embedded_socket",
+        "pipe_saddle",
+        "conduit_body",
+        "coupling",
+        "service_hatch"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "segmented artery pipe with oversized shutoff wheel",
+      "interaction": "sever, vent, clamp, or repair pressure flow",
+      "collider": "solid saddles with hazard envelope only while ruptured",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_severable_pressure_conduit_arterial_conduit",
+          "system": "pipe",
+          "function": "transports pressurized fluid"
+        },
+        {
+          "id": "fp_severable_pressure_conduit_emergency_shutoff",
+          "system": "valve",
+          "function": "isolates a ruptured segment"
+        },
+        {
+          "id": "fp_severable_pressure_conduit_compression_sleeve_tendons",
+          "system": "tendon",
+          "function": "restrain the pipe wall"
+        },
+        {
+          "id": "fp_severable_pressure_conduit_rupturable_coupling",
+          "system": "connective_tissue",
+          "function": "seals replaceable segments"
+        }
+      ]
+    },
+    {
+      "id": "fp_tendon_hound",
+      "wave": "P0",
+      "class": "creature",
+      "runtime_role": "fast ground pursuer",
+      "room_roles": [
+        "kill_court",
+        "undercroft_pass"
+      ],
+      "host_surface": "walkable floor",
+      "support_chain": [
+        "feet",
+        "limb_tendons",
+        "pelvis_frame",
+        "spine",
+        "head"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "low predatory quadruped with exposed traction tendons",
+      "interaction": "pursue, lunge, recoil, and expose a severable tendon",
+      "collider": "capsule body plus grounded foot contacts",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_tendon_hound_respiratory_pipe",
+          "system": "pipe",
+          "function": "moves air along armored torso"
+        },
+        {
+          "id": "fp_tendon_hound_carotid_throttle_valve",
+          "system": "valve",
+          "function": "controls lunge pressure"
+        },
+        {
+          "id": "fp_tendon_hound_traction_tendons",
+          "system": "tendon",
+          "function": "drive readable locomotion"
+        },
+        {
+          "id": "fp_tendon_hound_joint_ligaments",
+          "system": "connective_tissue",
+          "function": "anchor limbs without floating parts"
+        }
+      ]
+    },
+    {
+      "id": "fp_pipe_crawler",
+      "wave": "P0",
+      "class": "creature",
+      "runtime_role": "wall and ceiling ambusher",
+      "room_roles": [
+        "undercroft_pass",
+        "winch_gallery"
+      ],
+      "host_surface": "pipe wall or ceiling service rack",
+      "support_chain": [
+        "grip_hooks",
+        "segment_sockets",
+        "spine",
+        "head_mount"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "segmented crawler wrapped around a pipe run",
+      "interaction": "crawl, drop, constrict, and retreat into service routes",
+      "collider": "segmented capsules plus surface grip probes",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_pipe_crawler_breathing_manifold",
+          "system": "pipe",
+          "function": "uses host pipes as respiratory feed"
+        },
+        {
+          "id": "fp_pipe_crawler_segment_vent_valves",
+          "system": "valve",
+          "function": "control body compression"
+        },
+        {
+          "id": "fp_pipe_crawler_hook_retraction_tendons",
+          "system": "tendon",
+          "function": "drive wall grips"
+        },
+        {
+          "id": "fp_pipe_crawler_segment_membranes",
+          "system": "connective_tissue",
+          "function": "join armored body segments"
+        }
+      ]
+    },
+    {
+      "id": "fp_graft_sentry",
+      "wave": "P0",
+      "class": "creature",
+      "runtime_role": "stationary ranged strongpoint",
+      "room_roles": [
+        "strongpoint_gallery",
+        "gate_step"
+      ],
+      "host_surface": "weapon plinth",
+      "support_chain": [
+        "rock_socket",
+        "swivel_base",
+        "ammo_organ",
+        "barrel_support",
+        "service_rear"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "vascular cannon on a restrained swivel plinth",
+      "interaction": "track, fire, jam, vent, or sever ammunition feed",
+      "collider": "solid plinth, swivel clearance, projectile muzzle",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_graft_sentry_ammo_feed_vessel",
+          "system": "pipe",
+          "function": "feeds vascular projectiles"
+        },
+        {
+          "id": "fp_graft_sentry_breech_pressure_valve",
+          "system": "valve",
+          "function": "meters each shot"
+        },
+        {
+          "id": "fp_graft_sentry_elevation_tendons",
+          "system": "tendon",
+          "function": "aim the cannon"
+        },
+        {
+          "id": "fp_graft_sentry_swivel_graft_collar",
+          "system": "connective_tissue",
+          "function": "anchors cannon to plinth"
+        }
+      ]
+    },
+    {
+      "id": "fp_sluice_mother",
+      "wave": "P0",
+      "class": "creature",
+      "runtime_role": "sump pump, route controller, and spawner",
+      "room_roles": [
+        "undercroft_pass",
+        "kill_court"
+      ],
+      "host_surface": "carved recovery sump",
+      "support_chain": [
+        "sump_socket",
+        "restraining_frame",
+        "pump_chambers",
+        "pipe_roots",
+        "service_ring"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "restrained pumping organism rooted across a sluice chamber",
+      "interaction": "pump, spawn, flood, drain, stun, or sever route feeds",
+      "collider": "large fixed body, service ring, spawn-clearance volumes",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_sluice_mother_sluice_root_pipes",
+          "system": "pipe",
+          "function": "move blood and floodwater"
+        },
+        {
+          "id": "fp_sluice_mother_brood_sluice_valves",
+          "system": "valve",
+          "function": "control spawning and water level"
+        },
+        {
+          "id": "fp_sluice_mother_pump_tendons",
+          "system": "tendon",
+          "function": "compress the chamber hearts"
+        },
+        {
+          "id": "fp_sluice_mother_restraining_graft_web",
+          "system": "connective_tissue",
+          "function": "anchors organism to frame and rock"
+        }
+      ]
+    },
+    {
+      "id": "fp_vascular_switch_pedestal",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "route-state switch",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "route-state switch",
+      "interaction": "operate, damage, repair, or exploit route-state switch",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_vascular_switch_pedestal_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_vascular_switch_pedestal_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_vascular_switch_pedestal_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_vascular_switch_pedestal_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_blood_cistern_pump",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "resource and pressure pump",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "resource and pressure pump",
+      "interaction": "operate, damage, repair, or exploit resource and pressure pump",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_blood_cistern_pump_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_blood_cistern_pump_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_blood_cistern_pump_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_blood_cistern_pump_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_rib_cover_barricade",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "breakable tactical cover",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "breakable tactical cover",
+      "interaction": "operate, damage, repair, or exploit breakable tactical cover",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_rib_cover_barricade_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_rib_cover_barricade_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_rib_cover_barricade_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_rib_cover_barricade_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_tendon_ladder_mantle_rail",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "climb recovery affordance",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "climb recovery affordance",
+      "interaction": "operate, damage, repair, or exploit climb recovery affordance",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_tendon_ladder_mantle_rail_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_tendon_ladder_mantle_rail_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_tendon_ladder_mantle_rail_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_tendon_ladder_mantle_rail_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_bone_iron_portcullis",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "heavy route gate",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "heavy route gate",
+      "interaction": "operate, damage, repair, or exploit heavy route gate",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_bone_iron_portcullis_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_bone_iron_portcullis_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_bone_iron_portcullis_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_bone_iron_portcullis_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_graft_repair_station",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "repair and healing station",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "repair and healing station",
+      "interaction": "operate, damage, repair, or exploit repair and healing station",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_graft_repair_station_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_graft_repair_station_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_graft_repair_station_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_graft_repair_station_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_ammo_egg_dispenser",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "ammunition dispenser",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "ammunition dispenser",
+      "interaction": "operate, damage, repair, or exploit ammunition dispenser",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_ammo_egg_dispenser_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_ammo_egg_dispenser_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_ammo_egg_dispenser_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_ammo_egg_dispenser_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_lung_ventilator",
+      "wave": "P1",
+      "class": "machine",
+      "runtime_role": "pressure timing hazard",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "pressure timing hazard",
+      "interaction": "operate, damage, repair, or exploit pressure timing hazard",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_lung_ventilator_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_lung_ventilator_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_lung_ventilator_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_lung_ventilator_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_bridge_parasite",
+      "wave": "P1",
+      "class": "creature",
+      "runtime_role": "bridge integrity attacker",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "bridge integrity attacker",
+      "interaction": "operate, damage, repair, or exploit bridge integrity attacker",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_bridge_parasite_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_bridge_parasite_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_bridge_parasite_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_bridge_parasite_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_pressure_leech",
+      "wave": "P1",
+      "class": "creature",
+      "runtime_role": "conduit sabotage creature",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "conduit sabotage creature",
+      "interaction": "operate, damage, repair, or exploit conduit sabotage creature",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_pressure_leech_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_pressure_leech_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_pressure_leech_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_pressure_leech_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_bone_winch_brute",
+      "wave": "P1",
+      "class": "creature",
+      "runtime_role": "heavy bridge operator enemy",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "heavy bridge operator enemy",
+      "interaction": "operate, damage, repair, or exploit heavy bridge operator enemy",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_bone_winch_brute_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_bone_winch_brute_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_bone_winch_brute_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_bone_winch_brute_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_organ_key_bearer",
+      "wave": "P1",
+      "class": "creature",
+      "runtime_role": "mobile route-key carrier",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "mobile route-key carrier",
+      "interaction": "operate, damage, repair, or exploit mobile route-key carrier",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_organ_key_bearer_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_organ_key_bearer_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_organ_key_bearer_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_organ_key_bearer_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_artery_pipe_wall_spine",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "service-wall circulation",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "service-wall circulation",
+      "interaction": "operate, damage, repair, or exploit service-wall circulation",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_artery_pipe_wall_spine_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_artery_pipe_wall_spine_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_artery_pipe_wall_spine_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_artery_pipe_wall_spine_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_connective_corner_socket",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "structural corner attachment",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "structural corner attachment",
+      "interaction": "operate, damage, repair, or exploit structural corner attachment",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_connective_corner_socket_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_connective_corner_socket_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_connective_corner_socket_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_connective_corner_socket_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_tissue_expansion_joint",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "moving pipe joint",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "moving pipe joint",
+      "interaction": "operate, damage, repair, or exploit moving pipe joint",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_tissue_expansion_joint_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_tissue_expansion_joint_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_tissue_expansion_joint_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_tissue_expansion_joint_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_corpsefire_route_lamp",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "route landmark",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "route landmark",
+      "interaction": "operate, damage, repair, or exploit route landmark",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_corpsefire_route_lamp_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_corpsefire_route_lamp_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_corpsefire_route_lamp_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_corpsefire_route_lamp_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_deadfall_tendon_release",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "triggered vertical hazard",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "triggered vertical hazard",
+      "interaction": "operate, damage, repair, or exploit triggered vertical hazard",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_deadfall_tendon_release_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_deadfall_tendon_release_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_deadfall_tendon_release_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_deadfall_tendon_release_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_living_cannon_breech",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "artillery mechanism",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "artillery mechanism",
+      "interaction": "operate, damage, repair, or exploit artillery mechanism",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_living_cannon_breech_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_living_cannon_breech_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_living_cannon_breech_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_living_cannon_breech_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_service_hatch_sphincter",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "maintenance access",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "maintenance access",
+      "interaction": "operate, damage, repair, or exploit maintenance access",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_service_hatch_sphincter_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_service_hatch_sphincter_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_service_hatch_sphincter_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_service_hatch_sphincter_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_floor_drain_filter_organ",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "waste filtration",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "waste filtration",
+      "interaction": "operate, damage, repair, or exploit waste filtration",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_floor_drain_filter_organ_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_floor_drain_filter_organ_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_floor_drain_filter_organ_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_floor_drain_filter_organ_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_bridge_anchor_heart",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "bridge tension core",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "bridge tension core",
+      "interaction": "operate, damage, repair, or exploit bridge tension core",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_bridge_anchor_heart_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_bridge_anchor_heart_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_bridge_anchor_heart_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_bridge_anchor_heart_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    },
+    {
+      "id": "fp_pressure_manifold_hub",
+      "wave": "P2",
+      "class": "machine",
+      "runtime_role": "multi-route pressure controller",
+      "room_roles": [
+        "gate_step",
+        "kill_court",
+        "tower_core",
+        "winch_gallery",
+        "undercroft_pass",
+        "strongpoint_gallery"
+      ],
+      "host_surface": "carved structural socket",
+      "support_chain": [
+        "host_socket",
+        "load_base",
+        "working_body",
+        "termination"
+      ],
+      "service_route": "visible maintenance access from the traversable route",
+      "silhouette": "multi-route pressure controller",
+      "interaction": "operate, damage, repair, or exploit multi-route pressure controller",
+      "collider": "solid support and role-specific interaction envelope",
+      "required_views": [
+        "ASSEMBLED",
+        "EXPLODED",
+        "ORTHOGRAPHIC"
+      ],
+      "components": [
+        {
+          "id": "fp_pressure_manifold_hub_service_pipe",
+          "system": "pipe",
+          "function": "transports the declared working medium"
+        },
+        {
+          "id": "fp_pressure_manifold_hub_control_valve",
+          "system": "valve",
+          "function": "changes the declared machine state"
+        },
+        {
+          "id": "fp_pressure_manifold_hub_actuation_tendon",
+          "system": "tendon",
+          "function": "transmits working force"
+        },
+        {
+          "id": "fp_pressure_manifold_hub_attachment_graft",
+          "system": "connective_tissue",
+          "function": "anchors and seals the assembly"
+        }
+      ]
+    }
+  ]
+}

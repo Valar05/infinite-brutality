@@ -1,0 +1,44 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_graft_sentry",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_graft_sentry_ammo_feed_vessel",
+    "fp_graft_sentry_breech_pressure_valve",
+    "fp_graft_sentry_elevation_tendons",
+    "fp_graft_sentry_swivel_graft_collar"
+  ],
+  "componentGraphHash": "414f91609df5ce73e400add67f63308e7beeaf86f3a2e9295634f69f8ec0d680",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "weapon plinth",
+  "supportChain": [
+    "rock_socket",
+    "swivel_base",
+    "ammo_organ",
+    "barrel_support",
+    "service_rear"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "vascular cannon on a restrained swivel plinth",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}

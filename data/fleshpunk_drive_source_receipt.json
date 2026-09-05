@@ -1,0 +1,74 @@
+{
+  "schema": "FLESHPUNK DRIVE SOURCE RECEIPT 1",
+  "observed_at": "2026-09-04T23:00:00Z",
+  "folder": {
+    "title": "fleshpunk-lora",
+    "id": "1H9h4Whd4E2CvpmyZ4IemhcK7FDgNSZo4",
+    "visibility": "not_shared"
+  },
+  "files": [
+    {
+      "title": "manifest.json",
+      "id": "1oq17OT8kozZiPfzh41OjagzKaadrm48w",
+      "size": 12207,
+      "modified": "2026-08-09T01:48:10.837Z"
+    },
+    {
+      "title": "dataset-contact-sheet.jpg",
+      "id": "1sa1AvZGfPs0mZnZpETP80WLiFLkj_72O",
+      "size": 300667,
+      "modified": "2026-08-09T01:48:11.982Z"
+    },
+    {
+      "title": "dataset.toml",
+      "id": "1tgn81Wy_AciyrxrLydGJUFGmSYOdtDD3",
+      "size": 391,
+      "modified": "2026-08-09T01:48:10.835Z"
+    },
+    {
+      "title": "training.stdout.log",
+      "id": "1KUtxwwZK4kccjLJ7sLuMB3bwmFlS1X2b",
+      "size": 1765,
+      "modified": "2026-08-09T02:07:05.361Z"
+    },
+    {
+      "title": "training.stderr.log",
+      "id": "1tVQB87OBhk_U9jOJyG7mvXTmFlTsAD54",
+      "size": 115245,
+      "modified": "2026-08-09T02:06:55.294Z"
+    },
+    {
+      "title": "sample-prompts.txt",
+      "id": "18O4y8eka0Apchw54veyRaEBNyAs6VUcH",
+      "size": 370,
+      "modified": "2026-08-09T01:48:10.836Z"
+    }
+  ],
+  "dataset_evidence": {
+    "images": 20,
+    "repeats": 6,
+    "epochs": 5,
+    "steps": 600,
+    "validation_images": 0,
+    "regularization_images": 0,
+    "import_state": "VERIFIED_PROVIDER_BYTES_LEGACY_DIGEST_STALE",
+    "materialized_files": 40,
+    "provider_size_mismatches": 0,
+    "decode_failures": 0,
+    "legacy_manifest_digest_mismatches": 20,
+    "training_eligibility": "OBSERVE_REQUIRES_LINEART_PIXEL_GATE",
+    "local_root": "assets/training/fleshpunk/drive-v1",
+    "materialization_receipt_sha256": "92e1bd11c155274b2ee82457e273c260dcc3d46b5a7d3256354f31721d5aba66"
+  },
+  "lora": {
+    "filename": "drw_fleshpunk_v1.safetensors",
+    "drive_state": "BAD_NOT_FOUND",
+    "cauldron_historical_path_state": "VERIFIED_EXISTS_HASH_PENDING",
+    "quarantine_rule": "only this file may be hash-locked and copied; no code or runtime reuse"
+  },
+  "forbidden_drive_trees": [
+    "sd-scripts",
+    ".venv"
+  ],
+  "note": "Exact Drive file IDs were materialized. All provider byte counts and PNG decodes pass. All 20 legacy manifest digests differ systematically; both old and observed hashes are preserved. Training remains stopped pending the lineart pixel gate."
+}

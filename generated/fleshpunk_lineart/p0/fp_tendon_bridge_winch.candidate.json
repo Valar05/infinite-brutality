@@ -1,0 +1,44 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_tendon_bridge_winch",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_tendon_bridge_winch_pressure_feed_pipe",
+    "fp_tendon_bridge_winch_ratchet_release_valve",
+    "fp_tendon_bridge_winch_bridge_traction_tendons",
+    "fp_tendon_bridge_winch_bearing_cuffs"
+  ],
+  "componentGraphHash": "4161191a3ae28de5ae53d71a31753974c6b505300ebfb18e03822f018d1fdcfc",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "reinforced cliff shelf",
+  "supportChain": [
+    "rock_anchor",
+    "bone_plinth",
+    "drum_bearings",
+    "tendon_drum",
+    "bridge_anchor"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "large tendon drum and valve wheel above the bridge anchor",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}

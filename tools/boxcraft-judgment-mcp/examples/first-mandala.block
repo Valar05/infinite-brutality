@@ -1,0 +1,12 @@
+BLOCK REQUEST 1
+id: first-mandala
+seed: mandala-block-001
+controller_axis: 50
+grammar: LOOP
+center: MANDALA
+pressures: mandala@1, quake@1, doom@1, modern-war@1, modern-fps@1, clustertruck@1, quake-anime-bullshit@1
+population: 4
+generations: 3
+bounds: 32x24x3
+require: START, READ, BUILD, COMMIT, CHANGE, RETURN, RESOLVE, RECOVER, EXIT
+forbid:

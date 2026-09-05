@@ -1,0 +1,9 @@
+{
+  "schema": "FLESHPUNK NEGATIVE VISUAL RECEIPT 1",
+  "status": "QUARANTINED_NEGATIVE_EXAMPLE",
+  "artifact_root": "generated/fleshpunk_lineart/p0",
+  "reason": "flat toy diagrams and duplicated creature silhouettes fail the professional exploded machinery and no-blob commission",
+  "may_train": false,
+  "may_ship": false,
+  "user_acceptance": false
+}

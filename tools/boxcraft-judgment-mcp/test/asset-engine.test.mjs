@@ -1,0 +1,12 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { ASSET_CATALOG, assetGraphHash, formatAssetRequest, getAssetTarget, judgeAsset, listAssetTargets, parseAssetRequest } from "../src/asset-engine.mjs";
+const request = formatAssetRequest("fp_pressure_valve_gate", "314159");
+const asset = getAssetTarget("fp_pressure_valve_gate");
+const candidate = {targetId:asset.id,seed:"314159",views:asset.required_views,componentIds:asset.components.map(c=>c.id),componentGraphHash:assetGraphHash(asset),lineArt:ASSET_CATALOG.lineart_contract,hostSurface:asset.host_surface,supportChain:asset.support_chain,serviceRoute:asset.service_route,silhouette:asset.silhouette,regnet:{status:"UNKNOWN"}};
+test("catalog has the confirmed 30 assets and eight P0 targets",()=>{assert.equal(ASSET_CATALOG.assets.length,30);assert.equal(listAssetTargets({wave:"P0"}).assets.length,8)});
+test("ASSET REQUEST 1 is strict and catalog-bound",()=>{assert.equal(parseAssetRequest(request).status,"PROCEED");assert.equal(parseAssetRequest("make a flesh blob").status,"UNKNOWN");assert.match(parseAssetRequest(request+"mood: wet\n").errors.join(" "),/unknown field/)});
+test("all P0 assets expose pipes valves tendons and connective tissue",()=>{for(const target of listAssetTargets({wave:"P0"}).assets)assert.deepEqual([...new Set(target.components.map(c=>c.system))].sort(),["connective_tissue","pipe","tendon","valve"])});
+test("anatomy ablation and lineart violations deny mutation",()=>{const missing={...candidate,componentIds:candidate.componentIds.slice(1)};assert.equal(judgeAsset(request,missing).mutationDecision,"DENY_MUTATION");const shaded={...candidate,lineArt:{...candidate.lineArt,shading:true}};assert.equal(judgeAsset(request,shaded).status,"REJECT")});
+test("structural pass waits for RegNet and user acceptance",()=>{assert.equal(judgeAsset(request,candidate).mutationDecision,"WAIT_FOR_REGNET");const scored={...candidate,regnet:{status:"PROCEED",traceSimilarity:.9,recreationSimilarity:.91,identityContinuity:.92}};const result=judgeAsset(request,scored);assert.equal(result.internalVerdict,"PROCEED");assert.equal(result.status,"OBSERVE");assert.equal(result.finalAcceptance,"USER_ONLY")});
+test("known target with changed declared anatomy is rejected rather than repaired",()=>{const changed=request.replace("fp_pressure_valve_gate_blood_pressure_pipes","made_up_pipe");const result=parseAssetRequest(changed);assert.equal(result.status,"REJECT");assert.match(result.errors.join(" "),/pipe_inventory/)});

@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_severable_pressure_conduit-canary
+seed: 314159
+target_id: fp_severable_pressure_conduit
+view: TRIPTYCH
+room_roles: undercroft_pass, gate_step
+host_surface: wall or floor service chase
+support_chain: embedded_socket > pipe_saddle > conduit_body > coupling > service_hatch
+pipes: fp_severable_pressure_conduit_arterial_conduit
+valves: fp_severable_pressure_conduit_emergency_shutoff
+tendons: fp_severable_pressure_conduit_compression_sleeve_tendons
+connective_tissue: fp_severable_pressure_conduit_rupturable_coupling
+interaction: sever, vent, clamp, or repair pressure flow
+collider: solid saddles with hazard envelope only while ruptured
+service_route: visible maintenance access from the traversable route
+silhouette: segmented artery pipe with oversized shutoff wheel
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

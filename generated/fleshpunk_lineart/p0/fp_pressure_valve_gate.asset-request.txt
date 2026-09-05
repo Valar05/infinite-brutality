@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_pressure_valve_gate-canary
+seed: 314159
+target_id: fp_pressure_valve_gate
+view: TRIPTYCH
+room_roles: gate_step, kill_court
+host_surface: carved gate throat
+support_chain: host_socket > bone_iron_frame > hinge_load_path > gate_leaf > wall_tie_in
+pipes: fp_pressure_valve_gate_blood_pressure_pipes
+valves: fp_pressure_valve_gate_wheel_shutoff_valve
+tendons: fp_pressure_valve_gate_paired_gate_tendons
+connective_tissue: fp_pressure_valve_gate_hinge_seal
+interaction: rotate valve to open, close, or vent the gate
+collider: solid gate leaf plus walkable threshold
+service_route: visible maintenance access from the traversable route
+silhouette: twin pressure uprights framing a tendon-bound gate
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

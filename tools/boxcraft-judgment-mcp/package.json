@@ -1,0 +1,15 @@
+{
+  "name": "@infinite-brutality/boxcraft-judgment-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/engine.test.mjs test/asset-engine.test.mjs test/mcp.test.mjs ../../tools/fleshpunk-lineart-training/test_campaign.mjs",
+    "smoke": "node test/stdio-smoke.mjs",
+    "canary": "node ../fleshpunk-lineart-training/generate_canaries.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "3.25.76"
+  }
+}

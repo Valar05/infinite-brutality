@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_pipe_crawler-canary
+seed: 314159
+target_id: fp_pipe_crawler
+view: TRIPTYCH
+room_roles: undercroft_pass, winch_gallery
+host_surface: pipe wall or ceiling service rack
+support_chain: grip_hooks > segment_sockets > spine > head_mount
+pipes: fp_pipe_crawler_breathing_manifold
+valves: fp_pipe_crawler_segment_vent_valves
+tendons: fp_pipe_crawler_hook_retraction_tendons
+connective_tissue: fp_pipe_crawler_segment_membranes
+interaction: crawl, drop, constrict, and retreat into service routes
+collider: segmented capsules plus surface grip probes
+service_route: visible maintenance access from the traversable route
+silhouette: segmented crawler wrapped around a pipe run
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

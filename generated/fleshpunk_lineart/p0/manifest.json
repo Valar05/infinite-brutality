@@ -1,0 +1,79 @@
+{
+  "schema": "FLESHPUNK CANARY MANIFEST 1",
+  "family": "fleshpunk_maze",
+  "visualAcceptance": false,
+  "assets": [
+    {
+      "id": "fp_pressure_valve_gate",
+      "svg": "fp_pressure_valve_gate.svg",
+      "svgSha256": "fd3fbc2d9e44a39924f357b8edc9cebe9598efb5d48f65071e345ccf87fc7569",
+      "request": "fp_pressure_valve_gate.asset-request.txt",
+      "candidate": "fp_pressure_valve_gate.candidate.json",
+      "caption": "fp_pressure_valve_gate.txt",
+      "graphHash": "c51ff12301057c432401c7eb1466fd914a4dafa5d4f60b9101e0ed048b892eef"
+    },
+    {
+      "id": "fp_tendon_bridge_winch",
+      "svg": "fp_tendon_bridge_winch.svg",
+      "svgSha256": "5641160ec90096a170c125d232be0da3b0eaed45e2a252a9c0fb11528da84b49",
+      "request": "fp_tendon_bridge_winch.asset-request.txt",
+      "candidate": "fp_tendon_bridge_winch.candidate.json",
+      "caption": "fp_tendon_bridge_winch.txt",
+      "graphHash": "4161191a3ae28de5ae53d71a31753974c6b505300ebfb18e03822f018d1fdcfc"
+    },
+    {
+      "id": "fp_peristaltic_lift",
+      "svg": "fp_peristaltic_lift.svg",
+      "svgSha256": "e216a9784c9b84e600eac2285cadbfa8eafa3433e81e5e28e171b5ecd475f9bc",
+      "request": "fp_peristaltic_lift.asset-request.txt",
+      "candidate": "fp_peristaltic_lift.candidate.json",
+      "caption": "fp_peristaltic_lift.txt",
+      "graphHash": "f0aaa7670f15aabeec5dcd824cfa407e64aefaf698cfda355d4a46d52920da48"
+    },
+    {
+      "id": "fp_severable_pressure_conduit",
+      "svg": "fp_severable_pressure_conduit.svg",
+      "svgSha256": "16767730eb8c30b9104f6d7e98b932de8b561c47b6d28050401680e6b0f7fb77",
+      "request": "fp_severable_pressure_conduit.asset-request.txt",
+      "candidate": "fp_severable_pressure_conduit.candidate.json",
+      "caption": "fp_severable_pressure_conduit.txt",
+      "graphHash": "3d0d4d4fb55d3874c8422bb9bbd091e192d2595b9739eba483f2f4d21ba4145e"
+    },
+    {
+      "id": "fp_tendon_hound",
+      "svg": "fp_tendon_hound.svg",
+      "svgSha256": "9a7a0326037b170d48bedb80dd62b29b789783ef1df643a398709b474702f34e",
+      "request": "fp_tendon_hound.asset-request.txt",
+      "candidate": "fp_tendon_hound.candidate.json",
+      "caption": "fp_tendon_hound.txt",
+      "graphHash": "1517ead747648a78038498506cf318282b9ae8b8c28dc5d1929b7b7beba96114"
+    },
+    {
+      "id": "fp_pipe_crawler",
+      "svg": "fp_pipe_crawler.svg",
+      "svgSha256": "95bba1164161e9a6de49e33173d7f6a15900bbe18ed5843806c5660159bac5d7",
+      "request": "fp_pipe_crawler.asset-request.txt",
+      "candidate": "fp_pipe_crawler.candidate.json",
+      "caption": "fp_pipe_crawler.txt",
+      "graphHash": "21a25b24147b21abc0e3549dfbe73472456bdc42172d0813ce62c3e3bba08695"
+    },
+    {
+      "id": "fp_graft_sentry",
+      "svg": "fp_graft_sentry.svg",
+      "svgSha256": "063519954ea3c7d4b9fc6bcf9103e5b3d818097da8e91cc62ba73d2ef4afca9e",
+      "request": "fp_graft_sentry.asset-request.txt",
+      "candidate": "fp_graft_sentry.candidate.json",
+      "caption": "fp_graft_sentry.txt",
+      "graphHash": "414f91609df5ce73e400add67f63308e7beeaf86f3a2e9295634f69f8ec0d680"
+    },
+    {
+      "id": "fp_sluice_mother",
+      "svg": "fp_sluice_mother.svg",
+      "svgSha256": "154255f8ce0cc7d2a07f2d4bc246e35e088d0a234a599ef2d1b647d441753cb9",
+      "request": "fp_sluice_mother.asset-request.txt",
+      "candidate": "fp_sluice_mother.candidate.json",
+      "caption": "fp_sluice_mother.txt",
+      "graphHash": "b41a5c7efe8e3fb7be750ef288f83c7b3f4b052720d1d0fdbd1f9e3f29e3692e"
+    }
+  ]
+}

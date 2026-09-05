@@ -1,0 +1,27 @@
+{
+  "schema": "qa-case-v1",
+  "id": "fleshpunk-training-contract",
+  "title": "Fleshpunk line-art corpus and mutation gates remain deterministic",
+  "status": "bound",
+  "source_globs": [
+    "tools/fleshpunk-lineart-training/**",
+    "tools/boxcraft-judgment-mcp/**",
+    "data/fleshpunk_*.json",
+    "assets/training/fleshpunk/**",
+    "generated/fleshpunk_lineart/**",
+    "docs/FLESHPUNK_MAZE_TRAINING_CONTRACT.md"
+  ],
+  "command": "fleshpunk-training-contract",
+  "quick": true,
+  "evidence_classification": "machine-guardrail",
+  "expected_exit_code": 0,
+  "negative_controls": [
+    {
+      "id": "reject-unexpected-argument",
+      "argv_append": [
+        "--unexpected"
+      ],
+      "expected_exit_code": 2
+    }
+  ]
+}

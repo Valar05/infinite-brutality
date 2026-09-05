@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_tendon_hound-canary
+seed: 314159
+target_id: fp_tendon_hound
+view: TRIPTYCH
+room_roles: kill_court, undercroft_pass
+host_surface: walkable floor
+support_chain: feet > limb_tendons > pelvis_frame > spine > head
+pipes: fp_tendon_hound_respiratory_pipe
+valves: fp_tendon_hound_carotid_throttle_valve
+tendons: fp_tendon_hound_traction_tendons
+connective_tissue: fp_tendon_hound_joint_ligaments
+interaction: pursue, lunge, recoil, and expose a severable tendon
+collider: capsule body plus grounded foot contacts
+service_route: visible maintenance access from the traversable route
+silhouette: low predatory quadruped with exposed traction tendons
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

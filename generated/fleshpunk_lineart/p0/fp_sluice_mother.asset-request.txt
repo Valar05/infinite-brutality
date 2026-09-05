@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_sluice_mother-canary
+seed: 314159
+target_id: fp_sluice_mother
+view: TRIPTYCH
+room_roles: undercroft_pass, kill_court
+host_surface: carved recovery sump
+support_chain: sump_socket > restraining_frame > pump_chambers > pipe_roots > service_ring
+pipes: fp_sluice_mother_sluice_root_pipes
+valves: fp_sluice_mother_brood_sluice_valves
+tendons: fp_sluice_mother_pump_tendons
+connective_tissue: fp_sluice_mother_restraining_graft_web
+interaction: pump, spawn, flood, drain, stun, or sever route feeds
+collider: large fixed body, service ring, spawn-clearance volumes
+service_route: visible maintenance access from the traversable route
+silhouette: restrained pumping organism rooted across a sluice chamber
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

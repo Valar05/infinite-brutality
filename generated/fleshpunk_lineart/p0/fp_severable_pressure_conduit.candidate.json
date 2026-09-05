@@ -1,0 +1,44 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_severable_pressure_conduit",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_severable_pressure_conduit_arterial_conduit",
+    "fp_severable_pressure_conduit_emergency_shutoff",
+    "fp_severable_pressure_conduit_compression_sleeve_tendons",
+    "fp_severable_pressure_conduit_rupturable_coupling"
+  ],
+  "componentGraphHash": "3d0d4d4fb55d3874c8422bb9bbd091e192d2595b9739eba483f2f4d21ba4145e",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "wall or floor service chase",
+  "supportChain": [
+    "embedded_socket",
+    "pipe_saddle",
+    "conduit_body",
+    "coupling",
+    "service_hatch"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "segmented artery pipe with oversized shutoff wheel",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}

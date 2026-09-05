@@ -1,0 +1,75 @@
+{
+  "schema": "FLESHPUNK RUNTIME BINDINGS 1",
+  "family": "fleshpunk_maze",
+  "default_direction": "fleshpunk_maze",
+  "legacy_selector": "?family=hanging_gardens",
+  "activation_state": "PROOF_ASSETS_REQUIRED",
+  "proof_district": {
+    "skeleton_type": "lift_court_hybrid",
+    "bindings": [
+      {
+        "existing": "gate_chokepoint_set",
+        "target": "fp_pressure_valve_gate",
+        "roles": [
+          "gate_step",
+          "kill_court"
+        ]
+      },
+      {
+        "existing": "counterweight_winch",
+        "target": "fp_tendon_bridge_winch",
+        "roles": [
+          "winch_gallery"
+        ]
+      },
+      {
+        "existing": "cargo_lift_cage",
+        "target": "fp_peristaltic_lift",
+        "roles": [
+          "tower_core",
+          "undercroft_pass"
+        ]
+      },
+      {
+        "existing": "brake_lever_pedestal",
+        "target": "fp_severable_pressure_conduit",
+        "roles": [
+          "gate_step",
+          "undercroft_pass"
+        ]
+      },
+      {
+        "existing": "enemy_fast",
+        "target": "fp_tendon_hound",
+        "roles": [
+          "kill_court"
+        ]
+      },
+      {
+        "existing": "enemy_ambush",
+        "target": "fp_pipe_crawler",
+        "roles": [
+          "undercroft_pass",
+          "winch_gallery"
+        ]
+      },
+      {
+        "existing": "enemy_ranged",
+        "target": "fp_graft_sentry",
+        "roles": [
+          "strongpoint_gallery"
+        ]
+      },
+      {
+        "existing": "setpiece_spawner",
+        "target": "fp_sluice_mother",
+        "roles": [
+          "undercroft_pass",
+          "kill_court"
+        ]
+      }
+    ],
+    "activation_gate": "all P0 assets USER_ACCEPTED in cloud/Sense; collision, support, service access, and route clearance verified"
+  },
+  "visual_acceptance": false
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_pressure_valve_gate",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_pressure_valve_gate_blood_pressure_pipes",
+    "fp_pressure_valve_gate_wheel_shutoff_valve",
+    "fp_pressure_valve_gate_paired_gate_tendons",
+    "fp_pressure_valve_gate_hinge_seal"
+  ],
+  "componentGraphHash": "c51ff12301057c432401c7eb1466fd914a4dafa5d4f60b9101e0ed048b892eef",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "carved gate throat",
+  "supportChain": [
+    "host_socket",
+    "bone_iron_frame",
+    "hinge_load_path",
+    "gate_leaf",
+    "wall_tie_in"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "twin pressure uprights framing a tendon-bound gate",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_peristaltic_lift",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_peristaltic_lift_lift_pressure_risers",
+    "fp_peristaltic_lift_floor_stop_valves",
+    "fp_peristaltic_lift_suspension_tendons",
+    "fp_peristaltic_lift_rib_platform_ligaments"
+  ],
+  "componentGraphHash": "f0aaa7670f15aabeec5dcd824cfa407e64aefaf698cfda355d4a46d52920da48",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "carved lift shaft",
+  "supportChain": [
+    "shaft_socket",
+    "rib_platform",
+    "tendon_suspension",
+    "guide_rails",
+    "upper_termination"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "rib cage platform suspended inside a pumping shaft",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}

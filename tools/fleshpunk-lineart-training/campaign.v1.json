@@ -1,0 +1,104 @@
+{
+  "schema": "FLESHPUNK LINEART CAMPAIGN 1",
+  "campaign_id": "ib-fleshpunk-maze-p0",
+  "family": "fleshpunk_maze",
+  "trigger": "drw_fleshpunk",
+  "source_receipt": "../../data/fleshpunk_drive_source_receipt.json",
+  "asset_catalog": "../../data/fleshpunk_asset_targets.json",
+  "proof_district": "lift_court_hybrid",
+  "first_wave": [
+    "fp_pressure_valve_gate",
+    "fp_tendon_bridge_winch",
+    "fp_peristaltic_lift",
+    "fp_severable_pressure_conduit",
+    "fp_tendon_hound",
+    "fp_pipe_crawler",
+    "fp_graft_sentry",
+    "fp_sluice_mother"
+  ],
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "seeds": [
+    314159,
+    271828,
+    161803
+  ],
+  "lineart": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false,
+    "preprocess": {
+      "algorithm": "difference-of-gaussians-binary-ink",
+      "threshold": 48,
+      "tight_radius": 1.5,
+      "broad_radius": 5.0,
+      "solid_tile_max": 0.21,
+      "bbox_ink_fill_max": 0.35,
+      "minimum_selected_drive_sources": 8,
+      "required_authored_supplements": 1,
+      "supplement_binary_threshold": 220
+    },
+    "selected_projection": "assets/training/fleshpunk/lineart-v1/selected"
+  },
+  "split_policy": {
+    "group_key": "asset_id",
+    "same_asset_views_stay_together": true,
+    "drive_v1_is_training_only": true,
+    "held_out_families_required": true,
+    "leakage_verdict": "REJECT"
+  },
+  "training": {
+    "resolution": 512,
+    "batch_size": 1,
+    "shuffle_caption": true,
+    "keep_tokens": 1,
+    "enable_bucket": true,
+    "min_bucket_reso": 256,
+    "max_bucket_reso": 768,
+    "bucket_reso_steps": 64,
+    "precision": "fp16",
+    "attention": "sdpa",
+    "optimizer": "AdamW8bit",
+    "cache_latents": true,
+    "network_dim": 8,
+    "network_alpha": 4,
+    "conv_dim": 4,
+    "conv_alpha": 2,
+    "checkpoint_every_steps": 150,
+    "change_one_factor_per_mutation": true
+  },
+  "review": {
+    "worker": "REGNET_QA_JUDGMENT_JAR",
+    "model": "torchvision.regnet_x_400mf",
+    "required_triptych": [
+      "TRACE",
+      "RECREATION",
+      "MUTATION"
+    ],
+    "boxcraft_hard_gate": true,
+    "auto_chain_internal_winners": true,
+    "final_acceptance": "USER_ONLY"
+  },
+  "remote": {
+    "host": "dclar@100.68.37.106",
+    "clean_root": "C:/Users/dclar/AppData/Local/FleshpunkCauldron",
+    "comfy_commit": "250b2e9551a7bc7a8ebb5beb07e0fecd2983e04a",
+    "sd_scripts_commit": "37a1cbbc5725ed2a3575506e7bd2001c9908ac92",
+    "base_model_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors",
+    "base_model_sha256": "6ce0161689b3853acaa03779ec93eafe75a02f4ced659bee03f50797806fa2fa",
+    "base_model_bytes": 4265146304,
+    "schedule": "00:00-08:00 local",
+    "single_gpu_workload": true
+  }
+}

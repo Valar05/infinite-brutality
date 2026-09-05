@@ -1,0 +1,4 @@
+import assert from "node:assert/strict";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+const transport=new StdioClientTransport({command:process.execPath,args:[new URL("../src/server.mjs",import.meta.url).pathname],stderr:"pipe"});const client=new Client({name:"boxcraft-stdio-smoke",version:"1"});await client.connect(transport);try{const listed=await client.listTools();assert.equal(listed.tools.length,9);const result=await client.callTool({name:"list_pressures",arguments:{}}),data=JSON.parse(result.content[0].text);assert.equal(data.controllerAxis.zero,"MODERN_WAR");assert.equal(data.controllerAxis.hundred,"QUAKE_ANIME_BULLSHIT");console.log("stdio smoke: 9 tools; block and Fleshpunk asset contracts present")}finally{await client.close()}

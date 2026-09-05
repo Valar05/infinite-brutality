@@ -1,0 +1,162 @@
+[
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\hero-panel\\Through_The_Slit_Exploded_Organ_Design_v001.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\001_Through_The_Slit_Exploded_Organ_Design_v001.png",
+    "width": 1536,
+    "height": 1024,
+    "caption": "drw_fleshpunk, exploded anatomical design of a living armored vehicle, wet organs, oxidized iron, isolated mechanical graft components, black studio background",
+    "digest": "e4edf2f82aac455aa8e4162fc29be1cf7958e911a9670bbb7fd76dd7dcf130d8"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\Fleshpunk_Sherman_Part_Lab_v1_exploded.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\002_Fleshpunk_Sherman_Part_Lab_v1_exploded.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, exploded engineering study of a living tank, muscular machinery, bone braces, iron armor, dark technical presentation",
+    "digest": "4a1c5b3821edd711e6f3d0be88d83b64198419be6ab94c669625a11a0a327b38"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\Fleshpunk_Sherman_Part_Lab_v1_preview.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\003_Fleshpunk_Sherman_Part_Lab_v1_preview.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, cinematic living tank prototype, grafted flesh and heavy steel armor, grim industrial lighting",
+    "digest": "8d1e6547f1a792a2af6b39e0ef62a6fe9028fec25803843ab73b36afcb6fa793"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\004_Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, living armored war machine, organic tread assembly, sinew, bone and riveted metal, battlefield presentation",
+    "digest": "3e62498975a899dfbfe405e1de407113f265bc42b1abed6178fc8eefebb51704"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\005_Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, side view of a biomechanical tank, living treads, exposed muscle, corroded armor plating",
+    "digest": "94ca55b256d1fdd3588dce19d47f790ecf4bed65c4261db00f9736d811e0f923"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_A_Living_Treads_HD_v001_exploded.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\006_TK_A_Living_Treads_HD_v001_exploded.png",
+    "width": 1536,
+    "height": 864,
+    "caption": "drw_fleshpunk, exploded study of living tank treads, tendon belts, bone wheels, greasy iron components",
+    "digest": "65063b00eeb74c8dbda37e56721a99a5f7d2e5e39aea5e652cf8d0eb5fe6425a"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_B_Casemate_Chassis_HD_v001_exploded.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\007_TK_B_Casemate_Chassis_HD_v001_exploded.png",
+    "width": 1536,
+    "height": 864,
+    "caption": "drw_fleshpunk, exploded casemate chassis, anatomical armor construction, red tissue and industrial steel",
+    "digest": "dacaf5de0a779ce6710ce0ae539e2f18b8d6a5183a5ed22f20b14e9c822595c8"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_C_Slit_Cannon_HD_v001_exploded.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\008_TK_C_Slit_Cannon_HD_v001_exploded.png",
+    "width": 1536,
+    "height": 864,
+    "caption": "drw_fleshpunk, exploded organic cannon mechanism, vascular barrel, surgical hardware, dark industrial concept art",
+    "digest": "ef75651ba12a4c18ffd0948c2b2bc1a8bcfdb6a805798ea332dea5dfc4bfe66b"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\009_TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, assembled crimson iron leviathan tank, massive living war machine, wet flesh under battered armor",
+    "digest": "0dd4166121eab0501804d1e5d1ff85696052704b2d2cf4fef2d63833cd08e421"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\010_TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, calibrated reference view of a living armored leviathan, organic engineering and corroded steel",
+    "digest": "b93c57ce70aff1d3472519a5dda23e12ad5756d7807ba0fe6d254cf6124770c9"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_E_Bacon_Row_Working_v001_preview.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\011_TK_E_Bacon_Row_Working_v001_preview.png",
+    "width": 1536,
+    "height": 768,
+    "caption": "drw_fleshpunk, row of grafted biological armor modules, raw muscle, bone fixtures, workshop lighting",
+    "digest": "913bc50f562fcc8738728b276bc5e4f262cbb2e5d7e8170bf829a025c92839b1"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\fleshpunk-sherman-part-lab-v1\\tank-kata-checkpoints\\TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\012_TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.png",
+    "width": 1536,
+    "height": 853,
+    "caption": "drw_fleshpunk, full biomechanical graft specimen, visceral machinery, surgical restraint hardware, black background",
+    "digest": "5ac5393129075a7057640ae04adb629f41c94866414b044ccbeecf33e9f472a1"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\outputs\\houdini-fleshpunk-test\\FLESHPUNK_LOOKDEV_TEST_v1.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\013_FLESHPUNK_LOOKDEV_TEST_v1.png",
+    "width": 1536,
+    "height": 864,
+    "caption": "drw_fleshpunk, cinematic subterranean organ chamber, enormous pulsing tissue held by pipes and iron restraints, volumetric red light",
+    "digest": "0a67e73cccea2bf72f4da137df455e20b84cec56670d1204416b6ad3360937f9"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\outputs\\houdini-fleshpunk-test\\SLUICE_CHAMBER_CLEAN_PLATE_v1.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\014_SLUICE_CHAMBER_CLEAN_PLATE_v1.png",
+    "width": 1536,
+    "height": 864,
+    "caption": "drw_fleshpunk, abandoned industrial sluice chamber, wet stone, iron pipes, ominous cinematic darkness",
+    "digest": "2656690dac728ebd19e0342d58af13744c815265d90cd0c9ccc3301613fe3b0d"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\outputs\\houdini-fleshpunk-test\\SLUICE_MOTHER_MESH_RENDER_v2.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\015_SLUICE_MOTHER_MESH_RENDER_v2.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, large restrained biomechanical organism, vascular lobes and metal apparatus, cinematic creature render",
+    "digest": "f673e3fb0c1a4d5b110b8fb60841307d4f0d114a5ccc108508f3f244a24e7d31"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\outputs\\houdini-fleshpunk-test\\SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\016_SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, isolated anatomical machine organism, fleshy lobes, branching vessels, industrial restraint rings",
+    "digest": "c43f23d6bb24224965293d78bd8f130c8a0e234f8ed10f56d4a525b53276029a"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\work\\houdini-fleshpunk\\feeds-v3-qa-01.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\017_feeds-v3-qa-01.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, cathedral-sized restrained organ machine, wet branching tissue, black steel pipes, cinematic blue and crimson light",
+    "digest": "c212f687f2dd0eb0cf4b28a34c842dfd66f32cfa7aae22c00e2f71e9e0fc53c5"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\work\\houdini-fleshpunk\\feeds-v3-qa-03.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\018_feeds-v3-qa-03.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, living industrial organism with an open vascular aperture, iron restraints, glossy membranes, dark chamber",
+    "digest": "f79b01373361278772a45acdd7cc0c205d222499862ed39f83d72c1701c50b61"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-06\\d\\work\\houdini-fleshpunk\\feeds-v3-qa-05.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\019_feeds-v3-qa-05.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, massive grafted sluice organism, translucent flesh and vascular tubes, surgical cage, cinematic industrial chamber",
+    "digest": "b92e02497a59eb9db2d9506ba55d73877e34dd8e50f2cc1333a44bcb9b8d1836"
+  },
+  {
+    "source": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-05\\for\\work\\authored-intro-v2\\reference-organ.png",
+    "destination": "C:\\Users\\dclar\\Documents\\Codex\\2026-08-04\\i\\outputs\\regnese-discord-bot\\work\\fleshpunk-lora\\dataset\\images\\020_reference-organ.png",
+    "width": 1280,
+    "height": 720,
+    "caption": "drw_fleshpunk, armored biomechanical landship in a muddy battlefield, organic treads, patched iron hull, smoke and dramatic war light",
+    "digest": "3addd295ff7bf224258e9f1b075a9610de7718246f238cc4a573f650fd7525fc"
+  }
+]

@@ -1,0 +1,18 @@
+ASSET REQUEST 1
+id: fp_graft_sentry-canary
+seed: 314159
+target_id: fp_graft_sentry
+view: TRIPTYCH
+room_roles: strongpoint_gallery, gate_step
+host_surface: weapon plinth
+support_chain: rock_socket > swivel_base > ammo_organ > barrel_support > service_rear
+pipes: fp_graft_sentry_ammo_feed_vessel
+valves: fp_graft_sentry_breech_pressure_valve
+tendons: fp_graft_sentry_elevation_tendons
+connective_tissue: fp_graft_sentry_swivel_graft_collar
+interaction: track, fire, jam, vent, or sever ammunition feed
+collider: solid plinth, swivel clearance, projectile muzzle
+service_route: visible maintenance access from the traversable route
+silhouette: vascular cannon on a restrained swivel plinth
+require: PIPE, VALVE, TENDON, CONNECTIVE_TISSUE, ASSEMBLED, EXPLODED, ORTHOGRAPHIC, HOST, SUPPORT, SERVICE, SILHOUETTE
+forbid: SHADING, GRAY, HATCHING, GRADIENT, FILTER, BLOB, FLOATING_PART

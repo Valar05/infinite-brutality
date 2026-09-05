@@ -1,0 +1,10 @@
+{
+  "schema": "FLESHPUNK PIXEL ACCEPTANCE 1",
+  "accepted": false,
+  "accepted_by": null,
+  "artifact": "contact-sheet-selected.png",
+  "artifact_sha256": "e5f14582ae84458163855e850a95aeed64d7449ede74e27900b487331f64cf33",
+  "note": "Only the user may change accepted to true after reviewing the selected lineart pixels.",
+  "selected_pixel_aggregate_sha256": "8a14f9e1dab6611232a236a04c6b5a7fb25cfeabda14ba27bb777e9f21bd546f",
+  "selected_images": 9
+}

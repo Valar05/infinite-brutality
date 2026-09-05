@@ -1,0 +1,373 @@
+{
+  "schema": "FLESHPUNK DRIVE MATERIALIZATION 1",
+  "files": [
+    {
+      "name": "001_Through_The_Slit_Exploded_Organ_Design_v001.png",
+      "bytes": 2345041,
+      "provider_bytes": 2345041,
+      "size_match": true,
+      "sha256": "d67c7fa868c54e9b04ff9148e283c26e82c1078ae605877c5be4c8e3c70be490",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "e4edf2f82aac455aa8e4162fc29be1cf7958e911a9670bbb7fd76dd7dcf130d8",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "001_Through_The_Slit_Exploded_Organ_Design_v001.txt",
+      "bytes": 161,
+      "provider_bytes": 161,
+      "size_match": true,
+      "sha256": "521a85008872c659f97363b838313cf5d786cd84d8e05797c413284c72e514d3",
+      "decode": "PASS"
+    },
+    {
+      "name": "002_Fleshpunk_Sherman_Part_Lab_v1_exploded.png",
+      "bytes": 665203,
+      "provider_bytes": 665203,
+      "size_match": true,
+      "sha256": "6dd5963c5e70d6efdd2cf013d7cc08ab9ad20b1b05e387087b7a9674a94ab4b6",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "4a1c5b3821edd711e6f3d0be88d83b64198419be6ab94c669625a11a0a327b38",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "002_Fleshpunk_Sherman_Part_Lab_v1_exploded.txt",
+      "bytes": 134,
+      "provider_bytes": 134,
+      "size_match": true,
+      "sha256": "832f2e792d8a6c0e195db51aa3d48d141b413d42b8c38fbce04a3c41e2fc3d0d",
+      "decode": "PASS"
+    },
+    {
+      "name": "003_Fleshpunk_Sherman_Part_Lab_v1_preview.png",
+      "bytes": 630301,
+      "provider_bytes": 630301,
+      "size_match": true,
+      "sha256": "76960c4d947c34cd3794ca01fd0a1908d69d5f644de489e2e7185734f8f4c864",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "8d1e6547f1a792a2af6b39e0ef62a6fe9028fec25803843ab73b36afcb6fa793",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "003_Fleshpunk_Sherman_Part_Lab_v1_preview.txt",
+      "bytes": 111,
+      "provider_bytes": 111,
+      "size_match": true,
+      "sha256": "b0e278e13d6b4d96c2e3d7214e8ec4b2a93e12cb3cf6857b042686756199f63b",
+      "decode": "PASS"
+    },
+    {
+      "name": "004_Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.png",
+      "bytes": 649262,
+      "provider_bytes": 649262,
+      "size_match": true,
+      "sha256": "d3d3e22ffe4b6da0af4ad5916427df753245f484ae7ebc57076b646589b95aab",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "3e62498975a899dfbfe405e1de407113f265bc42b1abed6178fc8eefebb51704",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "004_Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.txt",
+      "bytes": 124,
+      "provider_bytes": 124,
+      "size_match": true,
+      "sha256": "f2bd68429d3447284681b193974191db9e0acd021cdda2b595d2040743913296",
+      "decode": "PASS"
+    },
+    {
+      "name": "005_Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.png",
+      "bytes": 714227,
+      "provider_bytes": 714227,
+      "size_match": true,
+      "sha256": "ffcc20ab66f551d95c54ed892cee64c3a09c8509eb8a7e6aee2de81b305287a9",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "94ca55b256d1fdd3588dce19d47f790ecf4bed65c4261db00f9736d811e0f923",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "005_Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.txt",
+      "bytes": 105,
+      "provider_bytes": 105,
+      "size_match": true,
+      "sha256": "343844476b233bcc372c277d23ec03279016bd896746ea4db9c1d1365a19e847",
+      "decode": "PASS"
+    },
+    {
+      "name": "006_TK_A_Living_Treads_HD_v001_exploded.png",
+      "bytes": 812917,
+      "provider_bytes": 812917,
+      "size_match": true,
+      "sha256": "0064b303fbb1beb91b4e90a72256de691b5f4eca94462f6d4f225c8390f77022",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "65063b00eeb74c8dbda37e56721a99a5f7d2e5e39aea5e652cf8d0eb5fe6425a",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "006_TK_A_Living_Treads_HD_v001_exploded.txt",
+      "bytes": 104,
+      "provider_bytes": 104,
+      "size_match": true,
+      "sha256": "4d3a774bb1ef43cd7c44e304247ad320c53b08684ec9b4ce472d8b468aa9c297",
+      "decode": "PASS"
+    },
+    {
+      "name": "007_TK_B_Casemate_Chassis_HD_v001_exploded.png",
+      "bytes": 814534,
+      "provider_bytes": 814534,
+      "size_match": true,
+      "sha256": "777ba12fc14395adbf559c8d8db10994a53229fc059ba0c8b8babbd74560b658",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "dacaf5de0a779ce6710ce0ae539e2f18b8d6a5183a5ed22f20b14e9c822595c8",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "007_TK_B_Casemate_Chassis_HD_v001_exploded.txt",
+      "bytes": 106,
+      "provider_bytes": 106,
+      "size_match": true,
+      "sha256": "49b73bcc9543099c06a97f82bd9e4796ccfb5f6bb6cbc09db010d83f4e867187",
+      "decode": "PASS"
+    },
+    {
+      "name": "008_TK_C_Slit_Cannon_HD_v001_exploded.png",
+      "bytes": 645646,
+      "provider_bytes": 645646,
+      "size_match": true,
+      "sha256": "052a272c81d76e0f7844d4afb865e24591e8feb58430350f68c6f68518954d3b",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "ef75651ba12a4c18ffd0948c2b2bc1a8bcfdb6a805798ea332dea5dfc4bfe66b",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "008_TK_C_Slit_Cannon_HD_v001_exploded.txt",
+      "bytes": 115,
+      "provider_bytes": 115,
+      "size_match": true,
+      "sha256": "1503641fa606ad5d71f1f79c6b9ed3a0f129972d986d1f848ada4f67941bbd54",
+      "decode": "PASS"
+    },
+    {
+      "name": "009_TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.png",
+      "bytes": 740055,
+      "provider_bytes": 740055,
+      "size_match": true,
+      "sha256": "3a054aae17ef09830d5d75312926b366aeaf90080df2c32f4011a189deac0963",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "0dd4166121eab0501804d1e5d1ff85696052704b2d2cf4fef2d63833cd08e421",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "009_TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.txt",
+      "bytes": 114,
+      "provider_bytes": 114,
+      "size_match": true,
+      "sha256": "08902a0aa7d4d383e41481ca68e8cb79d57cf237e15f6e2b29ba9b974b4bc44a",
+      "decode": "PASS"
+    },
+    {
+      "name": "010_TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.png",
+      "bytes": 652365,
+      "provider_bytes": 652365,
+      "size_match": true,
+      "sha256": "82e0a4b3f4980219b01d769cae7eff9c96ebf44556b36368086e3d82e27ad768",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "b93c57ce70aff1d3472519a5dda23e12ad5756d7807ba0fe6d254cf6124770c9",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "010_TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.txt",
+      "bytes": 112,
+      "provider_bytes": 112,
+      "size_match": true,
+      "sha256": "80144fdaa35e94f228d2a0a94b77ac1ef0859e3a33786829dbccfad386617f49",
+      "decode": "PASS"
+    },
+    {
+      "name": "011_TK_E_Bacon_Row_Working_v001_preview.png",
+      "bytes": 907714,
+      "provider_bytes": 907714,
+      "size_match": true,
+      "sha256": "b89cb1ec129bacc2b77940f7ff24d2aefca1316fd377029070ef460062c6cf8e",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "913bc50f562fcc8738728b276bc5e4f262cbb2e5d7e8170bf829a025c92839b1",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "011_TK_E_Bacon_Row_Working_v001_preview.txt",
+      "bytes": 102,
+      "provider_bytes": 102,
+      "size_match": true,
+      "sha256": "daedb9d70b6c8352d0df80dd6f92fa121fd868db9f785a4ff3f653ec02b524a7",
+      "decode": "PASS"
+    },
+    {
+      "name": "012_TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.png",
+      "bytes": 848712,
+      "provider_bytes": 848712,
+      "size_match": true,
+      "sha256": "8e7098a8c1a5c9153214870a2f297758d54683b0ad27f476ccb420dd3d35ddcd",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "5ac5393129075a7057640ae04adb629f41c94866414b044ccbeecf33e9f472a1",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "012_TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.txt",
+      "bytes": 117,
+      "provider_bytes": 117,
+      "size_match": true,
+      "sha256": "97d79d27a8075920aa213b85dc40e36ee5835ad25455ddb3e22e4bc35a0b70ee",
+      "decode": "PASS"
+    },
+    {
+      "name": "013_FLESHPUNK_LOOKDEV_TEST_v1.png",
+      "bytes": 1926112,
+      "provider_bytes": 1926112,
+      "size_match": true,
+      "sha256": "1fbd210574fc6f9e7d7fe7dbda4132de5b96b8799661bfcb3d4c954b0448ae15",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "0a67e73cccea2bf72f4da137df455e20b84cec56670d1204416b6ad3360937f9",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "013_FLESHPUNK_LOOKDEV_TEST_v1.txt",
+      "bytes": 134,
+      "provider_bytes": 134,
+      "size_match": true,
+      "sha256": "c149bc7e62afa61d901b1c78591285a231a34e8916f64f6c3929913070abce69",
+      "decode": "PASS"
+    },
+    {
+      "name": "014_SLUICE_CHAMBER_CLEAN_PLATE_v1.png",
+      "bytes": 1449552,
+      "provider_bytes": 1449552,
+      "size_match": true,
+      "sha256": "e234433e6eb04c1f21506faebd03d6f8d061d4eb5b7716cc18bce7bde025ca47",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "2656690dac728ebd19e0342d58af13744c815265d90cd0c9ccc3301613fe3b0d",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "014_SLUICE_CHAMBER_CLEAN_PLATE_v1.txt",
+      "bytes": 103,
+      "provider_bytes": 103,
+      "size_match": true,
+      "sha256": "221aabcef944c7810ca0d43b69d821efb3857ae870483de718f5187a0a1127bf",
+      "decode": "PASS"
+    },
+    {
+      "name": "015_SLUICE_MOTHER_MESH_RENDER_v2.png",
+      "bytes": 98381,
+      "provider_bytes": 98381,
+      "size_match": true,
+      "sha256": "404d9685ab113778d7eac21d5d5c71771388f23b2a7f97178084d616a2082aeb",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "f673e3fb0c1a4d5b110b8fb60841307d4f0d114a5ccc108508f3f244a24e7d31",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "015_SLUICE_MOTHER_MESH_RENDER_v2.txt",
+      "bytes": 119,
+      "provider_bytes": 119,
+      "size_match": true,
+      "sha256": "a3a672318ac4e91d06b4b486f396501c9dcf2ed28a1793dbee8d0325d8cd9b21",
+      "decode": "PASS"
+    },
+    {
+      "name": "016_SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.png",
+      "bytes": 49687,
+      "provider_bytes": 49687,
+      "size_match": true,
+      "sha256": "e5ff14b628240bf7b39a2c6b49cbc3c35162fbfb7b67a7fcc16264ba75715bad",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "c43f23d6bb24224965293d78bd8f130c8a0e234f8ed10f56d4a525b53276029a",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "016_SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.txt",
+      "bytes": 114,
+      "provider_bytes": 114,
+      "size_match": true,
+      "sha256": "53ca495f96a168ad979e5bfda48375c0a6d7fa633e48ebe4403b6ea8476329c2",
+      "decode": "PASS"
+    },
+    {
+      "name": "017_feeds-v3-qa-01.png",
+      "bytes": 1143134,
+      "provider_bytes": 1143134,
+      "size_match": true,
+      "sha256": "85c725e7abc502bc8bccc308e05d57775146ed9f731e7fe8d13e62d6a0876cf0",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "c212f687f2dd0eb0cf4b28a34c842dfd66f32cfa7aae22c00e2f71e9e0fc53c5",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "017_feeds-v3-qa-01.txt",
+      "bytes": 132,
+      "provider_bytes": 132,
+      "size_match": true,
+      "sha256": "de06203468816a4d585fbe1f5c801f9950abf24be08b04cfcd589660fd156661",
+      "decode": "PASS"
+    },
+    {
+      "name": "018_feeds-v3-qa-03.png",
+      "bytes": 1221581,
+      "provider_bytes": 1221581,
+      "size_match": true,
+      "sha256": "cff773cbe1d31829463c0c7b885770962c4db508bb9e549dbc4d65241e7fc3df",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "f79b01373361278772a45acdd7cc0c205d222499862ed39f83d72c1701c50b61",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "018_feeds-v3-qa-03.txt",
+      "bytes": 123,
+      "provider_bytes": 123,
+      "size_match": true,
+      "sha256": "0fc53fd65c54f7083ed5b1634d20ed6e52325bd1a0f3d7ce250c0168f8647652",
+      "decode": "PASS"
+    },
+    {
+      "name": "019_feeds-v3-qa-05.png",
+      "bytes": 1201401,
+      "provider_bytes": 1201401,
+      "size_match": true,
+      "sha256": "422bf11a9159b3f66f92a51faf927faacf32db24977ed1f8d365068b209f0476",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "b92e02497a59eb9db2d9506ba55d73877e34dd8e50f2cc1333a44bcb9b8d1836",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "019_feeds-v3-qa-05.txt",
+      "bytes": 131,
+      "provider_bytes": 131,
+      "size_match": true,
+      "sha256": "3a200e3df96c3cdbeb10d470801ef198ccf02719e8806269a29b3c009c14038f",
+      "decode": "PASS"
+    },
+    {
+      "name": "020_reference-organ.png",
+      "bytes": 888057,
+      "provider_bytes": 888057,
+      "size_match": true,
+      "sha256": "6954c0ee02d430575b0c979d06bb1f0fb67731adb3fd322a2805c1d970340622",
+      "decode": "PASS",
+      "legacy_manifest_sha256": "3addd295ff7bf224258e9f1b075a9610de7718246f238cc4a573f650fd7525fc",
+      "legacy_digest_match": false
+    },
+    {
+      "name": "020_reference-organ.txt",
+      "bytes": 135,
+      "provider_bytes": 135,
+      "size_match": true,
+      "sha256": "a721b0058a88787c2b7147d325383a404ec5b9ab139fcbe680b4877b11865bc1",
+      "decode": "PASS"
+    }
+  ],
+  "summary": {
+    "files": 40,
+    "png": 20,
+    "txt": 20,
+    "provider_size_mismatches": 0,
+    "decode_failures": 0,
+    "legacy_digest_mismatches": 20
+  }
+}

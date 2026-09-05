@@ -1,0 +1,360 @@
+{
+  "schema": "FLESHPUNK LINEART PREPROCESS RECEIPT 1",
+  "algorithm": {
+    "name": "difference-of-gaussians-binary-ink",
+    "threshold": 48,
+    "tight_radius": 1.5,
+    "broad_radius": 5.0,
+    "stroke_expansion": 3,
+    "solid_tile_max": 0.21,
+    "bbox_ink_fill_max": 0.35
+  },
+  "source": "assets/training/fleshpunk/drive-v1/images",
+  "output": "assets/training/fleshpunk/lineart-v1/images",
+  "selected": "assets/training/fleshpunk/lineart-v1/selected",
+  "images": [
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/001_Through_The_Slit_Exploded_Organ_Design_v001.png",
+      "source_sha256": "d67c7fa868c54e9b04ff9148e283c26e82c1078ae605877c5be4c8e3c70be490",
+      "output": "assets/training/fleshpunk/lineart-v1/images/001_Through_The_Slit_Exploded_Organ_Design_v001.png",
+      "output_sha256": "875ed4d88dadd633f705f43bb210e577262a8d0d47b336cc64332b228714a87b",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/001_Through_The_Slit_Exploded_Organ_Design_v001.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.6066513061523438,
+      "dark_ratio": 0.39334869384765625,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.326171875,
+      "bbox_ink_fill": 0.4174655870445344
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/002_Fleshpunk_Sherman_Part_Lab_v1_exploded.png",
+      "source_sha256": "6dd5963c5e70d6efdd2cf013d7cc08ab9ad20b1b05e387087b7a9674a94ab4b6",
+      "output": "assets/training/fleshpunk/lineart-v1/images/002_Fleshpunk_Sherman_Part_Lab_v1_exploded.png",
+      "output_sha256": "08d6d38ff532435eddc898b538ae8a064259a2c1e27dd01625bd4054f6b17b21",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/002_Fleshpunk_Sherman_Part_Lab_v1_exploded.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.7737131076388889,
+      "dark_ratio": 0.2262868923611111,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.15868055555555555,
+      "bbox_ink_fill": 0.2364681603773585
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/003_Fleshpunk_Sherman_Part_Lab_v1_preview.png",
+      "source_sha256": "76960c4d947c34cd3794ca01fd0a1908d69d5f644de489e2e7185734f8f4c864",
+      "output": "assets/training/fleshpunk/lineart-v1/images/003_Fleshpunk_Sherman_Part_Lab_v1_preview.png",
+      "output_sha256": "6f0dcd4edc96beb0855e318090113ffc4a3ce0d1d7a95bcd6f0de6f30ad70df7",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/003_Fleshpunk_Sherman_Part_Lab_v1_preview.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.8166905381944445,
+      "dark_ratio": 0.18330946180555555,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.1342361111111111,
+      "bbox_ink_fill": 0.24855520244821092
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/004_Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.png",
+      "source_sha256": "d3d3e22ffe4b6da0af4ad5916427df753245f484ae7ebc57076b646589b95aab",
+      "output": "assets/training/fleshpunk/lineart-v1/images/004_Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.png",
+      "output_sha256": "d40b84cd4e2c36fb5a6b5d4b6e0e67e4e553525d33bbae7355625290af6fdff5",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/004_Fleshpunk_Vanguard_Living_Tread_Playable_v1_preview.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.7566807725694444,
+      "dark_ratio": 0.24331922743055556,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.20243055555555556,
+      "bbox_ink_fill": 0.26705768864329266
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/005_Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.png",
+      "source_sha256": "ffcc20ab66f551d95c54ed892cee64c3a09c8509eb8a7e6aee2de81b305287a9",
+      "output": "assets/training/fleshpunk/lineart-v1/images/005_Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.png",
+      "output_sha256": "eb61c748a6c97ebda7ba7bfb6738486dc8c1bc4c2e1904f8cfccfacdb867ad79",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/005_Fleshpunk_Vanguard_Living_Tread_Playable_v1_side.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.5929058159722222,
+      "dark_ratio": 0.40709418402777775,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.3367361111111111,
+      "bbox_ink_fill": 0.4099409965034965
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/006_TK_A_Living_Treads_HD_v001_exploded.png",
+      "source_sha256": "0064b303fbb1beb91b4e90a72256de691b5f4eca94462f6d4f225c8390f77022",
+      "output": "assets/training/fleshpunk/lineart-v1/images/006_TK_A_Living_Treads_HD_v001_exploded.png",
+      "output_sha256": "0ce677621aa26b30876e122ccb9726bcea03a1a4a46f496d34f8529f40bba9ae",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/006_TK_A_Living_Treads_HD_v001_exploded.txt",
+      "selected": false,
+      "quality_failures": [
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.7504257390528549,
+      "dark_ratio": 0.24957426094714505,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.20597029320987653,
+      "bbox_ink_fill": 0.520850631541868
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/007_TK_B_Casemate_Chassis_HD_v001_exploded.png",
+      "source_sha256": "777ba12fc14395adbf559c8d8db10994a53229fc059ba0c8b8babbd74560b658",
+      "output": "assets/training/fleshpunk/lineart-v1/images/007_TK_B_Casemate_Chassis_HD_v001_exploded.png",
+      "output_sha256": "ec72255aa178aff3282ac3da2a8134ab6be9e63771015e3800b19d39edf1459a",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/007_TK_B_Casemate_Chassis_HD_v001_exploded.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.8292356891396605,
+      "dark_ratio": 0.1707643108603395,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.13040123456790123,
+      "bbox_ink_fill": 0.1727638929547229
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/008_TK_C_Slit_Cannon_HD_v001_exploded.png",
+      "source_sha256": "052a272c81d76e0f7844d4afb865e24591e8feb58430350f68c6f68518954d3b",
+      "output": "assets/training/fleshpunk/lineart-v1/images/008_TK_C_Slit_Cannon_HD_v001_exploded.png",
+      "output_sha256": "33c3d60de8b45cc0b14e6f9857ecedef79c8bc52a063b80ab6e0bb3d6e705438",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/008_TK_C_Slit_Cannon_HD_v001_exploded.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.8839586046006944,
+      "dark_ratio": 0.11604139539930555,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.09259259259259259,
+      "bbox_ink_fill": 0.15939549383942767
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/009_TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.png",
+      "source_sha256": "3a054aae17ef09830d5d75312926b366aeaf90080df2c32f4011a189deac0963",
+      "output": "assets/training/fleshpunk/lineart-v1/images/009_TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.png",
+      "output_sha256": "a5665a2f72aed7f6e140d93d8a332b7aa4d5cb276410d0127d49e388dfefa760",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/009_TK_D_Crimson_Iron_Leviathan_Assembled_v007_preview.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.8006087239583334,
+      "dark_ratio": 0.19939127604166668,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.16381944444444443,
+      "bbox_ink_fill": 0.3270198604783599
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/010_TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.png",
+      "source_sha256": "82e0a4b3f4980219b01d769cae7eff9c96ebf44556b36368086e3d82e27ad768",
+      "output": "assets/training/fleshpunk/lineart-v1/images/010_TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.png",
+      "output_sha256": "5515c09dfc120abd281df555cc9ef258b85560b8509573ab9b8c60c9890041ef",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/010_TK_D_Crimson_Iron_Leviathan_Reference_Calibrated_v008_preview.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.7662825520833333,
+      "dark_ratio": 0.23371744791666665,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.18902777777777777,
+      "bbox_ink_fill": 0.2776840965346535
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/011_TK_E_Bacon_Row_Working_v001_preview.png",
+      "source_sha256": "b89cb1ec129bacc2b77940f7ff24d2aefca1316fd377029070ef460062c6cf8e",
+      "output": "assets/training/fleshpunk/lineart-v1/images/011_TK_E_Bacon_Row_Working_v001_preview.png",
+      "output_sha256": "8ce8e193444396c4eee730171b45e4b8a03f14e6bc3f610cfbcdf60c5056c705",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/011_TK_E_Bacon_Row_Working_v001_preview.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.6069318983289931,
+      "dark_ratio": 0.3930681016710069,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.3221028645833333,
+      "bbox_ink_fill": 0.53147236282277
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/012_TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.png",
+      "source_sha256": "8e7098a8c1a5c9153214870a2f297758d54683b0ad27f476ccb420dd3d35ddcd",
+      "output": "assets/training/fleshpunk/lineart-v1/images/012_TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.png",
+      "output_sha256": "8ed2446589687f72435ebda2146fab02a2f2c91c3e20d84c08205a696ae83fff",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/012_TK_F_Through_The_Slit_Full_Graft_Specimen_v001_preview.txt",
+      "selected": true,
+      "quality_failures": [],
+      "white_ratio": 0.8238455268171161,
+      "dark_ratio": 0.17615447318288394,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.1501572327044025,
+      "bbox_ink_fill": 0.22227775980029585
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/013_FLESHPUNK_LOOKDEV_TEST_v1.png",
+      "source_sha256": "1fbd210574fc6f9e7d7fe7dbda4132de5b96b8799661bfcb3d4c954b0448ae15",
+      "output": "assets/training/fleshpunk/lineart-v1/images/013_FLESHPUNK_LOOKDEV_TEST_v1.png",
+      "output_sha256": "fd3d3cb485e1580199db8ec7ec76b1ff0867a33cddd3c013d4cc71e002b87e36",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/013_FLESHPUNK_LOOKDEV_TEST_v1.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.5600005726755402,
+      "dark_ratio": 0.4399994273244599,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.31790123456790126,
+      "bbox_ink_fill": 0.4399994273244599
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/014_SLUICE_CHAMBER_CLEAN_PLATE_v1.png",
+      "source_sha256": "e234433e6eb04c1f21506faebd03d6f8d061d4eb5b7716cc18bce7bde025ca47",
+      "output": "assets/training/fleshpunk/lineart-v1/images/014_SLUICE_CHAMBER_CLEAN_PLATE_v1.png",
+      "output_sha256": "b76604282aec2b6a1ba3e5138cdf29ee6a92db3f60168309baad4c106ce62f63",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/014_SLUICE_CHAMBER_CLEAN_PLATE_v1.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.6143278899016203,
+      "dark_ratio": 0.38567211009837965,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.26413001543209874,
+      "bbox_ink_fill": 0.38567211009837965
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/015_SLUICE_MOTHER_MESH_RENDER_v2.png",
+      "source_sha256": "404d9685ab113778d7eac21d5d5c71771388f23b2a7f97178084d616a2082aeb",
+      "output": "assets/training/fleshpunk/lineart-v1/images/015_SLUICE_MOTHER_MESH_RENDER_v2.png",
+      "output_sha256": "02d014450bce576c2e1edc21a6edb5cf734ed39e5378d2ff6496a04a73eebb2f",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/015_SLUICE_MOTHER_MESH_RENDER_v2.txt",
+      "selected": false,
+      "quality_failures": [
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.84220703125,
+      "dark_ratio": 0.15779296875,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.13881944444444444,
+      "bbox_ink_fill": 0.4249495923555711
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/016_SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.png",
+      "source_sha256": "e5ff14b628240bf7b39a2c6b49cbc3c35162fbfb7b67a7fcc16264ba75715bad",
+      "output": "assets/training/fleshpunk/lineart-v1/images/016_SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.png",
+      "output_sha256": "fad85413bf425a7e4fb2599fa670d13c63850a24ee4cfa589461990621758c76",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/016_SLUICE_MOTHER_MESH_RENDER_ALPHA_v2.txt",
+      "selected": false,
+      "quality_failures": [
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.8396017795138889,
+      "dark_ratio": 0.1603982204861111,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.1375,
+      "bbox_ink_fill": 0.4186861305598985
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/017_feeds-v3-qa-01.png",
+      "source_sha256": "85c725e7abc502bc8bccc308e05d57775146ed9f731e7fe8d13e62d6a0876cf0",
+      "output": "assets/training/fleshpunk/lineart-v1/images/017_feeds-v3-qa-01.png",
+      "output_sha256": "189a9a1c3b1f1e8bc69518e176b598970ac6328f2f3f11e6cbc2bafbbae7e3f0",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/017_feeds-v3-qa-01.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.6406901041666667,
+      "dark_ratio": 0.35930989583333334,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.2865972222222222,
+      "bbox_ink_fill": 0.36015400678673976
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/018_feeds-v3-qa-03.png",
+      "source_sha256": "cff773cbe1d31829463c0c7b885770962c4db508bb9e549dbc4d65241e7fc3df",
+      "output": "assets/training/fleshpunk/lineart-v1/images/018_feeds-v3-qa-03.png",
+      "output_sha256": "098ac44958dd6173b230dd786109ae1f1c7104eafae3631efd6e2b821fba005c",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/018_feeds-v3-qa-03.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.6222200520833333,
+      "dark_ratio": 0.3777799479166667,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.30895833333333333,
+      "bbox_ink_fill": 0.3777799479166667
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/019_feeds-v3-qa-05.png",
+      "source_sha256": "422bf11a9159b3f66f92a51faf927faacf32db24977ed1f8d365068b209f0476",
+      "output": "assets/training/fleshpunk/lineart-v1/images/019_feeds-v3-qa-05.png",
+      "output_sha256": "3e911cacd960eabf4cf43ef70a085e24ef3bc0701a1815d691ff7599e9813446",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/019_feeds-v3-qa-05.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.6365592447916667,
+      "dark_ratio": 0.36344075520833335,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.29138888888888886,
+      "bbox_ink_fill": 0.36344075520833335
+    },
+    {
+      "source": "assets/training/fleshpunk/drive-v1/images/020_reference-organ.png",
+      "source_sha256": "6954c0ee02d430575b0c979d06bb1f0fb67731adb3fd322a2805c1d970340622",
+      "output": "assets/training/fleshpunk/lineart-v1/images/020_reference-organ.png",
+      "output_sha256": "79047d8c68896243ff508d3d77501bde59a5ffc1823f8997d1630670e537f4a3",
+      "caption": "assets/training/fleshpunk/lineart-v1/images/020_reference-organ.txt",
+      "selected": false,
+      "quality_failures": [
+        "dense_solid_ink",
+        "fused_or_blob_silhouette"
+      ],
+      "white_ratio": 0.4993142361111111,
+      "dark_ratio": 0.5006857638888889,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.379375,
+      "bbox_ink_fill": 0.5888887187262304
+    }
+  ],
+  "supplements": [
+    {
+      "source": "assets/training/fleshpunk/source/fp_pressure_valve_gate_line_v3.png",
+      "source_sha256": "f3a1022019157ae819e74df5665392da7d31a249d690b02937f358572791c727",
+      "output": "assets/training/fleshpunk/lineart-v1/selected/fp_pressure_valve_gate_line_v3.png",
+      "output_sha256": "97dcc31529ffa0f3fc6add61f90b85f97bd3229d31f72a00d269c996920f8416",
+      "caption": "assets/training/fleshpunk/lineart-v1/selected/fp_pressure_valve_gate_line_v3.txt",
+      "white_ratio": 0.8887106577555338,
+      "dark_ratio": 0.11128934224446614,
+      "mid_ratio": 0.0,
+      "solid_tile_ratio": 0.0013020833333333333,
+      "bbox_ink_fill": 0.1224854662960817
+    }
+  ],
+  "contact_sheet": {
+    "path": "assets/training/fleshpunk/lineart-v1/contact-sheet.png",
+    "sha256": "64ebe7f0b5a68fc458a5044a4ba3ca0f2ca8be57250089d0e9ded8b13d2f764d"
+  },
+  "selected_contact_sheet": {
+    "path": "assets/training/fleshpunk/lineart-v1/contact-sheet-selected.png",
+    "sha256": "e5f14582ae84458163855e850a95aeed64d7449ede74e27900b487331f64cf33"
+  },
+  "selected_pixel_aggregate_sha256": "8a14f9e1dab6611232a236a04c6b5a7fb25cfeabda14ba27bb777e9f21bd546f",
+  "status": "PROCEED",
+  "selected_count": 8,
+  "rejected_count": 12,
+  "supplement_count": 1,
+  "hard_failures": [],
+  "visual_acceptance": false,
+  "final_acceptance": "USER_ONLY"
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "FLESHPUNK ASSET CANDIDATE 1",
+  "targetId": "fp_sluice_mother",
+  "seed": "314159",
+  "views": [
+    "ASSEMBLED",
+    "EXPLODED",
+    "ORTHOGRAPHIC"
+  ],
+  "componentIds": [
+    "fp_sluice_mother_sluice_root_pipes",
+    "fp_sluice_mother_brood_sluice_valves",
+    "fp_sluice_mother_pump_tendons",
+    "fp_sluice_mother_restraining_graft_web"
+  ],
+  "componentGraphHash": "b41a5c7efe8e3fb7be750ef288f83c7b3f4b052720d1d0fdbd1f9e3f29e3692e",
+  "lineArt": {
+    "background": "#ffffff",
+    "stroke": "#000000",
+    "allowed_fills": [
+      "none",
+      "#ffffff"
+    ],
+    "shading": false,
+    "gray": false,
+    "hatching": false,
+    "gradients": false,
+    "filters": false
+  },
+  "hostSurface": "carved recovery sump",
+  "supportChain": [
+    "sump_socket",
+    "restraining_frame",
+    "pump_chambers",
+    "pipe_roots",
+    "service_ring"
+  ],
+  "serviceRoute": "visible maintenance access from the traversable route",
+  "silhouette": "restrained pumping organism rooted across a sluice chamber",
+  "regnet": {
+    "status": "UNKNOWN"
+  },
+  "visualAcceptance": false
+}
