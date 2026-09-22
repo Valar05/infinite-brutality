@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createProductOneInputAdapter } from '../src/product-one-input-adapter.js';
 const negativeControlIndex = process.argv.indexOf('--negative-control');
 if (negativeControlIndex >= 0) {
   const control = process.argv[negativeControlIndex + 1] || '';
@@ -17,6 +18,13 @@ import {
   findOpenWorldNodePath,
   fixtureIndexForWorldNode,
 } from '../src/open-world-runtime.js';
+
+const productionInputAdapter = createProductOneInputAdapter({
+  enqueueJump: () => true,
+  stepController: (_dt, move) => move,
+});
+productionInputAdapter.setMove({ moveX: 0, moveY: 1, source: 'open-world-runtime-qa' });
+productionInputAdapter.update(1 / 60);
 
 const plan = {
   levelIndex: 4,
