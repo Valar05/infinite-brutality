@@ -8,6 +8,7 @@ import {
   buildSedimentaryMesaMeshData,
   buildSurfaceNetMeshData,
 } from './island-geometry.js?v=0.8.191';
+import { buildOpenWorldTerrainField } from './open-world-field.js?v=0.1.0';
 
 const TERRAIN_DOWN = new THREE.Vector3(0, -1, 0);
 const terrainSupportRaycaster = new THREE.Raycaster();
@@ -221,6 +222,28 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     });
   };
 
+  const addOpenWorldPlan = (plan, options = {}) => {
+    if (!plan?.nodes?.length) return null;
+    const field = buildOpenWorldTerrainField(plan, options);
+    terrainSpecs.push({
+      type: 'openWorldField',
+      id: 'open-world-continuous-field',
+      nodeCount: plan.nodes.length,
+      edgeCount: plan.edges?.length || 0,
+      donorLineage: [...(plan.donorLineage || [])],
+    });
+    return addVoxelField({
+      id: 'open-world-continuous-field',
+      field,
+      rockGrammar: 'open_world_continuous_strata',
+      rockSilhouette: 'tapered_plateaus_with_organic_causeways',
+      imperialFunction: 'continuous_open_world_route_mass',
+      source: 'open-world-continuous-field',
+      kind: 'open_world_terrain',
+      material: MAT.sedimentaryRockDark,
+    });
+  };
+
   const supportAt = (x, z, feetY, options = {}) => {
     const radius = options.radius ?? 0.38;
     const stepUp = options.stepUp ?? 0.92;
@@ -287,6 +310,7 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     meshColliders,
     terrainSpecs,
     addVoxelField,
+    addOpenWorldPlan,
     addIslandStamp,
     addBridgeSpan,
     supportAt,

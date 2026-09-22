@@ -15,6 +15,7 @@ import { createProductOneController, PRODUCT_ONE_CAPABILITY_PROFILE, PRODUCT_ONE
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
+import { buildOpenWorldPlan } from './open-world-plan.js?v=0.1.0';
 import { generateControllerArena } from './controller-kata.js?v=0.8.222';
 import { applyWorldGridOverlay } from './controller-grid-material.js?v=0.8.214';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
@@ -278,6 +279,7 @@ const roomState = {
   transitionLock: 0,
   enemyPositions: [],
   districtPlan: null,
+  openWorldPlan: null,
   gauntletRooms: [],
   sliceSpecs: null,
   navGraph: null,
@@ -3801,6 +3803,12 @@ function generateDistrictPlan(levelIndex) {
 function ensureDistrictPlan() {
   if (!roomState.districtPlan || roomState.districtPlan.levelIndex !== roomState.levelIndex) {
     roomState.districtPlan = generateDistrictPlan(roomState.levelIndex);
+    roomState.openWorldPlan = buildOpenWorldPlan({
+      districtPlan: roomState.districtPlan,
+      roomCount: playableRoomCount(),
+      roomSpecAt: playableRoomSpec,
+    });
+    window.__infiniteBrutalityOpenWorldPlan = roomState.openWorldPlan;
   }
   return roomState.districtPlan;
 }
@@ -3814,6 +3822,8 @@ function districtInfoForRoomIndex(index, plan = roomState.districtPlan || ensure
 }
 
 function batchRoomWorldOffset(index, plan = roomState.districtPlan || ensureDistrictPlan()) {
+  const worldNode = roomState.openWorldPlan?.nodes?.[index];
+  if (worldNode?.position) return makeVec(worldNode.position[0], worldNode.position[1], worldNode.position[2]);
   const info = districtInfoForRoomIndex(index, plan);
   const districtPoints = info.district?.roomOffsets?.length ? info.district.roomOffsets : info.district?.layoutPoints;
   const points = districtPoints || DISTRICT_LOCAL_LAYOUTS[0].points;
@@ -3835,6 +3845,23 @@ function roomWantsBranch(index) {
 }
 
 function buildDistrictBranchLinks(plan = roomState.districtPlan || ensureDistrictPlan()) {
+  const worldEdges = roomState.openWorldPlan?.edges || [];
+  if (worldEdges.length) {
+    return worldEdges
+      .filter((edge) => edge.routeRole !== 'main')
+      .map((edge) => {
+        const offsetA = batchRoomWorldOffset(edge.a, plan);
+        const offsetB = batchRoomWorldOffset(edge.b, plan);
+        return {
+          a: edge.a,
+          b: edge.b,
+          sideA: connectorTowardOffset(offsetA, offsetB),
+          sideB: connectorTowardOffset(offsetB, offsetA),
+          routeRole: edge.routeRole,
+          worldEdgeId: edge.id,
+        };
+      });
+  }
   const links = [];
   for (const district of plan.districts) {
     for (const [fromLocal, toLocal] of district.branchPairs) {
@@ -5146,6 +5173,7 @@ function buildGeneratedGauntlet(startIndex = 0) {
     });
   }
   createActiveTerrainLayer();
+  roomState.terrainLayer.addOpenWorldPlan(roomState.openWorldPlan, { cell: 1.8 });
   for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
   for (const room of rawRooms) {
     const offset = room.offset;
