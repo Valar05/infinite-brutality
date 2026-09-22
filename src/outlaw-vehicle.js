@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ColliderDesc, RigidBodyDesc } from '../vendor/rapier3d/rapier.mjs';
 
-const ACCEPTED_OUTLAW_ASSET = './assets/vehicles/outlaw/Outlaw_Complete_Clearance_TEXTURED.glb';
+const ACCEPTED_OUTLAW_ASSET = 'https://valar05.github.io/model-viewer-lab/models/outlaw/Outlaw_Complete_Clearance_TEXTURED.glb';
 const WHEEL_RADIUS = 0.54;
 const MAX_STEER = THREE.MathUtils.degToRad(28);
 const MAX_FORWARD_SPEED = 15.5;
