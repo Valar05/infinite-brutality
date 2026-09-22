@@ -19,3 +19,35 @@ Named wheel assemblies used by runtime:
 - WHEEL_RR / RIM_RR / HUB_RR
 
 First mobility proof is deliberately narrow: Rapier kinematic collision/contact, forward/reverse speed integration, front steering, wheel spin, and chase camera. It does not claim suspension, drivetrain, tire-force simulation, or final vehicle physics.
+
+
+## Cockpit and handling authority
+
+The production driving perspective is first-person, Half-Life 2 style: the driver camera lives inside the same world-space truck that renders the exterior. The exterior is not replaced by a separate cockpit-only scene.
+
+The minimum interior currently includes:
+- dashboard and brow
+- center console
+- driver seat
+- steering column and visible steering wheel
+- instrument cluster
+
+Handling donor: `Valar05/long-haul`.
+
+Ported behavior family:
+- wheelbase steering using the Outlaw's actual ~3.528 m axle spacing
+- Long Haul steering response / return shape
+- speed-gated drift buildup
+- lateral slip
+- delayed heading recovery
+- grip-based momentum alignment
+- turn-look yaw
+- reduced first-person-safe turn roll
+
+Long Haul's 160 mph envelope is intentionally not copied. The Outlaw uses a grounded lower speed envelope while preserving the donor's handling relationships.
+
+Camera:
+- default: cockpit / first person
+- debug: chase camera for wheel and steering inspection
+- keyboard toggle: `C`
+- direct URL debug mode: `?vehicle=outlaw&vehicleCamera=debug`
