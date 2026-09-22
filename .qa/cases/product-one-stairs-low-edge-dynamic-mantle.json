@@ -28,7 +28,7 @@
     {
       "op": "eq",
       "path": "metrics.arenaGeometryHash",
-      "value": "8c87484c"
+      "value": "d884eb5f"
     },
     {
       "op": "eq",
@@ -38,7 +38,7 @@
     {
       "op": "eq",
       "path": "metrics.randomMantleFixtureId",
-      "value": "cube-12"
+      "value": "cube-13"
     },
     {
       "op": "eq",

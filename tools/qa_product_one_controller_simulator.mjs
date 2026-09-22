@@ -1,6 +1,7 @@
 import * as THREE from "../vendor/three/build/three.module.js";
 import { generateControllerArena } from "../src/controller-kata.js";
 import { createPhysicsWorld, ensurePhysicsReady } from "../src/physics-world.js";
+import { createProductOneInputAdapter } from "../src/product-one-input-adapter.js";
 import {
   createProductOneController,
   PRODUCT_ONE_CAPABILITY_PROFILE,
@@ -27,12 +28,15 @@ const lowMantleFixture = fixtureByRole("low-mantle");
 const highMantleFixture = fixtureByRole("high-mantle");
 const impossibleFixture = fixtureByRole("impossible-control");
 const apexRise = PRODUCT_ONE_CAPABILITY_PROFILE.jumpSpeed ** 2 / (2 * PRODUCT_ONE_CAPABILITY_PROFILE.gravity);
-const randomMantleFixture = arena.cubes.find((cube) => (
-  cube.size[0] >= 2.8
-  && cube.size[2] >= 2.8
-  && cube.size[1] > PRODUCT_ONE_CAPABILITY_PROFILE.autostepHeight
-  && cube.size[1] <= apexRise + PRODUCT_ONE_CAPABILITY_PROFILE.mantleMaxFeetToLip
-));
+const minimumMantleFootprint = PRODUCT_ONE_CAPABILITY_PROFILE.radius * 2 + PRODUCT_ONE_CAPABILITY_PROFILE.mantleForward;
+const randomMantleFixture = arena.cubes
+  .filter((cube) => (
+    cube.size[0] >= minimumMantleFootprint
+    && cube.size[2] >= minimumMantleFootprint
+    && cube.size[1] > PRODUCT_ONE_CAPABILITY_PROFILE.autostepHeight
+    && cube.size[1] <= apexRise + PRODUCT_ONE_CAPABILITY_PROFILE.mantleMaxFeetToLip
+  ))
+  .sort((a, b) => (b.size[0] * b.size[2]) - (a.size[0] * a.size[2]) || a.id.localeCompare(b.id))[0];
 const courseScenario = (fixture) => arena.traversal.scenarios[fixture.id];
 const withholdFixture = valueAfter(
   "--withhold-fixture",
@@ -101,16 +105,23 @@ function createHarness(spawn) {
     rightForYaw,
     onEvent: (event) => events.push(event),
   });
+  const input = createProductOneInputAdapter({
+    enqueueJump: () => controller.input.pressJump({ source: "diagnostic-simulator" }),
+    stepController: (dt, move) => {
+      controller.input.setMove({ ...move, source: "diagnostic-simulator" });
+      return controller.input.update(dt);
+    },
+  });
   let controllerTicks = 0;
   let physicsSteps = 0;
   const update = (rawInput) => {
-    controller.input.setMove({ ...rawInput, source: "diagnostic-simulator" });
-    const frame = controller.input.update(PRODUCT_ONE_FIXED_DT);
+    input.setMove({ ...rawInput, source: "diagnostic-simulator" });
+    const frame = input.update(PRODUCT_ONE_FIXED_DT);
     controllerTicks += frame.steps;
     if (frame.last?.move) physicsSteps += 1;
     return frame;
   };
-  return { physics, player, controller, events, mountedIds, update, counts: () => ({ controllerTicks, physicsSteps }) };
+  return { physics, player, controller, input, events, mountedIds, update, counts: () => ({ controllerTicks, physicsSteps }) };
 }
 
 function runForwardScenario(scenario, seconds, topBounds = null) {
@@ -170,7 +181,7 @@ function runJumpMantle(fixture, scenario) {
     harness.update({ moveY: 1 });
     if (harness.player.position.z >= frontZ - jumpTriggerDistance) break;
   }
-  harness.controller.input.pressJump({ source: "diagnostic-simulator" });
+  harness.input.pressJump({ source: "diagnostic-simulator" });
   for (let tick = 0; tick < tickHz * 3; tick += 1) {
     harness.update({ moveY: 1 });
     if (harness.events.some((event) => event.type === "mantle-complete")) break;
