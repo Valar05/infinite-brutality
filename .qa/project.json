@@ -18,6 +18,24 @@
       "seeds": [],
       "timeout_seconds": 30
     },
+    "open-world-runtime-world-position": {
+      "adapter": {
+        "kind": "exit-code"
+      },
+      "argv": [
+        "node",
+        "--no-warnings",
+        "tools/test_open_world_runtime_contract.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "QA_OFFLINE": "1"
+      },
+      "parameters": {},
+      "robustness_domains": {},
+      "seeds": [],
+      "timeout_seconds": 30
+    },
     "playtest-derived-regressions": {
       "adapter": {
         "kind": "final-json"

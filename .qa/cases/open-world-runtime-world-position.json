@@ -1,0 +1,28 @@
+{
+  "command": "open-world-runtime-world-position",
+  "evidence_classification": "machine-guardrail",
+  "expected_exit_code": 0,
+  "id": "open-world-runtime-world-position",
+  "negative_controls": [
+    {
+      "argv_append": [
+        "--negative-control",
+        "room-index-authority"
+      ],
+      "expected_exit_code": 7,
+      "id": "room-index-authority"
+    }
+  ],
+  "quick": true,
+  "schema": "qa-case-v1",
+  "source_globs": [
+    "src/main.js",
+    "src/open-world-plan.js",
+    "src/open-world-runtime.js",
+    "src/open-world-field.js",
+    "src/terrain-layer.js",
+    "tools/test_open_world_runtime_contract.mjs"
+  ],
+  "status": "bound",
+  "title": "Open-world runtime uses world position and semantic node IDs"
+}

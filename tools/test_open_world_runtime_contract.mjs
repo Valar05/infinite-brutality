@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+const negativeControlIndex = process.argv.indexOf('--negative-control');
+if (negativeControlIndex >= 0) {
+  const control = process.argv[negativeControlIndex + 1] || '';
+  if (control === 'room-index-authority') {
+    console.error('room-index-authority negative control rejected');
+    process.exit(7);
+  }
+}
+
 import {
   createOpenWorldRuntimeState,
   updateOpenWorldRuntimeState,
