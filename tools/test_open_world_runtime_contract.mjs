@@ -24,6 +24,7 @@ const productionInputAdapter = createProductOneInputAdapter({
   stepController: (_dt, move) => move,
 });
 productionInputAdapter.setMove({ moveX: 0, moveY: 1, source: 'open-world-runtime-qa' });
+productionInputAdapter.pressJump({ source: 'open-world-runtime-qa' });
 productionInputAdapter.update(1 / 60);
 
 const plan = {
