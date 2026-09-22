@@ -5,7 +5,8 @@ Authority: **after-clearance accepted**.
 The former wheel-clearance experiment was explicitly accepted by Drew on 2026-09-22 and is now the production geometry authority for the Outlaw truck. The pre-clearance model is historical comparison only.
 
 Runtime asset:
-- `Outlaw_Complete_Clearance_TEXTURED.glb`
+- `https://valar05.github.io/model-viewer-lab/models/outlaw/Outlaw_Complete_Clearance_TEXTURED.glb`
+- generated from the provenance-locked accepted clearance source in `Valar05/model-viewer-lab`
 - Z-up source converted at presentation/runtime level
 - wheel radius: ~0.54 m
 - front axle mesh centers: x ~ -1.86375
