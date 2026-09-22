@@ -11,6 +11,7 @@ import { createMaterialResources } from './materials.js?v=0.8.213';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createBoundedContactMantlePlan, createPlayerClimbApi } from './player-climb.js?v=0.8.218';
 import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.218';
+import { createOutlawVehicle } from './outlaw-vehicle.js?v=0.8.219';
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
@@ -34,9 +35,10 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.218';
+const BUILD = '0.8.219';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
+const OUTLAW_VEHICLE_MODE = URL_PARAMS.get('vehicle') === 'outlaw';
 const CONTROLLER_KATA_BASE_SEED = URL_PARAMS.get('seed') || 'controller-proof';
 const ACTIVE_DISTRICT_ID = URL_PARAMS.get('district') || 'artillery_battery';
 const ISLAND_ART_ONLY = true;
@@ -438,6 +440,7 @@ let lastErrorClipboardText = '';
 let visualQaCapturedFrames = 0;
 let visualQaLastCaptureMs = -Infinity;
 let visualQaRenderedBeaconSent = false;
+let outlawVehicle = null;
 
 function publishVisualQaBeacon(stage, values = {}) {
   if (!VISUAL_QA_BEACON) return;
@@ -9595,21 +9598,26 @@ function render() {
     updateEnemyBloodParticles(realDt);
     updateEnemyAttackSweepDebug(realDt);
     const dt = player.hitPause > 0 ? 0 : realDt * combatFx.timeScale;
-    updatePlayer(dt);
-    if (!useControllerKataSlice()) {
+    if (OUTLAW_VEHICLE_MODE && outlawVehicle) {
+      outlawVehicle.update(realDt);
+      skyDome.position.copy(camera.position);
+    } else {
+      updatePlayer(dt);
+    }
+    if (!useControllerKataSlice() && !OUTLAW_VEHICLE_MODE) {
       updateAttack(dt);
       updateEnemyEngagement(dt);
       updateArms(dt);
       updateNookTts(dt);
     }
-    updateControllerKataHud();
+    if (!OUTLAW_VEHICLE_MODE) updateControllerKataHud();
     updateDiegeticLights(performance.now() / 1000);
     updatePad();
     updateCollisionDebugOverlay();
     const renderStart = performance.now();
     renderer.clear();
     renderer.render(scene, camera);
-    if (!useControllerKataSlice()) {
+    if (!useControllerKataSlice() && !OUTLAW_VEHICLE_MODE) {
       renderer.clearDepth();
       renderer.render(armsScene, armsCamera);
     }
@@ -9651,12 +9659,30 @@ async function init() {
       hintEl.textContent = 'Move with WASD or left touch. Look with mouse or right touch. Jump. Reach the cyan exit.';
     }
     buildRoom();
+    if (OUTLAW_VEHICLE_MODE) {
+      attackButton.hidden = true;
+      jumpButton.hidden = true;
+      if (healthHudEl) healthHudEl.hidden = true;
+      if (damageFlashEl) damageFlashEl.hidden = true;
+      const vehicleGroundY = roomState.spawn.y - PLAYER_EYE_HEIGHT + 0.78;
+      outlawVehicle = await createOutlawVehicle({
+        parent: world,
+        loader,
+        physicsWorld: roomState.physicsWorld,
+        input,
+        camera,
+        spawn: new THREE.Vector3(roomState.spawn.x, vehicleGroundY, roomState.spawn.z),
+        setStatus,
+      });
+      hintEl.textContent = 'Drive with WASD or the left touch stick. Forward/reverse on Y, steer on X.';
+      hintEl.style.opacity = '1';
+    }
     publishVisualQaBeacon('reset', visualQaBeaconFields());
     setupTouch();
     resize();
     window.addEventListener('resize', resize);
     placeActionPad();
-    if (!useControllerKataSlice()) {
+    if (!useControllerKataSlice() && !OUTLAW_VEHICLE_MODE) {
       loadArms();
       loadOrcBerserkerEnemy();
       loadNookTtsManifest();
