@@ -16,6 +16,12 @@ import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
 import { buildOpenWorldPlan } from './open-world-plan.js?v=0.1.0';
+import {
+  createOpenWorldRuntimeState,
+  updateOpenWorldRuntimeState,
+  findOpenWorldNodePath,
+  fixtureIndexForWorldNode,
+} from './open-world-runtime.js?v=0.1.0';
 import { generateControllerArena } from './controller-kata.js?v=0.8.222';
 import { applyWorldGridOverlay } from './controller-grid-material.js?v=0.8.214';
 import { evaluateSpawnCandidate as evaluateSpawnAnchorCandidate, findSpawnAnchor as findBestSpawnAnchor } from './spawn-anchor.js?v=0.8.152';
@@ -280,6 +286,7 @@ const roomState = {
   enemyPositions: [],
   districtPlan: null,
   openWorldPlan: null,
+  worldRuntime: null,
   openWorldChunkState: null,
   openWorldChunkUpdateMs: 0,
   gauntletRooms: [],
@@ -3563,6 +3570,8 @@ function playableRoomCount() {
   return Math.max(1, Math.min(PLAYABLE_SLICE_ROOM_COUNT, GENERATED_ROOM_BATCH.length));
 }
 
+// Legacy generated rooms remain a content/regression fixture. Open-world runtime authority
+// lives in world position + semantic world-node IDs, not this array index.
 function playableRoomSpecs() {
   return GENERATED_ROOM_BATCH.slice(0, playableRoomCount());
 }
@@ -5175,15 +5184,20 @@ function buildGeneratedGauntlet(startIndex = 0) {
     });
   }
   createActiveTerrainLayer();
+  const startWorldNode = roomState.openWorldPlan?.nodes?.[startIndex] || roomState.openWorldPlan?.nodes?.[0] || null;
+  const initialWorldPosition = {
+    x: startWorldNode?.position?.[0] || 0,
+    y: startWorldNode?.position?.[1] || 0,
+    z: startWorldNode?.position?.[2] || 0,
+  };
+  roomState.worldRuntime = createOpenWorldRuntimeState(roomState.openWorldPlan, initialWorldPosition);
+  window.__infiniteBrutalityWorldRuntime = roomState.worldRuntime;
   roomState.openWorldChunkState = roomState.terrainLayer.addOpenWorldPlan(roomState.openWorldPlan, {
     cell: 1.8,
     chunkCells: 18,
     loadRadius: 52,
     unloadRadius: 82,
-    initialPosition: {
-      x: roomState.openWorldPlan?.nodes?.[startIndex]?.position?.[0] || 0,
-      z: roomState.openWorldPlan?.nodes?.[startIndex]?.position?.[2] || 0,
-    },
+    initialPosition: initialWorldPosition,
   });
   for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
   for (const room of rawRooms) {
@@ -8282,11 +8296,27 @@ function rebuildEnemyRoute(force = false) {
   const rooms = roomState.gauntletRooms || [];
   const specs = activeRoomSpecs();
   const graph = roomState.navGraph;
-  const enemyRoomIndex = findNearestGauntletRoomIndex(enemy.position);
-  const playerRoomIndex = findNearestGauntletRoomIndex(player.position);
-  nav.lastEnemyRoomIndex = enemyRoomIndex;
-  nav.lastPlayerRoomIndex = playerRoomIndex;
-  nav.routePath = graph ? findRoomTraversalPath(graph, enemyRoomIndex, playerRoomIndex) || [] : [];
+  const worldPath = findOpenWorldNodePath(roomState.openWorldPlan, enemy.position, player.position);
+  nav.lastEnemyWorldNodeId = worldPath.startNodeId;
+  nav.lastPlayerWorldNodeId = worldPath.goalNodeId;
+  nav.worldPathNodeIds = [...worldPath.nodeIds];
+  nav.worldPathEdgeIds = [...worldPath.edgeIds];
+  const enemyRoomIndex = fixtureIndexForWorldNode(roomState.openWorldPlan, worldPath.startNodeId);
+  const playerRoomIndex = fixtureIndexForWorldNode(roomState.openWorldPlan, worldPath.goalNodeId);
+  nav.lastEnemyRoomIndex = enemyRoomIndex; // fixture adapter only
+  nav.lastPlayerRoomIndex = playerRoomIndex; // fixture adapter only
+  nav.routePath = [];
+  if (graph && worldPath.nodeIds.length > 1) {
+    for (let i = 0; i < worldPath.nodeIds.length - 1; i += 1) {
+      const fromIndex = fixtureIndexForWorldNode(roomState.openWorldPlan, worldPath.nodeIds[i]);
+      const toIndex = fixtureIndexForWorldNode(roomState.openWorldPlan, worldPath.nodeIds[i + 1]);
+      const edge = (graph.adjacency?.[fromIndex] || []).find((candidate) => candidate.to === toIndex);
+      if (edge) nav.routePath.push(edge);
+    }
+  }
+  if (!nav.routePath.length && graph && enemyRoomIndex >= 0 && playerRoomIndex >= 0) {
+    nav.routePath = findRoomTraversalPath(graph, enemyRoomIndex, playerRoomIndex) || [];
+  }
 
   if (!rooms.length || enemyRoomIndex < 0 || playerRoomIndex < 0) {
     appendRoutePoint(goal, 'flat');
@@ -9557,6 +9587,8 @@ function updateOpenWorldChunkLifecycle(now = performance.now()) {
   if (!terrain?.updateOpenWorldChunks || !roomState.openWorldPlan) return;
   if (now - roomState.openWorldChunkUpdateMs < 180) return;
   roomState.openWorldChunkUpdateMs = now;
+  roomState.worldRuntime = updateOpenWorldRuntimeState(roomState.worldRuntime, roomState.openWorldPlan, player.position);
+  window.__infiniteBrutalityWorldRuntime = roomState.worldRuntime;
   const state = terrain.updateOpenWorldChunks(player.position, {
     loadRadius: 52,
     unloadRadius: 82,
@@ -9568,6 +9600,9 @@ function updateOpenWorldChunkLifecycle(now = performance.now()) {
     loadedThisUpdate: [...state.loaded],
     unloadedThisUpdate: [...state.unloaded],
     player: [player.position.x, player.position.y, player.position.z],
+    activeWorldNodeId: roomState.worldRuntime?.activeNodeId || null,
+    activeDistrictId: roomState.worldRuntime?.activeDistrictId || null,
+    worldBounds: roomState.worldRuntime?.bounds || null,
   };
 }
 

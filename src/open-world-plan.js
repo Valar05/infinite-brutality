@@ -65,7 +65,8 @@ export function buildOpenWorldPlan({ districtPlan, roomCount, roomSpecAt }) {
     ];
     nodes.push({
       id: 'world-node-' + roomIndex,
-      roomIndex,
+      fixtureRoomIndex: roomIndex,
+      roomIndex, // legacy fixture/content adapter only; runtime authority is world position
       districtId: info.district?.id || 'district-0',
       districtIndex: info.districtIndex,
       localIndex: info.localIndex,
@@ -90,6 +91,8 @@ export function buildOpenWorldPlan({ districtPlan, roomCount, roomSpecAt }) {
       id: 'world-edge-' + edges.length,
       a,
       b,
+      aId: nodes[a].id,
+      bId: nodes[b].id,
       routeRole,
       purpose,
       width: routeRole === 'main' ? 7.0 : 5.4,
