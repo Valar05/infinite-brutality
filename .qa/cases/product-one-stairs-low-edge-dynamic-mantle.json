@@ -143,7 +143,7 @@
     {
       "op": "eq",
       "path": "metrics.randomMantle.contactSource",
-      "value": "cube-12"
+      "value": "cube-13"
     },
     {
       "op": "eq",
