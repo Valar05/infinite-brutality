@@ -11,7 +11,7 @@ import { createMaterialResources } from './materials.js?v=0.8.213';
 import { createEnemyCombatApi } from './enemy-combat.js?v=0.8.128';
 import { createBoundedContactMantlePlan, createPlayerClimbApi } from './player-climb.js?v=0.8.218';
 import { createPhysicsWorld, ensurePhysicsReady } from './physics-world.js?v=0.8.218';
-import { createOutlawVehicle } from './outlaw-vehicle.js?v=0.8.219';
+import { createOutlawVehicle } from './outlaw-vehicle.js?v=0.8.220';
 import { createNookTtsApi } from './nook-tts.js';
 import { queryVoxelIntersectsPrism, queryVoxelTopY } from './island-geometry.js?v=0.8.179';
 import { createTerrainLayer } from './terrain-layer.js?v=0.8.200';
@@ -35,7 +35,7 @@ import {
   createDistrictStoryApi,
 } from './district-plan.js';
 
-const BUILD = '0.8.219';
+const BUILD = '0.8.220';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ACTIVE_SLICE = URL_PARAMS.get('slice') || 'controller_kata';
 const OUTLAW_VEHICLE_MODE = URL_PARAMS.get('vehicle') === 'outlaw';
@@ -9249,6 +9249,7 @@ function setupTouch() {
       event.preventDefault();
     }
     if (event.code === 'KeyF' || event.code === 'Enter') beginAttack();
+    if (event.code === 'KeyC' && OUTLAW_VEHICLE_MODE && outlawVehicle) outlawVehicle.toggleCamera();
     if (event.code === 'KeyW') input.moveY = 1;
     if (event.code === 'KeyS') input.moveY = -1;
     if (event.code === 'KeyA') input.moveX = -1;
@@ -9671,10 +9672,12 @@ async function init() {
         physicsWorld: roomState.physicsWorld,
         input,
         camera,
+        viewState: player,
         spawn: new THREE.Vector3(roomState.spawn.x, vehicleGroundY, roomState.spawn.z),
+        cameraMode: URL_PARAMS.get('vehicleCamera') === 'debug' ? 'debug' : 'cockpit',
         setStatus,
       });
-      hintEl.textContent = 'Drive with WASD or the left touch stick. Forward/reverse on Y, steer on X.';
+      hintEl.textContent = 'Drive with WASD or left stick. Look with mouse/right touch. C toggles wheel debug view.';
       hintEl.style.opacity = '1';
     }
     publishVisualQaBeacon('reset', visualQaBeaconFields());
