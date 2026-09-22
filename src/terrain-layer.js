@@ -8,7 +8,7 @@ import {
   buildSedimentaryMesaMeshData,
   buildSurfaceNetMeshData,
 } from './island-geometry.js?v=0.8.191';
-import { buildOpenWorldTerrainField } from './open-world-field.js?v=0.1.0';
+import { buildOpenWorldTerrainChunks, selectOpenWorldChunkIds } from './open-world-field.js?v=0.2.0';
 
 const TERRAIN_DOWN = new THREE.Vector3(0, -1, 0);
 const terrainSupportRaycaster = new THREE.Raycaster();
@@ -84,6 +84,8 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
   const visualMeshes = [];
   const meshColliders = [];
   const terrainSpecs = [];
+  let openWorldChunks = null;
+  const activeOpenWorldChunks = new Map();
 
   const addCollider = (field, origin, yaw, source, kind, mesh = null) => {
     const collider = {
@@ -222,27 +224,94 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     });
   };
 
+  const removeFieldMeshBySource = (source) => {
+    const colliderIndex = colliders.findIndex((entry) => entry.source === source);
+    if (colliderIndex >= 0) {
+      const collider = colliders[colliderIndex];
+      if (collider.mesh) {
+        const meshIndex = visualMeshes.indexOf(collider.mesh);
+        if (meshIndex >= 0) visualMeshes.splice(meshIndex, 1);
+        const meshColliderIndex = meshColliders.indexOf(collider);
+        if (meshColliderIndex >= 0) meshColliders.splice(meshColliderIndex, 1);
+        const holder = collider.mesh.parent;
+        holder?.parent?.remove(holder);
+        if (holder) disposeObjectTree(holder);
+      }
+      colliders.splice(colliderIndex, 1);
+    }
+    physicsWorld?.removeCollidersBySource?.(source);
+  };
+
+  const updateOpenWorldChunks = (position, options = {}) => {
+    if (!openWorldChunks) return null;
+    const selection = selectOpenWorldChunkIds(openWorldChunks, position, {
+      activeIds: [...activeOpenWorldChunks.keys()],
+      loadRadius: options.loadRadius,
+      unloadRadius: options.unloadRadius,
+    });
+    for (const id of selection.unload) {
+      const active = activeOpenWorldChunks.get(id);
+      if (!active) continue;
+      removeFieldMeshBySource(active.source);
+      activeOpenWorldChunks.delete(id);
+    }
+    for (const id of selection.load) {
+      const chunk = openWorldChunks.chunks.find((entry) => entry.id === id);
+      if (!chunk) continue;
+      const source = 'open-world-chunk:' + chunk.id;
+      const holder = addVoxelField({
+        id: chunk.id,
+        field: chunk.field,
+        rockGrammar: 'open_world_continuous_strata',
+        rockSilhouette: 'tapered_plateaus_with_organic_causeways',
+        imperialFunction: 'continuous_open_world_route_mass',
+        source,
+        kind: 'open_world_terrain_chunk',
+        material: MAT.sedimentaryRockDark,
+      });
+      activeOpenWorldChunks.set(id, { source, holder, chunk });
+    }
+    return {
+      activeIds: [...activeOpenWorldChunks.keys()],
+      loaded: selection.load,
+      unloaded: selection.unload,
+      activeCount: activeOpenWorldChunks.size,
+      totalChunkCount: openWorldChunks.chunks.length,
+      loadRadius: selection.loadRadius,
+      unloadRadius: selection.unloadRadius,
+    };
+  };
+
   const addOpenWorldPlan = (plan, options = {}) => {
     if (!plan?.nodes?.length) return null;
-    const field = buildOpenWorldTerrainField(plan, options);
+    openWorldChunks = buildOpenWorldTerrainChunks(plan, {
+      ...options,
+      isRenderableField: (field) => buildSedimentaryMesaMeshData(field, MAT.sedimentaryRock?.userData?.uvScale ?? 0.072).indices.length > 0,
+    });
+    activeOpenWorldChunks.clear();
     terrainSpecs.push({
-      type: 'openWorldField',
-      id: 'open-world-continuous-field',
+      type: 'openWorldChunks',
+      id: 'open-world-continuous-chunks',
       nodeCount: plan.nodes.length,
       edgeCount: plan.edges?.length || 0,
+      chunkCount: openWorldChunks.chunks.length,
+      chunkWorldSize: openWorldChunks.chunkWorldSize,
       donorLineage: [...(plan.donorLineage || [])],
     });
-    return addVoxelField({
-      id: 'open-world-continuous-field',
-      field,
-      rockGrammar: 'open_world_continuous_strata',
-      rockSilhouette: 'tapered_plateaus_with_organic_causeways',
-      imperialFunction: 'continuous_open_world_route_mass',
-      source: 'open-world-continuous-field',
-      kind: 'open_world_terrain',
-      material: MAT.sedimentaryRockDark,
-    });
+    const initial = options.initialPosition || {
+      x: plan.nodes[0]?.position?.[0] || 0,
+      z: plan.nodes[0]?.position?.[2] || 0,
+    };
+    return updateOpenWorldChunks(initial, options);
   };
+
+  const openWorldChunkSnapshot = () => ({
+    initialized: !!openWorldChunks,
+    totalChunkCount: openWorldChunks?.chunks?.length || 0,
+    activeChunkCount: activeOpenWorldChunks.size,
+    activeIds: [...activeOpenWorldChunks.keys()],
+    chunkWorldSize: openWorldChunks?.chunkWorldSize || 0,
+  });
 
   const supportAt = (x, z, feetY, options = {}) => {
     const radius = options.radius ?? 0.38;
@@ -301,6 +370,8 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     visualMeshes.length = 0;
     meshColliders.length = 0;
     terrainSpecs.length = 0;
+    activeOpenWorldChunks.clear();
+    openWorldChunks = null;
   };
 
   return {
@@ -311,6 +382,8 @@ export function createTerrainLayer({ MAT, hashRoomKey, debugMode = 'visual', phy
     terrainSpecs,
     addVoxelField,
     addOpenWorldPlan,
+    updateOpenWorldChunks,
+    openWorldChunkSnapshot,
     addIslandStamp,
     addBridgeSpan,
     supportAt,

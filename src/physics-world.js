@@ -92,6 +92,27 @@ export function createPhysicsWorld(options = {}) {
     });
   };
 
+  const removeCollidersBySource = (source) => {
+    const cleanSource = String(source || '');
+    if (!cleanSource) return 0;
+    let removed = 0;
+    for (let i = staticColliders.length - 1; i >= 0; i -= 1) {
+      const collider = staticColliders[i];
+      if ((collider?.userData?.source || '') !== cleanSource) continue;
+      const kind = collider?.userData?.kind || 'unknown';
+      world.removeCollider(collider, true);
+      staticColliders.splice(i, 1);
+      colliderRecords.splice(i, 1);
+      if (colliderKinds[kind]) {
+        colliderKinds[kind] -= 1;
+        if (colliderKinds[kind] <= 0) delete colliderKinds[kind];
+      }
+      removed += 1;
+    }
+    if (removed) collidersDirty = true;
+    return removed;
+  };
+
   const addCuboid = ({ size, position, yaw = 0, source = '', kind = 'solid' }) => {
     if (!size || !position) return null;
     const desc = ColliderDesc.cuboid(size[0] * 0.5, size[1] * 0.5, size[2] * 0.5)
@@ -324,6 +345,7 @@ export function createPhysicsWorld(options = {}) {
   return {
     world,
     addTerrainMesh,
+    removeCollidersBySource,
     addCuboid,
     movePlayer,
     getWalkableCuboid,

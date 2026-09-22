@@ -141,3 +141,125 @@ export function buildOpenWorldTerrainField(plan, options = {}) {
   field.openWorldPlan = plan;
   return field;
 }
+
+function copyOpenWorldChunk(source, startX, startZ, endX, endZ) {
+  const halo = 1;
+  const sx0 = Math.max(0, startX - halo);
+  const sz0 = Math.max(0, startZ - halo);
+  const sx1 = Math.min(source.nx, endX + halo);
+  const sz1 = Math.min(source.nz, endZ + halo);
+  const nx = Math.max(1, sx1 - sx0);
+  const ny = source.ny;
+  const nz = Math.max(1, sz1 - sz0);
+  const field = {
+    cell: source.cell,
+    min: {
+      x: source.min.x + sx0 * source.cell,
+      y: source.min.y,
+      z: source.min.z + sz0 * source.cell,
+    },
+    max: {
+      x: source.min.x + sx1 * source.cell,
+      y: source.max.y,
+      z: source.min.z + sz1 * source.cell,
+    },
+    nx,
+    ny,
+    nz,
+    voxels: new Uint8Array(nx * ny * nz),
+    rockGrammar: { ...source.rockGrammar },
+  };
+  let occupied = 0;
+  for (let z = 0; z < nz; z += 1) {
+    for (let y = 0; y < ny; y += 1) {
+      for (let x = 0; x < nx; x += 1) {
+        const sourceX = sx0 + x;
+        const sourceZ = sz0 + z;
+        const value = source.voxels[sourceX + source.nx * (y + source.ny * sourceZ)];
+        field.voxels[x + nx * (y + ny * z)] = value;
+        if (value) occupied += 1;
+      }
+    }
+  }
+  return { field, occupied, sourceBounds: { startX: sx0, endX: sx1, startZ: sz0, endZ: sz1 } };
+}
+
+function chunkHasRenderableCell(field) {
+  for (let z = 0; z < field.nz - 1; z += 1) {
+    for (let y = 0; y < field.ny - 1; y += 1) {
+      for (let x = 0; x < field.nx - 1; x += 1) {
+        let solid = 0;
+        for (let dz = 0; dz <= 1; dz += 1) {
+          for (let dy = 0; dy <= 1; dy += 1) {
+            for (let dx = 0; dx <= 1; dx += 1) {
+              solid += field.voxels[(x + dx) + field.nx * ((y + dy) + field.ny * (z + dz))] ? 1 : 0;
+            }
+          }
+        }
+        if (solid > 0 && solid < 8) return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function buildOpenWorldTerrainChunks(plan, options = {}) {
+  const field = buildOpenWorldTerrainField(plan, options);
+  const chunkCells = Math.max(8, Math.floor(Number(options.chunkCells) || 20));
+  const chunks = [];
+  const chunkCountX = Math.ceil(field.nx / chunkCells);
+  const chunkCountZ = Math.ceil(field.nz / chunkCells);
+  for (let cz = 0; cz < chunkCountZ; cz += 1) {
+    for (let cx = 0; cx < chunkCountX; cx += 1) {
+      const startX = cx * chunkCells;
+      const endX = Math.min(field.nx, startX + chunkCells);
+      const startZ = cz * chunkCells;
+      const endZ = Math.min(field.nz, startZ + chunkCells);
+      const copied = copyOpenWorldChunk(field, startX, startZ, endX, endZ);
+      if (!copied.occupied || !chunkHasRenderableCell(copied.field)) continue;
+      if (options.isRenderableField && !options.isRenderableField(copied.field)) continue;
+      const centerX = field.min.x + (startX + (endX - startX) * 0.5) * field.cell;
+      const centerZ = field.min.z + (startZ + (endZ - startZ) * 0.5) * field.cell;
+      chunks.push({
+        id: 'open-world-chunk-' + cx + '-' + cz,
+        cx,
+        cz,
+        center: [centerX, (field.min.y + field.max.y) * 0.5, centerZ],
+        radius: Math.hypot((endX - startX) * field.cell * 0.5, (endZ - startZ) * field.cell * 0.5),
+        occupiedVoxels: copied.occupied,
+        sourceBounds: copied.sourceBounds,
+        field: copied.field,
+      });
+    }
+  }
+  return {
+    schema: 'infinite-brutality.open-world-chunks.v1',
+    seed: field.openWorldPlan?.seed ?? plan.seed,
+    cell: field.cell,
+    chunkCells,
+    chunkWorldSize: chunkCells * field.cell,
+    bounds: { min: field.min, max: field.max },
+    chunks,
+  };
+}
+
+export function selectOpenWorldChunkIds(chunkSet, position, options = {}) {
+  const loadRadius = Math.max(chunkSet.chunkWorldSize * 0.75, Number(options.loadRadius) || chunkSet.chunkWorldSize * 1.45);
+  const unloadRadius = Math.max(loadRadius, Number(options.unloadRadius) || loadRadius + chunkSet.chunkWorldSize * 0.85);
+  const activeIds = new Set(options.activeIds || []);
+  const load = [];
+  const keep = [];
+  const unload = [];
+  for (const chunk of chunkSet.chunks) {
+    const distance = Math.hypot(position.x - chunk.center[0], position.z - chunk.center[2]);
+    if (distance <= loadRadius + chunk.radius) {
+      keep.push(chunk.id);
+      if (!activeIds.has(chunk.id)) load.push(chunk.id);
+    } else if (activeIds.has(chunk.id) && distance > unloadRadius + chunk.radius) {
+      unload.push(chunk.id);
+    } else if (activeIds.has(chunk.id)) {
+      keep.push(chunk.id);
+    }
+  }
+  return { load, keep, unload, loadRadius, unloadRadius };
+}

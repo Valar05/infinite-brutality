@@ -69,8 +69,9 @@ assert.match(mainSource, /import \{ buildOpenWorldPlan \} from '\.\/open-world-p
 assert.match(mainSource, /roomState\.openWorldPlan = buildOpenWorldPlan\(/);
 assert.match(mainSource, /const worldNode = roomState\.openWorldPlan\?\.nodes\?\.\[index\]/);
 assert.match(mainSource, /terrainLayer\.addOpenWorldPlan\(roomState\.openWorldPlan/);
-assert.match(terrainSource, /buildOpenWorldTerrainField\(plan, options\)/);
-assert.match(terrainSource, /kind: 'open_world_terrain'/);
+assert.match(terrainSource, /buildOpenWorldTerrainChunks\(plan, \{/);
+assert.match(terrainSource, /updateOpenWorldChunks/);
+assert.match(terrainSource, /kind: 'open_world_terrain_chunk'/);
 
 console.log(JSON.stringify({
   ok: true,

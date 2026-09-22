@@ -280,6 +280,8 @@ const roomState = {
   enemyPositions: [],
   districtPlan: null,
   openWorldPlan: null,
+  openWorldChunkState: null,
+  openWorldChunkUpdateMs: 0,
   gauntletRooms: [],
   sliceSpecs: null,
   navGraph: null,
@@ -5173,7 +5175,16 @@ function buildGeneratedGauntlet(startIndex = 0) {
     });
   }
   createActiveTerrainLayer();
-  roomState.terrainLayer.addOpenWorldPlan(roomState.openWorldPlan, { cell: 1.8 });
+  roomState.openWorldChunkState = roomState.terrainLayer.addOpenWorldPlan(roomState.openWorldPlan, {
+    cell: 1.8,
+    chunkCells: 18,
+    loadRadius: 52,
+    unloadRadius: 82,
+    initialPosition: {
+      x: roomState.openWorldPlan?.nodes?.[startIndex]?.position?.[0] || 0,
+      z: roomState.openWorldPlan?.nodes?.[startIndex]?.position?.[2] || 0,
+    },
+  });
   for (const district of districtPlan.districts) districtGeometry.addDistrictSkeletonGeometry(district);
   for (const room of rawRooms) {
     const offset = room.offset;
@@ -9541,6 +9552,25 @@ function updatePlayer(dt) {
   finalizePlayerFrame(dt, now, stickMagnitude);
 }
 
+function updateOpenWorldChunkLifecycle(now = performance.now()) {
+  const terrain = roomState.terrainLayer;
+  if (!terrain?.updateOpenWorldChunks || !roomState.openWorldPlan) return;
+  if (now - roomState.openWorldChunkUpdateMs < 180) return;
+  roomState.openWorldChunkUpdateMs = now;
+  const state = terrain.updateOpenWorldChunks(player.position, {
+    loadRadius: 52,
+    unloadRadius: 82,
+  });
+  if (!state) return;
+  roomState.openWorldChunkState = state;
+  window.__infiniteBrutalityOpenWorldChunks = {
+    ...terrain.openWorldChunkSnapshot(),
+    loadedThisUpdate: [...state.loaded],
+    unloadedThisUpdate: [...state.unloaded],
+    player: [player.position.x, player.position.y, player.position.z],
+  };
+}
+
 function updateArms(dt) {
   if (armsMixer) armsMixer.update(dt);
   player.hurtTimer = Math.max(0, player.hurtTimer - dt);
@@ -9629,6 +9659,7 @@ function render() {
     updateEnemyAttackSweepDebug(realDt);
     const dt = player.hitPause > 0 ? 0 : realDt * combatFx.timeScale;
     updatePlayer(dt);
+    updateOpenWorldChunkLifecycle(frameStart);
     if (!useControllerKataSlice()) {
       updateAttack(dt);
       updateEnemyEngagement(dt);
